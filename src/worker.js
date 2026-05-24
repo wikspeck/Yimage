@@ -211,24 +211,80 @@ function getFileExtension(filename) {
   return parts.length > 1 ? parts.pop() : "";
 }
 
-function validateUploadedImageFile(file, label = "Image") {
+async function detectImageSignature(file) {
+  const headerBuffer = await file.slice(0, 16).arrayBuffer();
+  const bytes = new Uint8Array(headerBuffer);
+
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return "image/jpeg";
+  }
+
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+
+  if (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  ) {
+    return "image/webp";
+  }
+
+  if (
+    bytes.length >= 6 &&
+    bytes[0] === 0x47 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x38 &&
+    (bytes[4] === 0x37 || bytes[4] === 0x39) &&
+    bytes[5] === 0x61
+  ) {
+    return "image/gif";
+  }
+
+  return "";
+}
+
+async function validateUploadedImageFile(file, label = "Image") {
   if (!(file instanceof File)) {
-    return `${label} file is required.`;
+    return "Invalid upload.";
   }
 
   const extension = getFileExtension(file.name);
   const allowedExtensions = ALLOWED_IMAGE_EXTENSIONS[file.type];
 
   if (!ALLOWED_IMAGE_TYPES[file.type] || !allowedExtensions) {
-    return "Only JPG, PNG, WEBP, and GIF images are allowed.";
+    return "Unsupported file type.";
   }
 
   if (!extension || !allowedExtensions.includes(extension)) {
-    return "The file extension does not match an allowed image type.";
+    return "Unsupported file type.";
   }
 
   if (file.size > MAX_FILE_SIZE) {
-    return `${label} must be 10 MB or smaller.`;
+    return "File too large.";
+  }
+
+  const detectedMimeType = await detectImageSignature(file);
+  if (!detectedMimeType || detectedMimeType !== file.type) {
+    return "Invalid upload.";
   }
 
   return "";
@@ -1123,7 +1179,7 @@ async function handleAvatarUpload(request, env) {
   const formData = await request.formData();
   const avatar = formData.get("avatar");
 
-  const avatarValidationMessage = validateUploadedImageFile(avatar, "Avatar image");
+  const avatarValidationMessage = await validateUploadedImageFile(avatar, "Avatar image");
   if (avatarValidationMessage) {
     return fail(avatarValidationMessage);
   }
@@ -1184,7 +1240,7 @@ async function handleCreatePost(request, env) {
   if (description.length > MAX_DESCRIPTION_LENGTH) {
     return fail(`Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`);
   }
-  const imageValidationMessage = validateUploadedImageFile(image, "Image");
+  const imageValidationMessage = await validateUploadedImageFile(image, "Image");
   if (imageValidationMessage) {
     return fail(imageValidationMessage);
   }
