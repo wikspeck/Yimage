@@ -314,14 +314,14 @@ async function getViewerVoteMap(env, userId, postIds) {
 
   const placeholders = postIds.map(() => "?").join(", ");
   const rows = await env.DB.prepare(
-    `SELECT post_id AS postId, vote FROM votes WHERE user_id = ? AND post_id IN (${placeholders})`
+    `SELECT post_id AS postId, value FROM votes WHERE user_id = ? AND post_id IN (${placeholders})`
   )
     .bind(userId, ...postIds)
     .all();
 
   const result = {};
   (rows.results || []).forEach((row) => {
-    result[row.postId] = row.vote;
+    result[row.postId] = Number(row.value) === 1 ? "up" : "down";
   });
   return result;
 }
@@ -658,7 +658,7 @@ async function handleLike(request, env, postId) {
     return fail("Post not found.", 404);
   }
 
-  const existingVote = await env.DB.prepare("SELECT vote FROM votes WHERE user_id = ? AND post_id = ? LIMIT 1")
+  const existingVote = await env.DB.prepare("SELECT id, value FROM votes WHERE user_id = ? AND post_id = ? LIMIT 1")
     .bind(user.id, postId)
     .first();
 
@@ -666,17 +666,17 @@ async function handleLike(request, env, postId) {
   let scoreDelta = 0;
 
   if (!existingVote) {
-    await env.DB.prepare("INSERT INTO votes (post_id, user_id, vote, created_at) VALUES (?, ?, ?, ?)")
-      .bind(postId, user.id, "up", toIsoDate())
+    await env.DB.prepare("INSERT INTO votes (id, post_id, user_id, value, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(createId("vote_"), postId, user.id, 1, toIsoDate(), toIsoDate())
       .run();
     scoreDelta = 1;
-  } else if (existingVote.vote === "up") {
-    await env.DB.prepare("DELETE FROM votes WHERE user_id = ? AND post_id = ?").bind(user.id, postId).run();
+  } else if (Number(existingVote.value) === 1) {
+    await env.DB.prepare("DELETE FROM votes WHERE id = ?").bind(existingVote.id).run();
     scoreDelta = -1;
     finalVote = null;
   } else {
-    await env.DB.prepare("UPDATE votes SET vote = ?, created_at = ? WHERE user_id = ? AND post_id = ?")
-      .bind("up", toIsoDate(), user.id, postId)
+    await env.DB.prepare("UPDATE votes SET value = ?, updated_at = ? WHERE id = ?")
+      .bind(1, toIsoDate(), existingVote.id)
       .run();
     scoreDelta = 2;
   }
@@ -709,25 +709,26 @@ async function handleVote(request, env, postId) {
     return fail("Vote must be up or down.", 400);
   }
 
-  const existingVote = await env.DB.prepare("SELECT vote FROM votes WHERE user_id = ? AND post_id = ? LIMIT 1")
+  const existingVote = await env.DB.prepare("SELECT id, value FROM votes WHERE user_id = ? AND post_id = ? LIMIT 1")
     .bind(user.id, postId)
     .first();
 
   let finalVote = nextVote;
   let scoreDelta = 0;
+  const nextVoteValue = nextVote === "up" ? 1 : -1;
 
   if (!existingVote) {
-    await env.DB.prepare("INSERT INTO votes (post_id, user_id, vote, created_at) VALUES (?, ?, ?, ?)")
-      .bind(postId, user.id, nextVote, toIsoDate())
+    await env.DB.prepare("INSERT INTO votes (id, post_id, user_id, value, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(createId("vote_"), postId, user.id, nextVoteValue, toIsoDate(), toIsoDate())
       .run();
-    scoreDelta = nextVote === "up" ? 1 : -1;
-  } else if (existingVote.vote === nextVote) {
-    await env.DB.prepare("DELETE FROM votes WHERE user_id = ? AND post_id = ?").bind(user.id, postId).run();
+    scoreDelta = nextVoteValue;
+  } else if (Number(existingVote.value) === nextVoteValue) {
+    await env.DB.prepare("DELETE FROM votes WHERE id = ?").bind(existingVote.id).run();
     scoreDelta = nextVote === "up" ? -1 : 1;
     finalVote = null;
   } else {
-    await env.DB.prepare("UPDATE votes SET vote = ?, created_at = ? WHERE user_id = ? AND post_id = ?")
-      .bind(nextVote, toIsoDate(), user.id, postId)
+    await env.DB.prepare("UPDATE votes SET value = ?, updated_at = ? WHERE id = ?")
+      .bind(nextVoteValue, toIsoDate(), existingVote.id)
       .run();
     scoreDelta = nextVote === "up" ? 2 : -2;
   }
