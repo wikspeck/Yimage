@@ -299,10 +299,37 @@ a {
   overflow-x: auto;
 }
 
+.cookie-banner-shell {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.cookie-banner-card {
+  width: min(100%, 920px);
+  border-radius: 22px;
+  background: rgba(5, 5, 5, 0.96);
+  border-color: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
 @media (max-width: 640px) {
   .page-shell,
   .auth-shell {
     padding-top: 20px;
+  }
+
+  .cookie-banner-shell {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
   }
 
   .post-preview-media {

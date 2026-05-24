@@ -2,6 +2,7 @@ import { CssBaseline, CssVarsProvider } from "@mui/joy";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
+import CookieConsentBanner from "./components/CookieConsentBanner";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import CreatePostPage from "./pages/CreatePostPage";
 import DiscoverPage from "./pages/DiscoverPage";
@@ -12,6 +13,7 @@ import SignupPage from "./pages/SignupPage";
 import ModerationPage from "./pages/ModerationPage";
 import CommunityGuidelinesPage from "./pages/CommunityGuidelinesPage";
 import DmcaPage from "./pages/DmcaPage";
+import CookiePolicyPage from "./pages/CookiePolicyPage";
 
 function RequireAuth({ children }) {
   const { user, isLoading } = useAuth();
@@ -79,6 +81,7 @@ function AppRoutes() {
               <Route path="/signup" element={<SignupPage />} />
               <Route path="/guidelines" element={<CommunityGuidelinesPage />} />
               <Route path="/dmca" element={<DmcaPage />} />
+              <Route path="/cookies" element={<CookiePolicyPage />} />
               <Route
                 path="/profile"
                 element={
@@ -100,6 +103,7 @@ function AppRoutes() {
             </Routes>
           </main>
           <Footer />
+          <CookieConsentBanner />
         </div>
       </AuthProvider>
     </BrowserRouter>
