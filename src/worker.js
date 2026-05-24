@@ -42,6 +42,40 @@ const HARASSMENT_TERMS = ["kill yourself", "die", "stupid bitch"];
 const SEXUAL_TERMS = ["porn", "nude", "nsfw", "explicit"];
 const VIOLENCE_TERMS = ["gore", "beheading", "murder"];
 const SPAM_TERMS = ["free money", "buy now", "click here"];
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "script-src 'self' https://challenges.cloudflare.com",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data:",
+  "connect-src 'self' https://challenges.cloudflare.com",
+  "frame-src https://challenges.cloudflare.com"
+].join("; ");
+
+function applySecurityHeaders(response) {
+  const headers = new Headers(response.headers);
+
+  // Restrict what the browser can load while keeping React, API calls, images, and Turnstile working.
+  headers.set("Content-Security-Policy", CONTENT_SECURITY_POLICY);
+  // Prevent embedding Yimage inside iframes to reduce clickjacking risk.
+  headers.set("X-Frame-Options", "DENY");
+  // Limit how much referrer information is sent when users follow external links.
+  headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  // Tell browsers not to guess content types beyond what the server declares.
+  headers.set("X-Content-Type-Options", "nosniff");
+  // Disable browser/device capabilities Yimage does not need.
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=(), accelerometer=(), gyroscope=(), magnetometer=()");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
 
 function json(data, init = {}) {
   const headers = new Headers(init.headers || {});
@@ -1835,98 +1869,101 @@ async function handleAvatar(env, username) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const response = await (async () => {
+      try {
+        if (url.pathname === "/api/health" && request.method === "GET") {
+          return success({ message: "Yimage Worker API is working" });
+        }
+        if (url.pathname === "/api/auth/signup" && request.method === "POST") {
+          return await handleSignup(request, env);
+        }
+        if (url.pathname === "/api/auth/login" && request.method === "POST") {
+          return await handleLogin(request, env);
+        }
+        if (url.pathname === "/api/auth/logout" && request.method === "POST") {
+          return await handleLogout(request, env);
+        }
+        if (url.pathname === "/api/auth/me" && request.method === "GET") {
+          return await handleMe(request, env);
+        }
+        if (url.pathname === "/api/me/profile" && request.method === "PATCH") {
+          return await handleUpdateProfile(request, env);
+        }
+        if (url.pathname === "/api/me/avatar" && request.method === "POST") {
+          return await handleAvatarUpload(request, env);
+        }
+        if (url.pathname === "/api/categories" && request.method === "GET") {
+          return await handleCategoriesList(env);
+        }
+        if (url.pathname === "/api/reports" && request.method === "POST") {
+          return await handleCreateReport(request, env);
+        }
+        if (url.pathname === "/api/mod/reports" && request.method === "GET") {
+          return await handleModerationOverview(request, env);
+        }
+        if (url.pathname === "/api/mod/action" && request.method === "POST") {
+          return await handleModerationAction(request, env);
+        }
+        if ((url.pathname === "/api/upload" || url.pathname === "/api/posts") && request.method === "POST") {
+          return await handleCreatePost(request, env);
+        }
+        if (url.pathname === "/api/posts" && request.method === "GET") {
+          return await handleListPosts(request, env);
+        }
+        if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/vote") && request.method === "POST") {
+          return await handleVote(request, env, url.pathname.split("/")[3]);
+        }
+        if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/repost") && request.method === "POST") {
+          return await handleRepost(request, env, url.pathname.split("/")[3]);
+        }
+        if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/like") && request.method === "POST") {
+          return await handleLike(request, env, url.pathname.split("/")[3]);
+        }
+        if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/comments") && request.method === "GET") {
+          return await handleCommentsList(request, env, url.pathname.split("/")[3]);
+        }
+        if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/comments") && request.method === "POST") {
+          return await handleCommentCreate(request, env, url.pathname.split("/")[3]);
+        }
+        if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/download") && request.method === "GET") {
+          return await handleDownload(env, url.pathname.split("/")[3]);
+        }
+        if (url.pathname.startsWith("/api/posts/") && request.method === "GET") {
+          return await handleGetPost(request, env, url.pathname.replace("/api/posts/", "").trim());
+        }
+        if (url.pathname.startsWith("/api/comments/") && url.pathname.endsWith("/vote") && request.method === "POST") {
+          return await handleCommentVote(request, env, url.pathname.split("/")[3]);
+        }
+        if (url.pathname.startsWith("/api/users/") && url.pathname.endsWith("/follow") && request.method === "POST") {
+          return await handleToggleFollow(request, env, decodeURIComponent(url.pathname.split("/")[3]));
+        }
+        if (url.pathname.startsWith("/api/users/") && url.pathname.endsWith("/avatar") && request.method === "GET") {
+          return await handleAvatar(env, decodeURIComponent(url.pathname.split("/")[3]));
+        }
+        if (url.pathname.startsWith("/api/users/") && request.method === "GET") {
+          return await handleGetProfile(request, env, decodeURIComponent(url.pathname.split("/")[3]));
+        }
+        if (url.pathname.startsWith("/api/image/") && request.method === "GET") {
+          return await handleImage(env, url.pathname.replace("/api/image/", "").trim());
+        }
+        if (url.pathname.startsWith("/api/")) {
+          return fail("API route not found.", 404);
+        }
+        return fail("Not found.", 404);
+      } catch (thrown) {
+        if (thrown instanceof Response) {
+          return thrown;
+        }
 
-    try {
-      if (url.pathname === "/api/health" && request.method === "GET") {
-        return success({ message: "Yimage Worker API is working" });
+        console.error("Unhandled Worker error", {
+          method: request.method,
+          pathname: url.pathname,
+          error: thrown instanceof Error ? thrown.message : String(thrown)
+        });
+        return fail(thrown?.message || "Unexpected server error.", 500);
       }
-      if (url.pathname === "/api/auth/signup" && request.method === "POST") {
-        return await handleSignup(request, env);
-      }
-      if (url.pathname === "/api/auth/login" && request.method === "POST") {
-        return await handleLogin(request, env);
-      }
-      if (url.pathname === "/api/auth/logout" && request.method === "POST") {
-        return await handleLogout(request, env);
-      }
-      if (url.pathname === "/api/auth/me" && request.method === "GET") {
-        return await handleMe(request, env);
-      }
-      if (url.pathname === "/api/me/profile" && request.method === "PATCH") {
-        return await handleUpdateProfile(request, env);
-      }
-      if (url.pathname === "/api/me/avatar" && request.method === "POST") {
-        return await handleAvatarUpload(request, env);
-      }
-      if (url.pathname === "/api/categories" && request.method === "GET") {
-        return await handleCategoriesList(env);
-      }
-      if (url.pathname === "/api/reports" && request.method === "POST") {
-        return await handleCreateReport(request, env);
-      }
-      if (url.pathname === "/api/mod/reports" && request.method === "GET") {
-        return await handleModerationOverview(request, env);
-      }
-      if (url.pathname === "/api/mod/action" && request.method === "POST") {
-        return await handleModerationAction(request, env);
-      }
-      if ((url.pathname === "/api/upload" || url.pathname === "/api/posts") && request.method === "POST") {
-        return await handleCreatePost(request, env);
-      }
-      if (url.pathname === "/api/posts" && request.method === "GET") {
-        return await handleListPosts(request, env);
-      }
-      if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/vote") && request.method === "POST") {
-        return await handleVote(request, env, url.pathname.split("/")[3]);
-      }
-      if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/repost") && request.method === "POST") {
-        return await handleRepost(request, env, url.pathname.split("/")[3]);
-      }
-      if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/like") && request.method === "POST") {
-        return await handleLike(request, env, url.pathname.split("/")[3]);
-      }
-      if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/comments") && request.method === "GET") {
-        return await handleCommentsList(request, env, url.pathname.split("/")[3]);
-      }
-      if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/comments") && request.method === "POST") {
-        return await handleCommentCreate(request, env, url.pathname.split("/")[3]);
-      }
-      if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/download") && request.method === "GET") {
-        return await handleDownload(env, url.pathname.split("/")[3]);
-      }
-      if (url.pathname.startsWith("/api/posts/") && request.method === "GET") {
-        return await handleGetPost(request, env, url.pathname.replace("/api/posts/", "").trim());
-      }
-      if (url.pathname.startsWith("/api/comments/") && url.pathname.endsWith("/vote") && request.method === "POST") {
-        return await handleCommentVote(request, env, url.pathname.split("/")[3]);
-      }
-      if (url.pathname.startsWith("/api/users/") && url.pathname.endsWith("/follow") && request.method === "POST") {
-        return await handleToggleFollow(request, env, decodeURIComponent(url.pathname.split("/")[3]));
-      }
-      if (url.pathname.startsWith("/api/users/") && url.pathname.endsWith("/avatar") && request.method === "GET") {
-        return await handleAvatar(env, decodeURIComponent(url.pathname.split("/")[3]));
-      }
-      if (url.pathname.startsWith("/api/users/") && request.method === "GET") {
-        return await handleGetProfile(request, env, decodeURIComponent(url.pathname.split("/")[3]));
-      }
-      if (url.pathname.startsWith("/api/image/") && request.method === "GET") {
-        return await handleImage(env, url.pathname.replace("/api/image/", "").trim());
-      }
-      if (url.pathname.startsWith("/api/")) {
-        return fail("API route not found.", 404);
-      }
-      return fail("Not found.", 404);
-    } catch (thrown) {
-      if (thrown instanceof Response) {
-        return thrown;
-      }
+    })();
 
-      console.error("Unhandled Worker error", {
-        method: request.method,
-        pathname: url.pathname,
-        error: thrown instanceof Error ? thrown.message : String(thrown)
-      });
-      return fail(thrown?.message || "Unexpected server error.", 500);
-    }
+    return applySecurityHeaders(response);
   }
 };
