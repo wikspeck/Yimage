@@ -204,6 +204,30 @@ export async function toggleFollow(username) {
   return data.profile;
 }
 
+export async function createReport(payload) {
+  return request("/api/reports", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+export async function getModerationReports() {
+  return request("/api/mod/reports");
+}
+
+export async function applyModerationAction(payload) {
+  return request("/api/mod/action", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
 export function getDownloadUrl(id) {
   return `/api/posts/${id}/download`;
 }

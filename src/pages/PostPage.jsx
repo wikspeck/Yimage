@@ -6,6 +6,7 @@ import AuthPromptCard from "../components/AuthPromptCard";
 import BackButton from "../components/BackButton";
 import CommentThread from "../components/CommentThread";
 import PostActionBar from "../components/PostActionBar";
+import ReportDialog from "../components/ReportDialog";
 import { useAuth } from "../context/AuthContext";
 import { formatFullDate, formatRelativeTime } from "../utils/formatters";
 
@@ -14,11 +15,9 @@ function replaceComment(comments, updatedComment) {
     if (comment.id === updatedComment.id) {
       return { ...updatedComment, replies: comment.replies || [] };
     }
-
     if (comment.replies?.length) {
       return { ...comment, replies: replaceComment(comment.replies, updatedComment) };
     }
-
     return comment;
   });
 }
@@ -28,11 +27,9 @@ function appendReply(comments, reply) {
     if (comment.id === reply.parentId) {
       return { ...comment, replies: [...(comment.replies || []), reply] };
     }
-
     if (comment.replies?.length) {
       return { ...comment, replies: appendReply(comment.replies, reply) };
     }
-
     return comment;
   });
 }
@@ -50,6 +47,7 @@ export default function PostPage() {
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [copied, setCopied] = useState(false);
   const [actionNotice, setActionNotice] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -155,17 +153,14 @@ export default function PostPage() {
 
     try {
       if (navigator.share && window.matchMedia("(max-width: 820px)").matches) {
-        await navigator.share({
-          title: post.title,
-          url: link
-        });
+        await navigator.share({ title: post.title, url: link });
         return;
       }
 
       await navigator.clipboard.writeText(link);
       setActionNotice("Copied link to clipboard.");
-    } catch (error) {
-      if (error?.name !== "AbortError") {
+    } catch (shareError) {
+      if (shareError?.name !== "AbortError") {
         setError("Could not share this post.");
       }
     }
@@ -174,10 +169,7 @@ export default function PostPage() {
   async function handleFollowToggle() {
     try {
       const profile = await toggleFollow(post.authorUsername);
-      setPost((current) => ({
-        ...current,
-        authorProfile: profile
-      }));
+      setPost((current) => ({ ...current, authorProfile: profile }));
     } catch (followError) {
       setError(followError.message || "Could not update follow status.");
     }
@@ -227,9 +219,7 @@ export default function PostPage() {
                   {post.title}
                 </Typography>
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
-                  <Typography level="body-sm" textColor="neutral.400">
-                    by
-                  </Typography>
+                  <Typography level="body-sm" textColor="neutral.400">by</Typography>
                   <Link underline="hover" color="neutral" onClick={() => navigate(`/u/${post.authorUsername}`)} sx={{ cursor: "pointer" }}>
                     @{post.authorUsername}
                   </Link>
@@ -250,24 +240,20 @@ export default function PostPage() {
                     </Typography>
                   ))}
                 </Stack>
-                {post.description ? (
-                  <Typography level="body-lg" textColor="neutral.300">
-                    {post.description}
-                  </Typography>
-                ) : null}
+                {post.description ? <Typography level="body-lg" textColor="neutral.300">{post.description}</Typography> : null}
               </Stack>
 
               <PostActionBar
                 post={post}
                 isLoggedIn={Boolean(user)}
                 isBusy={isBusy}
-              onUpvote={() => handleVote("up")}
-              onDownvote={() => handleVote("down")}
-              onRepost={handleRepost}
-              onShare={handleShare}
-              onComment={() => document.getElementById("comments")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
-            />
+                onUpvote={() => handleVote("up")}
+                onDownvote={() => handleVote("down")}
+                onRepost={handleRepost}
+                onShare={handleShare}
+                onComment={() => document.getElementById("comments")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
+              />
 
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap">
                 <Button variant="soft" color="neutral" component="a" href={`https://yimage.org/${post.id}`} sx={{ borderRadius: "999px" }}>
@@ -281,6 +267,9 @@ export default function PostPage() {
                     {post.authorProfile?.isFollowing ? "Unfollow" : "Follow"}
                   </Button>
                 ) : null}
+                <Button variant="plain" color="neutral" onClick={() => setReportOpen(true)} sx={{ borderRadius: "999px" }}>
+                  Report
+                </Button>
               </Stack>
             </Stack>
           </Card>
@@ -320,9 +309,7 @@ export default function PostPage() {
 
             {!comments.length ? (
               <Card variant="outlined" className="content-card">
-                <Typography level="body-md" textColor="neutral.400">
-                  No comments yet.
-                </Typography>
+                <Typography level="body-md" textColor="neutral.400">No comments yet.</Typography>
               </Card>
             ) : (
               comments.map((comment) => (
@@ -338,6 +325,8 @@ export default function PostPage() {
             )}
           </Stack>
         </div>
+
+        <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} targetType="post" targetId={post.id} title="Report post" />
       </Stack>
     </div>
   );

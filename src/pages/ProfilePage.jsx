@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { getUserProfile, toggleFollow } from "../api/yimageApi";
 import BackButton from "../components/BackButton";
 import PostCard from "../components/PostCard";
+import ReportDialog from "../components/ReportDialog";
 import { useAuth } from "../context/AuthContext";
 import { formatFullDate } from "../utils/formatters";
 
@@ -20,6 +21,7 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
+  const [reportOpen, setReportOpen] = useState(false);
   const isOwnProfile = Boolean(user && profile && user.username === profile.username);
 
   useEffect(() => {
@@ -208,6 +210,11 @@ export default function ProfilePage() {
               <Button variant="plain" color="neutral" onClick={handleShareProfile} sx={{ borderRadius: "14px", alignSelf: "flex-start" }}>
                 Share profile
               </Button>
+              {!isOwnProfile ? (
+                <Button variant="plain" color="neutral" onClick={() => setReportOpen(true)} sx={{ borderRadius: "14px", alignSelf: "flex-start" }}>
+                  Report profile
+                </Button>
+              ) : null}
             </Stack>
           </Stack>
         </Card>
@@ -261,6 +268,7 @@ export default function ProfilePage() {
             />
           ))}
         </Stack>
+        <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} targetType="user" targetId={profile.id} title="Report profile" />
       </Stack>
     </div>
   );

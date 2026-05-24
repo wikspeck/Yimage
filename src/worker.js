@@ -14,6 +14,28 @@ const SESSION_COOKIE = "yimage_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const POST_ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const PBKDF2_ITERATIONS = 100000;
+const REPORT_REASONS = new Set([
+  "spam",
+  "harassment",
+  "illegal content",
+  "sexual content",
+  "violence",
+  "hate speech",
+  "copyright violation",
+  "other"
+]);
+const MODERATION_STATES = {
+  ACTIVE: "active",
+  UNDER_REVIEW: "under_review",
+  HIDDEN: "hidden",
+  REMOVED: "removed",
+  SUSPENDED: "suspended"
+};
+const OFFENSIVE_TERMS = ["nazi", "hitler", "kkk", "slur", "terrorist"];
+const HARASSMENT_TERMS = ["kill yourself", "die", "stupid bitch"];
+const SEXUAL_TERMS = ["porn", "nude", "nsfw", "explicit"];
+const VIOLENCE_TERMS = ["gore", "beheading", "murder"];
+const SPAM_TERMS = ["free money", "buy now", "click here"];
 
 function json(data, init = {}) {
   const headers = new Headers(init.headers || {});
@@ -92,6 +114,43 @@ function parseHashtags(value) {
   return [...new Set(matches)].slice(0, 12);
 }
 
+function textContainsAny(value, terms) {
+  const normalized = normalizeText(value).toLowerCase();
+  return terms.some((term) => normalized.includes(term));
+}
+
+function assessSafetyRisk({ username = "", displayName = "", title = "", description = "", text = "", bio = "" }) {
+  const combined = [username, displayName, title, description, text, bio].filter(Boolean).join(" \n ");
+  let riskScore = 0;
+  const categories = [];
+
+  if (textContainsAny(combined, OFFENSIVE_TERMS)) {
+    riskScore += 6;
+    categories.push("hate_speech");
+  }
+  if (textContainsAny(combined, HARASSMENT_TERMS)) {
+    riskScore += 4;
+    categories.push("harassment");
+  }
+  if (textContainsAny(combined, SEXUAL_TERMS)) {
+    riskScore += 4;
+    categories.push("sexual_content");
+  }
+  if (textContainsAny(combined, VIOLENCE_TERMS)) {
+    riskScore += 4;
+    categories.push("violence");
+  }
+  if (textContainsAny(combined, SPAM_TERMS)) {
+    riskScore += 3;
+    categories.push("spam");
+  }
+
+  return {
+    riskScore,
+    categories: [...new Set(categories)]
+  };
+}
+
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -137,7 +196,9 @@ function toPublicUser(user) {
     createdAt: user.createdAt,
     displayName: user.displayName || "",
     bio: user.bio || "",
-    avatarUrl: user.avatarUrl || ""
+    avatarUrl: user.avatarUrl || "",
+    isAdmin: Boolean(user.isAdmin),
+    moderationStatus: user.moderationStatus || MODERATION_STATES.ACTIVE
   };
 }
 
@@ -288,7 +349,9 @@ async function getCurrentUser(request, env) {
         users.created_at AS createdAt,
         COALESCE(users.display_name, '') AS displayName,
         COALESCE(users.bio, '') AS bio,
-        COALESCE(users.avatar_url, '') AS avatarUrl
+        COALESCE(users.avatar_url, '') AS avatarUrl,
+        COALESCE(users.is_admin, 0) AS isAdmin,
+        COALESCE(users.moderation_status, 'active') AS moderationStatus
       FROM sessions
       INNER JOIN users ON users.id = sessions.user_id
       WHERE sessions.token_hash = ?
@@ -314,6 +377,17 @@ async function requireUser(request, env) {
   const user = await getCurrentUser(request, env);
   if (!user) {
     throw fail("You must be logged in to do that.", 401);
+  }
+  if (user.moderationStatus === MODERATION_STATES.SUSPENDED) {
+    throw fail("Your account is suspended.", 403);
+  }
+  return user;
+}
+
+async function requireModerator(request, env) {
+  const user = await requireUser(request, env);
+  if (!user.isAdmin) {
+    throw fail("Moderator access required.", 403);
   }
   return user;
 }
@@ -348,7 +422,82 @@ async function getPostHashtagsMap(env, postIds) {
   return result;
 }
 
-async function getPostRecord(env, postId) {
+async function createSafetyFlag(env, { userId = null, targetType, targetId, source, category, riskScore, details = "" }) {
+  await env.DB.prepare(
+    "INSERT INTO user_safety_flags (id, user_id, target_type, target_id, source, category, risk_score, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  )
+    .bind(createId("flag_"), userId, targetType, targetId, source, category, riskScore, details, toIsoDate())
+    .run();
+}
+
+async function applyModerationRisk(env, targetType, targetId, riskScore) {
+  if (!riskScore) {
+    return;
+  }
+
+  if (targetType === "post") {
+    await env.DB.prepare(
+      `UPDATE posts
+       SET moderation_risk_score = COALESCE(moderation_risk_score, 0) + ?,
+           moderation_status = CASE
+             WHEN COALESCE(moderation_risk_score, 0) + ? >= 8 THEN 'hidden'
+             WHEN COALESCE(moderation_risk_score, 0) + ? >= 3 AND moderation_status = 'active' THEN 'under_review'
+             ELSE moderation_status
+           END
+       WHERE id = ?`
+    )
+      .bind(riskScore, riskScore, riskScore, targetId)
+      .run();
+  }
+
+  if (targetType === "comment") {
+    await env.DB.prepare(
+      `UPDATE comments
+       SET moderation_risk_score = COALESCE(moderation_risk_score, 0) + ?,
+           moderation_status = CASE
+             WHEN COALESCE(moderation_risk_score, 0) + ? >= 8 THEN 'hidden'
+             WHEN COALESCE(moderation_risk_score, 0) + ? >= 3 AND moderation_status = 'active' THEN 'under_review'
+             ELSE moderation_status
+           END
+       WHERE id = ?`
+    )
+      .bind(riskScore, riskScore, riskScore, targetId)
+      .run();
+  }
+
+  if (targetType === "user") {
+    await env.DB.prepare(
+      `UPDATE users
+       SET moderation_risk_score = COALESCE(moderation_risk_score, 0) + ?,
+           moderation_status = CASE
+             WHEN COALESCE(moderation_risk_score, 0) + ? >= 8 THEN 'under_review'
+             ELSE moderation_status
+           END
+       WHERE id = ?`
+    )
+      .bind(riskScore, riskScore, targetId)
+      .run();
+  }
+}
+
+async function runSafetyAssessment(env, input) {
+  const assessment = assessSafetyRisk(input);
+  for (const category of assessment.categories) {
+    await createSafetyFlag(env, {
+      userId: input.userId || null,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      source: "heuristic_v1",
+      category,
+      riskScore: assessment.riskScore,
+      details: "Automatic text screening match"
+    });
+  }
+  await applyModerationRisk(env, input.targetType, input.targetId, assessment.riskScore);
+  return assessment;
+}
+
+async function getPostRecord(env, postId, includeModerated = false) {
   const row = await env.DB.prepare(
     `
       SELECT
@@ -365,6 +514,7 @@ async function getPostRecord(env, postId) {
         COALESCE(posts.comments_count, 0) AS commentsCount,
         COALESCE(posts.views, 0) AS views,
         COALESCE(posts.repost_count, 0) AS repostCount,
+        COALESCE(posts.moderation_status, 'active') AS moderationStatus,
         posts.category_id AS categoryId,
         categories.slug AS categorySlug,
         categories.label AS categoryLabel
@@ -372,6 +522,7 @@ async function getPostRecord(env, postId) {
       INNER JOIN users ON users.id = posts.author_id
       LEFT JOIN categories ON categories.id = posts.category_id
       WHERE posts.id = ?
+      ${includeModerated ? "" : "AND COALESCE(posts.moderation_status, 'active') NOT IN ('hidden', 'removed')"}
       LIMIT 1
     `
   )
@@ -488,8 +639,13 @@ async function listPosts(env, userId, options = {}) {
   const creatorQuery = searchQuery.replace(/^@+/, "");
   const category = normalizeText(options.category).toLowerCase();
   const hashtag = normalizeHashtag(options.hashtag);
+  const includeModerated = Boolean(options.includeModerated);
   const conditions = [];
   const bindings = [];
+
+  if (!includeModerated) {
+    conditions.push("COALESCE(posts.moderation_status, 'active') NOT IN ('hidden', 'removed')");
+  }
 
   if (searchQuery) {
     const likeValue = `%${searchQuery}%`;
@@ -554,6 +710,7 @@ async function listPosts(env, userId, options = {}) {
         COALESCE(posts.comments_count, 0) AS commentsCount,
         COALESCE(posts.views, 0) AS views,
         COALESCE(posts.repost_count, 0) AS repostCount,
+        COALESCE(posts.moderation_status, 'active') AS moderationStatus,
         posts.category_id AS categoryId,
         categories.slug AS categorySlug,
         categories.label AS categoryLabel
@@ -601,9 +758,13 @@ async function handleSignup(request, env) {
   const username = normalizeUsername(body.username);
   const email = normalizeEmail(body.email);
   const password = String(body.password || "");
+  const usernameSafety = assessSafetyRisk({ username });
 
   if (!isValidUsername(username)) {
     return fail("Username must be 3 to 24 characters and use only letters, numbers, or underscores.");
+  }
+  if (usernameSafety.riskScore >= 6) {
+    return fail("That username is not allowed.");
   }
   if (!isValidEmail(email)) {
     return fail("Please enter a valid email address.");
@@ -632,7 +793,7 @@ async function handleSignup(request, env) {
 
   return success(
     {
-      user: toPublicUser({ id: userId, username, email, createdAt, displayName: username, bio: "", avatarUrl: "" })
+      user: toPublicUser({ id: userId, username, email, createdAt, displayName: username, bio: "", avatarUrl: "", isAdmin: 0, moderationStatus: "active" })
     },
     {
       status: 201,
@@ -662,7 +823,9 @@ async function handleLogin(request, env) {
         created_at AS createdAt,
         COALESCE(display_name, '') AS displayName,
         COALESCE(bio, '') AS bio,
-        COALESCE(avatar_url, '') AS avatarUrl
+        COALESCE(avatar_url, '') AS avatarUrl,
+        COALESCE(is_admin, 0) AS isAdmin,
+        COALESCE(moderation_status, 'active') AS moderationStatus
       FROM users
       WHERE email = ?
       LIMIT 1
@@ -714,14 +877,25 @@ async function handleUpdateProfile(request, env) {
   const displayName = normalizeText(body.displayName).slice(0, 60);
   const bio = normalizeText(body.bio).slice(0, MAX_BIO_LENGTH);
   const avatarUrl = normalizeOptionalUrl(body.avatarUrl);
+  const profileSafety = assessSafetyRisk({ displayName, bio });
 
   if (body.avatarUrl && !avatarUrl) {
     return fail("Avatar URL must be empty, root-relative, or start with http/https.");
+  }
+  if (profileSafety.riskScore >= 6) {
+    return fail("That profile information is not allowed.");
   }
 
   await env.DB.prepare("UPDATE users SET display_name = ?, bio = ?, avatar_url = ? WHERE id = ?")
     .bind(displayName, bio, avatarUrl, user.id)
     .run();
+  await runSafetyAssessment(env, {
+    userId: user.id,
+    targetType: "user",
+    targetId: user.id,
+    displayName,
+    bio
+  });
 
   const updatedUser = await env.DB.prepare(
     `
@@ -825,6 +999,13 @@ async function handleCreatePost(request, env) {
     .run();
 
   await syncPostHashtags(env, postId, hashtags);
+  await runSafetyAssessment(env, {
+    userId: user.id,
+    targetType: "post",
+    targetId: postId,
+    title,
+    description
+  });
   const post = await getPostRecord(env, postId);
 
   return success({ post: toPostResponse(post) }, { status: 201 });
@@ -983,6 +1164,7 @@ async function handleCommentsList(request, env, postId) {
       FROM comments
       INNER JOIN users ON users.id = comments.author_id
       WHERE comments.post_id = ?
+        AND COALESCE(comments.moderation_status, 'active') NOT IN ('hidden', 'removed')
       ORDER BY comments.created_at ASC, comments.id ASC
     `
   )
@@ -1038,6 +1220,12 @@ async function handleCommentCreate(request, env, postId) {
   await env.DB.prepare("INSERT INTO comments (id, post_id, parent_id, author_id, text, created_at, score) VALUES (?, ?, ?, ?, ?, ?, 0)")
     .bind(comment.id, comment.postId, comment.parentId, comment.authorId, comment.text, comment.createdAt)
     .run();
+  await runSafetyAssessment(env, {
+    userId: user.id,
+    targetType: "comment",
+    targetId: comment.id,
+    text
+  });
 
   await env.DB.prepare("UPDATE posts SET comments_count = COALESCE(comments_count, 0) + 1 WHERE id = ?").bind(postId).run();
   return success({ comment: toCommentResponse(comment) }, { status: 201 });
@@ -1093,6 +1281,174 @@ async function handleCommentVote(request, env, commentId) {
 async function handleCategoriesList(env) {
   const categories = await listCategories(env);
   return success({ categories });
+}
+
+async function handleCreateReport(request, env) {
+  const reporter = await getCurrentUser(request, env);
+  const body = await parseJsonBody(request);
+  const targetType = normalizeText(body.targetType);
+  const targetId = normalizeText(body.targetId);
+  const reason = normalizeText(body.reason).toLowerCase();
+  const details = normalizeText(body.details).slice(0, 1000);
+
+  if (!["post", "comment", "user"].includes(targetType)) {
+    return fail("Invalid report target.");
+  }
+  if (!targetId) {
+    return fail("Report target is required.");
+  }
+  if (!REPORT_REASONS.has(reason)) {
+    return fail("Invalid report reason.");
+  }
+
+  if (targetType === "post") {
+    const post = await env.DB.prepare("SELECT id FROM posts WHERE id = ? LIMIT 1").bind(targetId).first();
+    if (!post) {
+      return fail("Post not found.", 404);
+    }
+  }
+  if (targetType === "comment") {
+    const comment = await env.DB.prepare("SELECT id FROM comments WHERE id = ? LIMIT 1").bind(targetId).first();
+    if (!comment) {
+      return fail("Comment not found.", 404);
+    }
+  }
+  if (targetType === "user") {
+    const reportedUser = await env.DB.prepare("SELECT id FROM users WHERE id = ? OR username = ? LIMIT 1").bind(targetId, targetId).first();
+    if (!reportedUser) {
+      return fail("User not found.", 404);
+    }
+  }
+
+  const reportId = createId("report_");
+  await env.DB.prepare(
+    "INSERT INTO reports (id, reporter_id, target_type, target_id, reason, details, created_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'open')"
+  )
+    .bind(reportId, reporter?.id || null, targetType, targetId, reason, details, toIsoDate())
+    .run();
+
+  if (reason === "copyright violation") {
+    await env.DB.prepare(
+      "INSERT INTO copyright_reports (id, report_id, claimant_name, claimant_email, copyright_description, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    )
+      .bind(
+        createId("dmca_"),
+        reportId,
+        normalizeText(body.claimantName).slice(0, 120),
+        normalizeEmail(body.claimantEmail).slice(0, 160),
+        normalizeText(body.copyrightDescription).slice(0, 1000),
+        toIsoDate()
+      )
+      .run();
+  }
+
+  const reportRisk = reason === "copyright violation" ? 2 : reason === "illegal content" ? 5 : reason === "hate speech" ? 5 : 3;
+  await createSafetyFlag(env, {
+    userId: reporter?.id || null,
+    targetType,
+    targetId,
+    source: "user_report",
+    category: reason.replace(/\s+/g, "_"),
+    riskScore: reportRisk,
+    details: details || "User report"
+  });
+  await applyModerationRisk(env, targetType, targetId, reportRisk);
+
+  return success({ message: "Report submitted." }, { status: 201 });
+}
+
+async function handleModerationOverview(request, env) {
+  await requireModerator(request, env);
+  const rows = await env.DB.prepare(
+    `
+      SELECT
+        reports.target_type AS targetType,
+        reports.target_id AS targetId,
+        reports.reason,
+        COUNT(*) AS reportCount,
+        MAX(reports.created_at) AS latestReportAt,
+        GROUP_CONCAT(DISTINCT reports.reason) AS reasons
+      FROM reports
+      WHERE reports.status = 'open'
+      GROUP BY reports.target_type, reports.target_id, reports.reason
+      ORDER BY latestReportAt DESC
+      LIMIT 200
+    `
+  ).all();
+
+  const warningsRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_warnings").first();
+  const suspensionsRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_suspensions WHERE lifted_at IS NULL").first();
+
+  return success({
+    reports: rows.results || [],
+    totals: {
+      warnings: Number(warningsRow?.count || 0),
+      activeSuspensions: Number(suspensionsRow?.count || 0)
+    }
+  });
+}
+
+async function handleModerationAction(request, env) {
+  const moderator = await requireModerator(request, env);
+  const body = await parseJsonBody(request);
+  const targetType = normalizeText(body.targetType);
+  const targetId = normalizeText(body.targetId);
+  const action = normalizeText(body.action);
+  const notes = normalizeText(body.notes).slice(0, 1000);
+
+  if (!["post", "comment", "user"].includes(targetType)) {
+    return fail("Invalid moderation target.");
+  }
+  if (!["under_review", "hide", "restore", "remove", "warn", "suspend"].includes(action)) {
+    return fail("Invalid moderation action.");
+  }
+
+  await env.DB.prepare(
+    "INSERT INTO moderation_actions (id, moderator_id, target_type, target_id, action, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  )
+    .bind(createId("mod_"), moderator.id, targetType, targetId, action, notes, toIsoDate())
+    .run();
+
+  if (targetType === "post") {
+    const nextStatus = action === "hide" ? MODERATION_STATES.HIDDEN : action === "restore" ? MODERATION_STATES.ACTIVE : action === "remove" ? MODERATION_STATES.REMOVED : action === "under_review" ? MODERATION_STATES.UNDER_REVIEW : null;
+    if (nextStatus) {
+      await env.DB.prepare("UPDATE posts SET moderation_status = ? WHERE id = ?").bind(nextStatus, targetId).run();
+    }
+  }
+
+  if (targetType === "comment") {
+    const nextStatus = action === "hide" ? MODERATION_STATES.HIDDEN : action === "restore" ? MODERATION_STATES.ACTIVE : action === "remove" ? MODERATION_STATES.REMOVED : action === "under_review" ? MODERATION_STATES.UNDER_REVIEW : null;
+    if (nextStatus) {
+      await env.DB.prepare("UPDATE comments SET moderation_status = ? WHERE id = ?").bind(nextStatus, targetId).run();
+    }
+  }
+
+  if (targetType === "user") {
+    if (action === "warn") {
+      await env.DB.prepare("INSERT INTO user_warnings (id, user_id, moderator_id, reason, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(createId("warn_"), targetId, moderator.id, notes || "Moderator warning", notes, toIsoDate())
+        .run();
+    }
+    if (action === "suspend") {
+      await env.DB.prepare("INSERT INTO user_suspensions (id, user_id, moderator_id, reason, notes, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+        .bind(createId("susp_"), targetId, moderator.id, notes || "Moderator suspension", notes, toIsoDate())
+        .run();
+      await env.DB.prepare("UPDATE users SET moderation_status = ? WHERE id = ?").bind(MODERATION_STATES.SUSPENDED, targetId).run();
+    }
+    if (action === "restore") {
+      await env.DB.prepare("UPDATE users SET moderation_status = ? WHERE id = ?").bind(MODERATION_STATES.ACTIVE, targetId).run();
+      await env.DB.prepare("UPDATE user_suspensions SET lifted_at = ? WHERE user_id = ? AND lifted_at IS NULL").bind(toIsoDate(), targetId).run();
+    }
+    if (action === "under_review") {
+      await env.DB.prepare("UPDATE users SET moderation_status = ? WHERE id = ?").bind(MODERATION_STATES.UNDER_REVIEW, targetId).run();
+    }
+  }
+
+  await env.DB.prepare("UPDATE reports SET status = 'reviewed' WHERE target_type = ? AND target_id = ? AND status = 'open'")
+    .bind(targetType, targetId)
+    .run();
+
+  return success({ message: "Moderation action applied." });
 }
 
 async function handleGetProfile(request, env, username) {
@@ -1162,6 +1518,7 @@ async function handleGetProfile(request, env, username) {
       INNER JOIN users ON users.id = posts.author_id
       LEFT JOIN categories ON categories.id = posts.category_id
       WHERE posts.author_id = ?
+        AND COALESCE(posts.moderation_status, 'active') NOT IN ('hidden', 'removed')
       ORDER BY posts.created_at DESC, posts.id DESC
       LIMIT 50
     `
@@ -1332,6 +1689,15 @@ export default {
       }
       if (url.pathname === "/api/categories" && request.method === "GET") {
         return await handleCategoriesList(env);
+      }
+      if (url.pathname === "/api/reports" && request.method === "POST") {
+        return await handleCreateReport(request, env);
+      }
+      if (url.pathname === "/api/mod/reports" && request.method === "GET") {
+        return await handleModerationOverview(request, env);
+      }
+      if (url.pathname === "/api/mod/action" && request.method === "POST") {
+        return await handleModerationAction(request, env);
       }
       if ((url.pathname === "/api/upload" || url.pathname === "/api/posts") && request.method === "POST") {
         return await handleCreatePost(request, env);

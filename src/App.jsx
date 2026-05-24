@@ -9,6 +9,9 @@ import LoginPage from "./pages/LoginPage";
 import PostPage from "./pages/PostPage";
 import ProfilePage from "./pages/ProfilePage";
 import SignupPage from "./pages/SignupPage";
+import ModerationPage from "./pages/ModerationPage";
+import CommunityGuidelinesPage from "./pages/CommunityGuidelinesPage";
+import DmcaPage from "./pages/DmcaPage";
 
 function RequireAuth({ children }) {
   const { user, isLoading } = useAuth();
@@ -20,6 +23,20 @@ function RequireAuth({ children }) {
 
   if (!user) {
     return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
+  }
+
+  return children;
+}
+
+function RequireModerator({ children }) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (!user?.isAdmin) {
+    return <Navigate to="/" replace />;
   }
 
   return children;
@@ -60,12 +77,22 @@ function AppRoutes() {
               />
               <Route path="/login" element={<LoginPage />} />
               <Route path="/signup" element={<SignupPage />} />
+              <Route path="/guidelines" element={<CommunityGuidelinesPage />} />
+              <Route path="/dmca" element={<DmcaPage />} />
               <Route
                 path="/profile"
                 element={
                   <RequireAuth>
                     <NavigateToOwnProfile />
                   </RequireAuth>
+                }
+              />
+              <Route
+                path="/moderation"
+                element={
+                  <RequireModerator>
+                    <ModerationPage />
+                  </RequireModerator>
                 }
               />
               <Route path="/u/:username" element={<ProfilePage />} />

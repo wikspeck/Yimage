@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button, Card, Stack, Textarea, Typography } from "@mui/joy";
 import { formatRelativeTime } from "../utils/formatters";
+import ReportDialog from "./ReportDialog";
 
 function VotePill({ active = false, children, onClick, label }) {
   return (
@@ -17,15 +18,9 @@ function VotePill({ active = false, children, onClick, label }) {
   );
 }
 
-function CommentNode({
-  comment,
-  isLoggedIn,
-  onRequireLogin,
-  onReply,
-  onVote,
-  depth = 0
-}) {
+function CommentNode({ comment, isLoggedIn, onRequireLogin, onReply, onVote, depth = 0 }) {
   const [replyOpen, setReplyOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -87,6 +82,9 @@ function CommentNode({
             >
               Reply
             </Button>
+            <Button size="sm" variant="plain" color="neutral" onClick={() => setReportOpen(true)} sx={{ borderRadius: "999px" }}>
+              Report
+            </Button>
           </Stack>
 
           {replyOpen ? (
@@ -112,6 +110,8 @@ function CommentNode({
           ) : null}
         </Stack>
       </Card>
+
+      <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} targetType="comment" targetId={comment.id} title="Report comment" />
 
       {comment.replies?.length
         ? comment.replies.map((reply) => (
