@@ -36,7 +36,10 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onDiscover
               width: { xs: 34, sm: 40 },
               height: { xs: 34, sm: 40 },
               borderRadius: "12px",
-              objectFit: "cover",
+              aspectRatio: "1 / 1",
+              objectFit: "contain",
+              objectPosition: "center",
+              backgroundColor: "#000000",
               flexShrink: 0
             }}
           />
