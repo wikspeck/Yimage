@@ -150,6 +150,27 @@ export default function PostPage() {
     window.setTimeout(() => setCopied(false), 1600);
   }
 
+  async function handleShare() {
+    const link = window.location.href;
+
+    try {
+      if (navigator.share && window.matchMedia("(max-width: 820px)").matches) {
+        await navigator.share({
+          title: post.title,
+          url: link
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(link);
+      setActionNotice("Copied link to clipboard.");
+    } catch (error) {
+      if (error?.name !== "AbortError") {
+        setError("Could not share this post.");
+      }
+    }
+  }
+
   async function handleFollowToggle() {
     try {
       const profile = await toggleFollow(post.authorUsername);
@@ -240,12 +261,13 @@ export default function PostPage() {
                 post={post}
                 isLoggedIn={Boolean(user)}
                 isBusy={isBusy}
-                onUpvote={() => handleVote("up")}
-                onDownvote={() => handleVote("down")}
-                onRepost={handleRepost}
-                onComment={() => document.getElementById("comments")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
-              />
+              onUpvote={() => handleVote("up")}
+              onDownvote={() => handleVote("down")}
+              onRepost={handleRepost}
+              onShare={handleShare}
+              onComment={() => document.getElementById("comments")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
+            />
 
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap">
                 <Button variant="soft" color="neutral" component="a" href={`https://yimage.org/${post.id}`} sx={{ borderRadius: "999px" }}>

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { getCurrentUser, loginUser, logoutUser, signupUser } from "../api/yimageApi";
+import { getCurrentUser, loginUser, logoutUser, signupUser, updateProfile as updateProfileRequest } from "../api/yimageApi";
 
 const AuthContext = createContext(null);
 
@@ -51,6 +51,11 @@ export function AuthProvider({ children }) {
       async logout() {
         await logoutUser();
         setUser(null);
+      },
+      async updateProfile(payload) {
+        const nextUser = await updateProfileRequest(payload);
+        setUser(nextUser);
+        return nextUser;
       },
       setUser
     }),

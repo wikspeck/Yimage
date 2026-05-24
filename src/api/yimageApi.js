@@ -112,6 +112,18 @@ export async function getCurrentUser() {
   return data.user;
 }
 
+export async function updateProfile({ displayName, bio, avatarUrl }) {
+  const data = await request("/api/me/profile", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ displayName, bio, avatarUrl })
+  });
+
+  return data.user;
+}
+
 export async function likePost(id) {
   const data = await request(`/api/posts/${id}/like`, {
     method: "POST"

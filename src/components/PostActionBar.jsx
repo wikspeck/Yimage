@@ -74,6 +74,16 @@ function SaveIcon() {
   );
 }
 
+function ShareIcon() {
+  return (
+    <Icon>
+      <path d="M8 12h8" />
+      <path d="M12 8l4 4-4 4" />
+      <path d="M7 18H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h1" />
+    </Icon>
+  );
+}
+
 export default function PostActionBar({
   post,
   isLoggedIn,
@@ -81,6 +91,7 @@ export default function PostActionBar({
   onUpvote,
   onDownvote,
   onRepost,
+  onShare,
   onComment,
   onRequireLogin
 }) {
@@ -133,6 +144,16 @@ export default function PostActionBar({
             aria-label="Comments"
           >
             <CommentIcon />
+          </Button>
+          <Button
+            size="sm"
+            variant="plain"
+            color="neutral"
+            onClick={() => onShare?.()}
+            className="icon-button"
+            aria-label="Share"
+          >
+            <ShareIcon />
           </Button>
           <Button
             size="sm"

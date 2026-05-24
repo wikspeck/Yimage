@@ -127,6 +127,27 @@ export default function DiscoverPage() {
     }
   }
 
+  async function handleShare(postId) {
+    const link = `${window.location.origin}/${postId}`;
+
+    try {
+      if (navigator.share && window.matchMedia("(max-width: 820px)").matches) {
+        await navigator.share({
+          title: "Yimage post",
+          url: link
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(link);
+      setNotice("Copied link to clipboard.");
+    } catch (error) {
+      if (error?.name !== "AbortError") {
+        setPostsError("Could not share this post.");
+      }
+    }
+  }
+
   return (
     <Box className="page-shell">
       <Stack spacing={3}>
@@ -150,7 +171,7 @@ export default function DiscoverPage() {
                 value={selectedCategory}
                 onChange={(_, value) => updateFilters({ category: value || "" })}
                 placeholder="All categories"
-                sx={{ minWidth: { xs: "100%", md: 180 }, borderRadius: "999px" }}
+                sx={{ minWidth: { xs: "100%", md: 180 }, borderRadius: "14px" }}
               >
                 <Option value="">All categories</Option>
                 {categories.map((category) => (
@@ -212,6 +233,7 @@ export default function DiscoverPage() {
               onUpvote={() => handleVote(post.id, "up")}
               onDownvote={() => handleVote(post.id, "down")}
               onRepost={() => handleRepost(post.id)}
+              onShare={() => handleShare(post.id)}
               onHashtagClick={(tag) => {
                 setSearchText(`#${tag}`);
                 updateFilters({ hashtag: tag, query: "" });

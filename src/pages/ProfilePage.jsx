@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, CircularProgress, Stack, Typography } from "@mui/joy";
+import { Alert, Avatar, Button, Card, CircularProgress, Input, Stack, Textarea, Typography } from "@mui/joy";
 import { useNavigate, useParams } from "react-router-dom";
 import { getUserProfile, toggleFollow } from "../api/yimageApi";
 import BackButton from "../components/BackButton";
@@ -9,14 +9,18 @@ import { formatFullDate } from "../utils/formatters";
 
 export default function ProfilePage() {
   const { username: routeUsername } = useParams();
-  const { user } = useAuth();
+  const { user, updateProfile } = useAuth();
   const navigate = useNavigate();
   const username = routeUsername || user?.username;
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [busyPostId, setBusyPostId] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const isOwnProfile = Boolean(user && profile && user.username === profile.username);
 
   useEffect(() => {
     let isMounted = true;
@@ -34,6 +38,9 @@ export default function ProfilePage() {
         if (isMounted) {
           setProfile(result.profile);
           setPosts(result.posts);
+          setDisplayName(result.profile.displayName || "");
+          setBio(result.profile.bio || "");
+          setAvatarUrl(result.profile.avatarUrl || "");
         }
       } catch (loadError) {
         if (isMounted) {
@@ -53,11 +60,75 @@ export default function ProfilePage() {
   }, [username]);
 
   async function handleFollow() {
+    setError("");
+    setNotice("");
+
     try {
       const nextProfile = await toggleFollow(profile.username);
       setProfile((current) => ({ ...current, ...nextProfile }));
     } catch (followError) {
       setError(followError.message || "Could not update follow status.");
+    }
+  }
+
+  async function handleProfileSave(event) {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+
+    try {
+      const nextUser = await updateProfile({ displayName, bio, avatarUrl });
+      setProfile((current) => ({
+        ...current,
+        displayName: nextUser.displayName,
+        bio: nextUser.bio,
+        avatarUrl: nextUser.avatarUrl
+      }));
+      setNotice("Profile updated.");
+    } catch (saveError) {
+      setError(saveError.message || "Could not save profile.");
+    }
+  }
+
+  async function handleShareProfile() {
+    const link = `${window.location.origin}/u/${profile.username}`;
+
+    try {
+      if (navigator.share && window.matchMedia("(max-width: 820px)").matches) {
+        await navigator.share({
+          title: `@${profile.username} on Yimage`,
+          url: link
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(link);
+      setNotice("Copied link to clipboard.");
+    } catch (shareError) {
+      if (shareError?.name !== "AbortError") {
+        setError("Could not share this profile.");
+      }
+    }
+  }
+
+  async function handleSharePost(postId) {
+    const link = `${window.location.origin}/${postId}`;
+
+    try {
+      if (navigator.share && window.matchMedia("(max-width: 820px)").matches) {
+        await navigator.share({
+          title: "Yimage post",
+          url: link
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(link);
+      setNotice("Copied link to clipboard.");
+    } catch (shareError) {
+      if (shareError?.name !== "AbortError") {
+        setError("Could not share this post.");
+      }
     }
   }
 
@@ -91,27 +162,87 @@ export default function ProfilePage() {
       <Stack spacing={3}>
         <BackButton fallbackTo="/" label="Back" />
         {error ? <Alert color="danger" variant="soft">{error}</Alert> : null}
+        {notice ? <Alert color="neutral" variant="soft">{notice}</Alert> : null}
 
         <Card variant="outlined" className="content-card">
-          <Stack spacing={1.25}>
-            <Typography level="h1" sx={{ letterSpacing: "-0.05em" }}>
-              @{profile.username}
-            </Typography>
-            <Typography level="body-sm" textColor="neutral.500">
-              Joined {formatFullDate(profile.createdAt)}
-            </Typography>
+          <Stack spacing={2}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }}>
+              <Avatar
+                src={profile.avatarUrl || undefined}
+                alt={profile.displayName || profile.username}
+                sx={{ width: 84, height: 84, fontSize: "1.5rem", bgcolor: "#111111" }}
+              >
+                {(profile.displayName || profile.username || "Y").slice(0, 1).toUpperCase()}
+              </Avatar>
+
+              <Stack spacing={0.75} sx={{ minWidth: 0 }}>
+                <Typography level="h1" sx={{ letterSpacing: "-0.05em" }}>
+                  {profile.displayName || profile.username}
+                </Typography>
+                <Typography level="body-md" textColor="neutral.400">
+                  @{profile.username}
+                </Typography>
+                {profile.bio ? (
+                  <Typography level="body-md" textColor="neutral.300">
+                    {profile.bio}
+                  </Typography>
+                ) : null}
+                <Typography level="body-sm" textColor="neutral.500">
+                  Joined {formatFullDate(profile.createdAt)}
+                </Typography>
+              </Stack>
+            </Stack>
+
             <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap">
               <Typography level="body-md">{profile.postsCount} posts</Typography>
               <Typography level="body-md">{profile.followersCount} followers</Typography>
               <Typography level="body-md">{profile.followingCount} following</Typography>
             </Stack>
-            {user && user.username !== profile.username ? (
-              <Button variant="soft" color="neutral" onClick={handleFollow} sx={{ borderRadius: "999px", alignSelf: "flex-start" }}>
-                {profile.isFollowing ? "Unfollow" : "Follow"}
+
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+              {!isOwnProfile ? (
+                <Button variant="soft" color="neutral" onClick={handleFollow} sx={{ borderRadius: "14px", alignSelf: "flex-start" }}>
+                  {profile.isFollowing ? "Unfollow" : "Follow"}
+                </Button>
+              ) : null}
+              <Button variant="plain" color="neutral" onClick={handleShareProfile} sx={{ borderRadius: "14px", alignSelf: "flex-start" }}>
+                Share profile
               </Button>
-            ) : null}
+            </Stack>
           </Stack>
         </Card>
+
+        {isOwnProfile ? (
+          <Card variant="outlined" className="content-card">
+            <Stack component="form" spacing={1.5} onSubmit={handleProfileSave}>
+              <Typography level="title-lg">Edit profile</Typography>
+              <Input
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                placeholder="Display name"
+                sx={{ borderRadius: "14px" }}
+              />
+              <Textarea
+                value={bio}
+                onChange={(event) => setBio(event.target.value)}
+                placeholder="Bio"
+                minRows={3}
+                maxRows={6}
+                maxLength={280}
+                sx={{ borderRadius: "14px" }}
+              />
+              <Input
+                value={avatarUrl}
+                onChange={(event) => setAvatarUrl(event.target.value)}
+                placeholder="Avatar URL or /path"
+                sx={{ borderRadius: "14px" }}
+              />
+              <Button type="submit" sx={{ borderRadius: "14px", alignSelf: "flex-start" }}>
+                Save profile
+              </Button>
+            </Stack>
+          </Card>
+        ) : null}
 
         <Stack spacing={2}>
           {posts.map((post) => (
@@ -119,10 +250,11 @@ export default function ProfilePage() {
               key={post.id}
               post={post}
               isLoggedIn={Boolean(user)}
-              isBusy={busyPostId === post.id}
+              isBusy={false}
               onUpvote={() => navigate(`/${post.id}`)}
               onDownvote={() => navigate(`/${post.id}`)}
               onRepost={() => navigate(`/${post.id}`)}
+              onShare={() => handleSharePost(post.id)}
               onHashtagClick={(tag) => navigate(`/?hashtag=${encodeURIComponent(tag)}`)}
               onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
               onRequireLogin={() => navigate(`/login?next=/${post.id}`)}

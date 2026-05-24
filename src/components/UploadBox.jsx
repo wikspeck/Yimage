@@ -40,7 +40,7 @@ export default function UploadBox({ onPostCreated }) {
         const nextCategories = await getCategories();
         if (isMounted) {
           setCategories(nextCategories);
-          setCategoryId(nextCategories[0]?.id || "");
+          setCategoryId("");
         }
       } catch {
         if (isMounted) {
@@ -198,8 +198,9 @@ export default function UploadBox({ onPostCreated }) {
               value={categoryId}
               onChange={(_, nextValue) => setCategoryId(nextValue || "")}
               placeholder="Category"
-              sx={{ borderRadius: "18px", minHeight: 48 }}
+              sx={{ borderRadius: "14px", minHeight: 48 }}
             >
+              <Option value="">All Category</Option>
               {categories.map((category) => (
                 <Option key={category.id} value={category.id}>
                   {category.label}

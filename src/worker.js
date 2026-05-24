@@ -9,6 +9,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 120;
 const MAX_DESCRIPTION_LENGTH = 1000;
 const MAX_COMMENT_LENGTH = 400;
+const MAX_BIO_LENGTH = 280;
 const SESSION_COOKIE = "yimage_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const POST_ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -69,6 +70,19 @@ function normalizeHashtag(value) {
   return normalizeText(value).replace(/^#+/, "").toLowerCase();
 }
 
+function normalizeOptionalUrl(value) {
+  const nextValue = normalizeText(value);
+  if (!nextValue) {
+    return "";
+  }
+
+  if (nextValue.startsWith("/") || /^https?:\/\//i.test(nextValue)) {
+    return nextValue;
+  }
+
+  return "";
+}
+
 function parseHashtags(value) {
   const matches = String(value || "")
     .split(/[,\s]+/)
@@ -120,7 +134,10 @@ function toPublicUser(user) {
     id: user.id,
     username: user.username,
     email: user.email,
-    createdAt: user.createdAt
+    createdAt: user.createdAt,
+    displayName: user.displayName || "",
+    bio: user.bio || "",
+    avatarUrl: user.avatarUrl || ""
   };
 }
 
@@ -268,7 +285,10 @@ async function getCurrentUser(request, env) {
         users.id,
         users.username,
         users.email,
-        users.created_at AS createdAt
+        users.created_at AS createdAt,
+        COALESCE(users.display_name, '') AS displayName,
+        COALESCE(users.bio, '') AS bio,
+        COALESCE(users.avatar_url, '') AS avatarUrl
       FROM sessions
       INNER JOIN users ON users.id = sessions.user_id
       WHERE sessions.token_hash = ?
@@ -604,15 +624,15 @@ async function handleSignup(request, env) {
   const createdAt = toIsoDate();
   const passwordHash = await hashPassword(password);
 
-  await env.DB.prepare("INSERT INTO users (id, username, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)")
-    .bind(userId, username, email, passwordHash, createdAt)
+  await env.DB.prepare("INSERT INTO users (id, username, email, password_hash, created_at, display_name, bio, avatar_url) VALUES (?, ?, ?, ?, ?, ?, '', '')")
+    .bind(userId, username, email, passwordHash, createdAt, username)
     .run();
 
   const token = await createSession(env, userId);
 
   return success(
     {
-      user: toPublicUser({ id: userId, username, email, createdAt })
+      user: toPublicUser({ id: userId, username, email, createdAt, displayName: username, bio: "", avatarUrl: "" })
     },
     {
       status: 201,
@@ -639,7 +659,10 @@ async function handleLogin(request, env) {
         username,
         email,
         password_hash AS passwordHash,
-        created_at AS createdAt
+        created_at AS createdAt,
+        COALESCE(display_name, '') AS displayName,
+        COALESCE(bio, '') AS bio,
+        COALESCE(avatar_url, '') AS avatarUrl
       FROM users
       WHERE email = ?
       LIMIT 1
@@ -683,6 +706,42 @@ async function handleLogout(request, env) {
 async function handleMe(request, env) {
   const user = await getCurrentUser(request, env);
   return success({ user: user ? toPublicUser(user) : null });
+}
+
+async function handleUpdateProfile(request, env) {
+  const user = await requireUser(request, env);
+  const body = await parseJsonBody(request);
+  const displayName = normalizeText(body.displayName).slice(0, 60);
+  const bio = normalizeText(body.bio).slice(0, MAX_BIO_LENGTH);
+  const avatarUrl = normalizeOptionalUrl(body.avatarUrl);
+
+  if (body.avatarUrl && !avatarUrl) {
+    return fail("Avatar URL must be empty, root-relative, or start with http/https.");
+  }
+
+  await env.DB.prepare("UPDATE users SET display_name = ?, bio = ?, avatar_url = ? WHERE id = ?")
+    .bind(displayName, bio, avatarUrl, user.id)
+    .run();
+
+  const updatedUser = await env.DB.prepare(
+    `
+      SELECT
+        id,
+        username,
+        email,
+        created_at AS createdAt,
+        COALESCE(display_name, '') AS displayName,
+        COALESCE(bio, '') AS bio,
+        COALESCE(avatar_url, '') AS avatarUrl
+      FROM users
+      WHERE id = ?
+      LIMIT 1
+    `
+  )
+    .bind(user.id)
+    .first();
+
+  return success({ user: toPublicUser(updatedUser) });
 }
 
 async function handleCreatePost(request, env) {
@@ -1045,7 +1104,10 @@ async function handleGetProfile(request, env, username) {
         id,
         username,
         email,
-        created_at AS createdAt
+        created_at AS createdAt,
+        COALESCE(display_name, '') AS displayName,
+        COALESCE(bio, '') AS bio,
+        COALESCE(avatar_url, '') AS avatarUrl
       FROM users
       WHERE username = ?
       LIMIT 1
@@ -1118,13 +1180,16 @@ async function handleGetProfile(request, env, username) {
   });
 
   return success({
-    profile: {
-      id: profileUser.id,
-      username: profileUser.username,
-      createdAt: profileUser.createdAt,
-      postsCount: Number(counts?.postsCount || 0),
-      followersCount: Number(counts?.followersCount || 0),
-      followingCount: Number(counts?.followingCount || 0),
+      profile: {
+        id: profileUser.id,
+        username: profileUser.username,
+        createdAt: profileUser.createdAt,
+        displayName: profileUser.displayName || profileUser.username,
+        bio: profileUser.bio || "",
+        avatarUrl: profileUser.avatarUrl || "",
+        postsCount: Number(counts?.postsCount || 0),
+        followersCount: Number(counts?.followersCount || 0),
+        followingCount: Number(counts?.followingCount || 0),
       isFollowing
     },
     posts: profilePosts
@@ -1137,10 +1202,27 @@ async function handleToggleFollow(request, env, username) {
   const targetUser = await env.DB.prepare("SELECT id, username, created_at AS createdAt FROM users WHERE username = ? LIMIT 1")
     .bind(normalizedUsername)
     .first();
-
+  
   if (!targetUser) {
     return fail("User not found.", 404);
   }
+
+  const targetProfile = await env.DB.prepare(
+    `
+      SELECT
+        id,
+        username,
+        created_at AS createdAt,
+        COALESCE(display_name, '') AS displayName,
+        COALESCE(bio, '') AS bio,
+        COALESCE(avatar_url, '') AS avatarUrl
+      FROM users
+      WHERE id = ?
+      LIMIT 1
+    `
+  )
+    .bind(targetUser.id)
+    .first();
   if (targetUser.id === viewer.id) {
     return fail("You cannot follow yourself.");
   }
@@ -1175,6 +1257,9 @@ async function handleToggleFollow(request, env, username) {
       id: targetUser.id,
       username: targetUser.username,
       createdAt: targetUser.createdAt,
+      displayName: targetProfile?.displayName || targetUser.username,
+      bio: targetProfile?.bio || "",
+      avatarUrl: targetProfile?.avatarUrl || "",
       postsCount: Number(counts?.postsCount || 0),
       followersCount: Number(counts?.followersCount || 0),
       followingCount: Number(counts?.followingCount || 0),
@@ -1241,6 +1326,9 @@ export default {
       }
       if (url.pathname === "/api/auth/me" && request.method === "GET") {
         return await handleMe(request, env);
+      }
+      if (url.pathname === "/api/me/profile" && request.method === "PATCH") {
+        return await handleUpdateProfile(request, env);
       }
       if (url.pathname === "/api/categories" && request.method === "GET") {
         return await handleCategoriesList(env);

@@ -10,6 +10,7 @@ export default function PostCard({
   onUpvote,
   onDownvote,
   onRepost,
+  onShare,
   onHashtagClick,
   onAuthorClick,
   onRequireLogin
@@ -91,6 +92,7 @@ export default function PostCard({
           onUpvote={onUpvote}
           onDownvote={onDownvote}
           onRepost={onRepost}
+          onShare={onShare}
           onComment={() => window.location.assign(`/${post.id}#comments`)}
           onRequireLogin={onRequireLogin}
         />
