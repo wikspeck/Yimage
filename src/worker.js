@@ -42,6 +42,7 @@ const HARASSMENT_TERMS = ["kill yourself", "die", "stupid bitch"];
 const SEXUAL_TERMS = ["porn", "nude", "nsfw", "explicit"];
 const VIOLENCE_TERMS = ["gore", "beheading", "murder"];
 const SPAM_TERMS = ["free money", "buy now", "click here"];
+const AI_MODERATION_MODEL = "@cf/meta/llama-guard-3-8b";
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -400,6 +401,7 @@ function toPostResponse(post, viewerVote = null, viewerHasReposted = false, repo
     commentsCount: Number(post.commentsCount || 0),
     views: Number(post.views || 0),
     repostCount: Number(post.repostCount || 0),
+    moderationStatus: post.moderationStatus || MODERATION_STATES.ACTIVE,
     category: post.categorySlug
       ? {
           id: post.categoryId,
@@ -652,6 +654,126 @@ async function createSafetyFlag(env, { userId = null, targetType, targetId, sour
     .run();
 }
 
+function getAiModerationText(result) {
+  if (!result) {
+    return "";
+  }
+
+  if (typeof result === "string") {
+    return result;
+  }
+
+  if (typeof result.response === "string") {
+    return result.response;
+  }
+
+  if (typeof result.result === "string") {
+    return result.result;
+  }
+
+  if (result.result && typeof result.result.response === "string") {
+    return result.result.response;
+  }
+
+  if (Array.isArray(result.response)) {
+    return result.response
+      .map((item) => (typeof item === "string" ? item : item?.text || ""))
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  return "";
+}
+
+function parseAiModerationPayload(rawText) {
+  const trimmed = normalizeText(rawText);
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    const parsedUnsafe = typeof parsed.safe === "boolean" ? !parsed.safe : Boolean(parsed.unsafe ?? parsed.isUnsafe);
+    return {
+      isUnsafe: parsedUnsafe,
+      labels: Array.isArray(parsed.labels) ? parsed.labels.map((item) => normalizeText(item)).filter(Boolean) : [],
+      reason: normalizeText(parsed.reason || parsed.ai_reason || ""),
+      riskScore: Number(parsed.risk_score || parsed.riskScore || 0)
+    };
+  } catch {
+    const normalized = trimmed.toLowerCase();
+    const isUnsafe = normalized.includes("\"unsafe\": true") || normalized.includes("unsafe");
+    const labels = [];
+
+    for (const label of ["explicit_content", "violence", "hate_speech", "harassment", "spam", "illegal_content", "impersonation", "copyright_risk"]) {
+      if (normalized.includes(label)) {
+        labels.push(label);
+      }
+    }
+
+    return {
+      isUnsafe,
+      labels,
+      reason: trimmed,
+      riskScore: isUnsafe ? Math.max(3, labels.length * 2 || 4) : 0
+    };
+  }
+}
+
+function parseJsonArray(value) {
+  try {
+    const parsed = JSON.parse(value || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function storeAiModerationResult(env, { contentId, contentType, riskScore, labels, aiReason, moderationStatus, source = "text" }) {
+  await env.DB.prepare(
+    "INSERT INTO ai_moderation_results (id, content_id, content_type, risk_score, labels, ai_reason, moderation_status, model, source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  )
+    .bind(
+      createId("ai_"),
+      contentId,
+      contentType,
+      riskScore,
+      JSON.stringify(labels || []),
+      aiReason || "",
+      moderationStatus,
+      AI_MODERATION_MODEL,
+      source,
+      toIsoDate()
+    )
+    .run();
+}
+
+async function markContentUnderReview(env, targetType, targetId) {
+  if (targetType === "post") {
+    await env.DB.prepare(
+      "UPDATE posts SET moderation_status = CASE WHEN COALESCE(moderation_status, 'active') = 'active' THEN 'under_review' ELSE moderation_status END WHERE id = ?"
+    )
+      .bind(targetId)
+      .run();
+  }
+
+  if (targetType === "comment") {
+    await env.DB.prepare(
+      "UPDATE comments SET moderation_status = CASE WHEN COALESCE(moderation_status, 'active') = 'active' THEN 'under_review' ELSE moderation_status END WHERE id = ?"
+    )
+      .bind(targetId)
+      .run();
+  }
+
+  if (targetType === "user") {
+    await env.DB.prepare(
+      "UPDATE users SET moderation_status = CASE WHEN COALESCE(moderation_status, 'active') = 'active' THEN 'under_review' ELSE moderation_status END WHERE id = ?"
+    )
+      .bind(targetId)
+      .run();
+  }
+}
+
 async function applyModerationRisk(env, targetType, targetId, riskScore) {
   if (!riskScore) {
     return;
@@ -719,6 +841,128 @@ async function runSafetyAssessment(env, input) {
   return assessment;
 }
 
+async function runAiTextModeration(env, input) {
+  if (!env.AI || typeof env.AI.run !== "function") {
+    return null;
+  }
+
+  const fields = Object.entries(input.fields || {})
+    .map(([key, value]) => [key, normalizeText(value)])
+    .filter(([, value]) => value);
+
+  if (!fields.length) {
+    return null;
+  }
+
+  const formattedFields = fields.map(([key, value]) => `${key}: ${value}`).join("\n");
+
+  try {
+    const result = await env.AI.run(AI_MODERATION_MODEL, {
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a content safety classifier for Yimage. Review the provided text and return strict JSON only with keys: unsafe (boolean), risk_score (0-10 integer), labels (array of strings), reason (string). Flag categories such as explicit_content, violence, hate_speech, harassment, spam, illegal_content, impersonation, copyright_risk."
+        },
+        {
+          role: "user",
+          content: `Content type: ${input.targetType}\n${formattedFields}`
+        }
+      ]
+    });
+
+    const moderation = parseAiModerationPayload(getAiModerationText(result));
+    if (!moderation?.isUnsafe) {
+      return moderation;
+    }
+
+    await storeAiModerationResult(env, {
+      contentId: input.targetId,
+      contentType: input.targetType,
+      riskScore: Math.max(3, Number(moderation.riskScore || 0)),
+      labels: moderation.labels,
+      aiReason: moderation.reason,
+      moderationStatus: MODERATION_STATES.UNDER_REVIEW,
+      source: "text"
+    });
+
+    await markContentUnderReview(env, input.targetType, input.targetId);
+    return moderation;
+  } catch (error) {
+    console.error("Workers AI moderation failed.", error);
+    return null;
+  }
+}
+
+function bytesToDataUrl(bytes, mimeType) {
+  return `data:${mimeType};base64,${bytesToBase64(bytes)}`;
+}
+
+async function runAiImageModeration(env, { postId, imageBytes, mimeType, title = "", description = "" }) {
+  if (!env.AI || typeof env.AI.run !== "function") {
+    return null;
+  }
+
+  try {
+    const result = await env.AI.run("@cf/meta/llama-3.2-11b-vision-instruct", {
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a safety classifier for Yimage uploads. Review the image and any visible text. Return strict JSON only with keys: safe (boolean), risk_score (0-100 integer), labels (array of strings), reason (string). Flag categories such as sexual_content, nudity, graphic_violence, hate_symbols, extremist_symbols, harassment, illegal_content, gore, spam_scam, offensive_text."
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Title: ${title || "(none)"}\nDescription: ${description || "(none)"}\nClassify this uploaded image for safety risk.`
+            },
+            {
+              type: "image",
+              image: bytesToDataUrl(imageBytes, mimeType)
+            }
+          ]
+        }
+      ]
+    });
+
+    const moderation = parseAiModerationPayload(getAiModerationText(result));
+    if (!moderation) {
+      return null;
+    }
+
+    if (!moderation.isUnsafe || Number(moderation.riskScore || 0) < 20) {
+      return {
+        ...moderation,
+        moderationStatus: MODERATION_STATES.ACTIVE
+      };
+    }
+
+    const nextStatus = Number(moderation.riskScore || 0) >= 70
+      ? MODERATION_STATES.HIDDEN
+      : MODERATION_STATES.UNDER_REVIEW;
+
+    await storeAiModerationResult(env, {
+      contentId: postId,
+      contentType: "post",
+      riskScore: Number(moderation.riskScore || 0),
+      labels: moderation.labels,
+      aiReason: moderation.reason,
+      moderationStatus: nextStatus,
+      source: "image"
+    });
+
+    return {
+      ...moderation,
+      moderationStatus: nextStatus
+    };
+  } catch (error) {
+    console.error("Workers AI image moderation failed.", error);
+    return null;
+  }
+}
+
 async function getPostRecord(env, postId, includeModerated = false) {
   const row = await env.DB.prepare(
     `
@@ -744,7 +988,7 @@ async function getPostRecord(env, postId, includeModerated = false) {
       INNER JOIN users ON users.id = posts.author_id
       LEFT JOIN categories ON categories.id = posts.category_id
       WHERE posts.id = ?
-      ${includeModerated ? "" : "AND COALESCE(posts.moderation_status, 'active') NOT IN ('hidden', 'removed')"}
+      ${includeModerated ? "" : "AND COALESCE(posts.moderation_status, 'active') NOT IN ('under_review', 'hidden', 'removed')"}
       LIMIT 1
     `
   )
@@ -866,7 +1110,7 @@ async function listPosts(env, userId, options = {}) {
   const bindings = [];
 
   if (!includeModerated) {
-    conditions.push("COALESCE(posts.moderation_status, 'active') NOT IN ('hidden', 'removed')");
+    conditions.push("COALESCE(posts.moderation_status, 'active') NOT IN ('under_review', 'hidden', 'removed')");
   }
 
   if (searchQuery) {
@@ -1014,12 +1258,41 @@ async function handleSignup(request, env) {
   await env.DB.prepare("INSERT INTO users (id, username, email, password_hash, created_at, display_name, bio, avatar_url) VALUES (?, ?, ?, ?, ?, ?, '', '')")
     .bind(userId, username, email, passwordHash, createdAt, username)
     .run();
+  await runAiTextModeration(env, {
+    userId,
+    targetType: "user",
+    targetId: userId,
+    fields: {
+      username,
+      display_name: username
+    }
+  });
 
   const token = await createSession(env, userId);
 
+  const createdUser = await env.DB.prepare(
+    `
+      SELECT
+        id,
+        username,
+        email,
+        created_at AS createdAt,
+        COALESCE(display_name, '') AS displayName,
+        COALESCE(bio, '') AS bio,
+        COALESCE(avatar_url, '') AS avatarUrl,
+        COALESCE(is_admin, 0) AS isAdmin,
+        COALESCE(moderation_status, 'active') AS moderationStatus
+      FROM users
+      WHERE id = ?
+      LIMIT 1
+    `
+  )
+    .bind(userId)
+    .first();
+
   return success(
     {
-      user: toPublicUser({ id: userId, username, email, createdAt, displayName: username, bio: "", avatarUrl: "", isAdmin: 0, moderationStatus: "active" })
+      user: toPublicUser(createdUser || { id: userId, username, email, createdAt, displayName: username, bio: "", avatarUrl: "", isAdmin: 0, moderationStatus: "active" })
     },
     {
       status: 201,
@@ -1126,6 +1399,16 @@ async function handleUpdateProfile(request, env) {
     displayName,
     bio
   });
+  await runAiTextModeration(env, {
+    userId: user.id,
+    targetType: "user",
+    targetId: user.id,
+    fields: {
+      username: user.username,
+      display_name: displayName,
+      bio
+    }
+  });
 
   const updatedUser = await env.DB.prepare(
     `
@@ -1214,6 +1497,7 @@ async function handleCreatePost(request, env) {
   if (imageValidationMessage) {
     return fail(imageValidationMessage);
   }
+  const imageBytes = new Uint8Array(await image.arrayBuffer());
 
   let resolvedCategoryId = null;
   if (categoryId) {
@@ -1241,11 +1525,20 @@ async function handleCreatePost(request, env) {
   const imageKey = getImageKey(postId, ALLOWED_IMAGE_TYPES[image.type]);
   const createdAt = toIsoDate();
 
-  await env.YIMAGE_BUCKET.put(imageKey, image.stream(), {
+  await env.YIMAGE_BUCKET.put(imageKey, imageBytes, {
     httpMetadata: {
       contentType: image.type
     }
   });
+
+  const imageModeration = await runAiImageModeration(env, {
+    postId,
+    imageBytes,
+    mimeType: image.type,
+    title,
+    description
+  });
+  const moderationStatus = imageModeration?.moderationStatus || MODERATION_STATES.ACTIVE;
 
   await env.DB.prepare(
     `
@@ -1260,11 +1553,12 @@ async function handleCreatePost(request, env) {
         like_count,
         comments_count,
         views,
-        category_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?)
+        category_id,
+        moderation_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?)
     `
   )
-    .bind(postId, user.id, title, description, imageKey, image.type, createdAt, resolvedCategoryId)
+    .bind(postId, user.id, title, description, imageKey, image.type, createdAt, resolvedCategoryId, moderationStatus)
     .run();
 
   await syncPostHashtags(env, postId, hashtags);
@@ -1275,9 +1569,39 @@ async function handleCreatePost(request, env) {
     title,
     description
   });
-  const post = await getPostRecord(env, postId);
+  const textModeration = await runAiTextModeration(env, {
+    userId: user.id,
+    targetType: "post",
+    targetId: postId,
+    fields: {
+      title,
+      description
+    }
+  });
+  const post = await getPostRecord(env, postId, true);
 
-  return success({ post: toPostResponse(post) }, { status: 201 });
+  const moderationNotice = imageModeration && imageModeration.moderationStatus !== MODERATION_STATES.ACTIVE
+    ? "Your post was hidden by automatic safety moderation. You can appeal this decision."
+    : textModeration?.isUnsafe
+      ? "Your post is being reviewed by automatic safety moderation."
+      : "";
+
+  return success(
+    {
+      post: toPostResponse(post),
+      moderationNotice,
+      canAppeal: Boolean(imageModeration && imageModeration.moderationStatus !== MODERATION_STATES.ACTIVE),
+      aiFinding: imageModeration
+        ? {
+            riskScore: Number(imageModeration.riskScore || 0),
+            labels: imageModeration.labels || [],
+            reason: imageModeration.reason || "",
+            moderationStatus: imageModeration.moderationStatus
+          }
+        : null
+    },
+    { status: 201 }
+  );
 }
 
 async function handleListPosts(request, env) {
@@ -1292,7 +1616,16 @@ async function handleListPosts(request, env) {
 }
 
 async function handleGetPost(request, env, postId) {
-  const post = await getPostRecord(env, postId);
+  const user = await getCurrentUser(request, env);
+  let post = await getPostRecord(env, postId);
+
+  if (!post && user) {
+    const moderatedPost = await getPostRecord(env, postId, true);
+    if (moderatedPost && (moderatedPost.userId === user.id || user.isAdmin)) {
+      post = moderatedPost;
+    }
+  }
+
   if (!post) {
     return fail("Post not found.", 404);
   }
@@ -1300,13 +1633,61 @@ async function handleGetPost(request, env, postId) {
   await env.DB.prepare("UPDATE posts SET views = COALESCE(views, 0) + 1 WHERE id = ?").bind(postId).run();
   post.views = Number(post.views || 0) + 1;
 
-  const user = await getCurrentUser(request, env);
   const votes = await getViewerVoteMap(env, user?.id, [postId]);
   const reposts = await getViewerRepostMap(env, user?.id, [postId]);
   const repostsRemainingToday = await getRepostsRemainingToday(env, user?.id);
+  let moderationReview = null;
+
+  if (user && (user.id === post.userId || user.isAdmin) && post.moderationStatus !== MODERATION_STATES.ACTIVE) {
+    const latestAiFinding = await env.DB.prepare(
+      `
+        SELECT
+          risk_score AS riskScore,
+          labels,
+          ai_reason AS aiReason,
+          moderation_status AS moderationStatus,
+          source,
+          created_at AS createdAt
+        FROM ai_moderation_results
+        WHERE content_type = 'post' AND content_id = ? AND source = 'image'
+        ORDER BY created_at DESC
+        LIMIT 1
+      `
+    )
+      .bind(postId)
+      .first();
+
+    const appeal = await env.DB.prepare(
+      `
+        SELECT
+          id,
+          message,
+          status,
+          created_at AS createdAt
+        FROM moderation_appeals
+        WHERE content_type = 'post' AND content_id = ? AND user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+      `
+    )
+      .bind(postId, user.id)
+      .first();
+
+    moderationReview = {
+      message: "Your post was hidden by automatic safety moderation. You can appeal this decision.",
+      aiFinding: latestAiFinding
+        ? {
+            ...latestAiFinding,
+            labels: parseJsonArray(latestAiFinding.labels)
+          }
+        : null,
+      appeal: appeal || null
+    };
+  }
 
   return success({
-    post: toPostResponse(post, votes[postId] || null, reposts[postId], repostsRemainingToday)
+    post: toPostResponse(post, votes[postId] || null, reposts[postId], repostsRemainingToday),
+    moderationReview
   });
 }
 
@@ -1442,7 +1823,16 @@ async function handleDeletePost(request, env, postId) {
 }
 
 async function handleCommentsList(request, env, postId) {
-  const post = await getPostRecord(env, postId);
+  const viewer = await getCurrentUser(request, env);
+  let post = await getPostRecord(env, postId);
+
+  if (!post && viewer) {
+    const moderatedPost = await getPostRecord(env, postId, true);
+    if (moderatedPost && (moderatedPost.userId === viewer.id || viewer.isAdmin)) {
+      post = moderatedPost;
+    }
+  }
+
   if (!post) {
     return fail("Post not found.", 404);
   }
@@ -1461,16 +1851,15 @@ async function handleCommentsList(request, env, postId) {
       FROM comments
       INNER JOIN users ON users.id = comments.author_id
       WHERE comments.post_id = ?
-        AND COALESCE(comments.moderation_status, 'active') NOT IN ('hidden', 'removed')
+        AND COALESCE(comments.moderation_status, 'active') NOT IN ('under_review', 'hidden', 'removed')
       ORDER BY comments.created_at ASC, comments.id ASC
     `
   )
     .bind(postId)
     .all();
 
-  const user = await getCurrentUser(request, env);
   const commentIds = (rows.results || []).map((row) => row.id);
-  const viewerVotes = await getViewerCommentVoteMap(env, user?.id, commentIds);
+  const viewerVotes = await getViewerCommentVoteMap(env, viewer?.id, commentIds);
   const comments = (rows.results || []).map((row) => toCommentResponse(row, viewerVotes[row.id] || null));
 
   return success({ comments: nestComments(comments) });
@@ -1526,6 +1915,14 @@ async function handleCommentCreate(request, env, postId) {
     targetType: "comment",
     targetId: comment.id,
     text
+  });
+  await runAiTextModeration(env, {
+    userId: user.id,
+    targetType: "comment",
+    targetId: comment.id,
+    fields: {
+      text
+    }
   });
 
   await env.DB.prepare("UPDATE posts SET comments_count = COALESCE(comments_count, 0) + 1 WHERE id = ?").bind(postId).run();
@@ -1662,6 +2059,50 @@ async function handleCreateReport(request, env) {
   return success({ message: "Report submitted." }, { status: 201 });
 }
 
+async function handleCreateAppeal(request, env) {
+  const user = await requireUser(request, env);
+  const body = await parseJsonBody(request);
+  const contentId = normalizeText(body.contentId);
+  const contentType = normalizeText(body.contentType);
+  const message = normalizeText(body.message).slice(0, 1000);
+
+  if (contentType !== "post") {
+    return fail("Only post appeals are supported right now.");
+  }
+  if (!contentId) {
+    return fail("Appeal target is required.");
+  }
+  if (!message) {
+    return fail("Please add a short explanation for your appeal.");
+  }
+
+  const post = await getPostRecord(env, contentId, true);
+  if (!post || post.userId !== user.id) {
+    return fail("Post not found.", 404);
+  }
+  if (![MODERATION_STATES.HIDDEN, MODERATION_STATES.UNDER_REVIEW].includes(post.moderationStatus)) {
+    return fail("This post is not currently eligible for appeal.");
+  }
+
+  const existingAppeal = await env.DB.prepare(
+    "SELECT id FROM moderation_appeals WHERE user_id = ? AND content_id = ? AND content_type = ? AND status = 'pending' LIMIT 1"
+  )
+    .bind(user.id, contentId, contentType)
+    .first();
+
+  if (existingAppeal) {
+    return fail("You already have a pending appeal for this post.", 409);
+  }
+
+  await env.DB.prepare(
+    "INSERT INTO moderation_appeals (id, user_id, content_id, content_type, message, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', ?)"
+  )
+    .bind(createId("appeal_"), user.id, contentId, contentType, message, toIsoDate())
+    .run();
+
+  return success({ message: "Appeal submitted." }, { status: 201 });
+}
+
 async function handleModerationOverview(request, env) {
   await requireModerator(request, env);
   const rows = await env.DB.prepare(
@@ -1681,16 +2122,108 @@ async function handleModerationOverview(request, env) {
     `
   ).all();
 
+  const aiRows = await env.DB.prepare(
+    `
+      SELECT
+        content_type AS contentType,
+        content_id AS contentId,
+        risk_score AS riskScore,
+        labels,
+        ai_reason AS aiReason,
+        moderation_status AS moderationStatus,
+        model,
+        source,
+        created_at AS createdAt
+      FROM ai_moderation_results
+      ORDER BY created_at DESC
+      LIMIT 200
+    `
+  ).all();
+
+  const appealRows = await env.DB.prepare(
+    `
+      SELECT
+        moderation_appeals.id,
+        moderation_appeals.user_id AS userId,
+        users.username,
+        moderation_appeals.content_id AS contentId,
+        moderation_appeals.content_type AS contentType,
+        moderation_appeals.message,
+        moderation_appeals.status,
+        moderation_appeals.created_at AS createdAt,
+        moderation_appeals.reviewed_at AS reviewedAt,
+        moderation_appeals.reviewed_by AS reviewedBy
+      FROM moderation_appeals
+      LEFT JOIN users ON users.id = moderation_appeals.user_id
+      ORDER BY moderation_appeals.status = 'pending' DESC, moderation_appeals.created_at DESC
+      LIMIT 200
+    `
+  ).all();
+
   const warningsRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_warnings").first();
   const suspensionsRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_suspensions WHERE lifted_at IS NULL").first();
 
   return success({
     reports: rows.results || [],
+    aiFindings: (aiRows.results || []).map((row) => ({
+      ...row,
+      labels: parseJsonArray(row.labels)
+    })),
+    appeals: appealRows.results || [],
     totals: {
       warnings: Number(warningsRow?.count || 0),
       activeSuspensions: Number(suspensionsRow?.count || 0)
     }
   });
+}
+
+async function handleAppealReview(request, env, appealId) {
+  const moderator = await requireModerator(request, env);
+  const body = await parseJsonBody(request);
+  const decision = normalizeText(body.decision);
+
+  if (!["approve", "reject"].includes(decision)) {
+    return fail("Invalid appeal decision.");
+  }
+
+  const appeal = await env.DB.prepare(
+    "SELECT id, content_id AS contentId, content_type AS contentType, status FROM moderation_appeals WHERE id = ? LIMIT 1"
+  )
+    .bind(appealId)
+    .first();
+
+  if (!appeal) {
+    return fail("Appeal not found.", 404);
+  }
+  if (appeal.status !== "pending") {
+    return fail("This appeal has already been reviewed.", 409);
+  }
+
+  await env.DB.prepare("UPDATE moderation_appeals SET status = ?, reviewed_at = ?, reviewed_by = ? WHERE id = ?")
+    .bind(decision === "approve" ? "approved" : "rejected", toIsoDate(), moderator.id, appealId)
+    .run();
+
+  if (appeal.contentType === "post") {
+    await env.DB.prepare("UPDATE posts SET moderation_status = ? WHERE id = ?")
+      .bind(decision === "approve" ? MODERATION_STATES.ACTIVE : MODERATION_STATES.HIDDEN, appeal.contentId)
+      .run();
+  }
+
+  await env.DB.prepare(
+    "INSERT INTO moderation_actions (id, moderator_id, target_type, target_id, action, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  )
+    .bind(
+      createId("mod_"),
+      moderator.id,
+      appeal.contentType,
+      appeal.contentId,
+      decision === "approve" ? "restore" : "hide",
+      decision === "approve" ? "Appeal approved." : "Appeal rejected.",
+      toIsoDate()
+    )
+    .run();
+
+  return success({ message: decision === "approve" ? "Appeal approved." : "Appeal rejected." });
 }
 
 async function handleModerationAction(request, env) {
@@ -1800,6 +2333,8 @@ async function handleGetProfile(request, env, username) {
     isFollowing = Boolean(followRow);
   }
 
+  const canViewModeratedPosts = Boolean(viewer && (viewer.id === profileUser.id || viewer.isAdmin));
+
   const postRows = await env.DB.prepare(
     `
       SELECT
@@ -1823,7 +2358,9 @@ async function handleGetProfile(request, env, username) {
       INNER JOIN users ON users.id = posts.author_id
       LEFT JOIN categories ON categories.id = posts.category_id
       WHERE posts.author_id = ?
-        AND COALESCE(posts.moderation_status, 'active') NOT IN ('hidden', 'removed')
+        ${canViewModeratedPosts
+          ? "AND COALESCE(posts.moderation_status, 'active') NOT IN ('removed')"
+          : "AND COALESCE(posts.moderation_status, 'active') NOT IN ('under_review', 'hidden', 'removed')"}
       ORDER BY posts.created_at DESC, posts.id DESC
       LIMIT 50
     `
@@ -1930,8 +2467,17 @@ async function handleToggleFollow(request, env, username) {
   });
 }
 
-async function handleImage(env, postId) {
-  const post = await getPostRecord(env, postId);
+async function handleImage(request, env, postId) {
+  const viewer = await getCurrentUser(request, env);
+  let post = await getPostRecord(env, postId);
+
+  if (!post && viewer) {
+    const moderatedPost = await getPostRecord(env, postId, true);
+    if (moderatedPost && (moderatedPost.userId === viewer.id || viewer.isAdmin)) {
+      post = moderatedPost;
+    }
+  }
+
   if (!post) {
     return fail("Image not found.", 404);
   }
@@ -1949,8 +2495,17 @@ async function handleImage(env, postId) {
   });
 }
 
-async function handleDownload(env, postId) {
-  const post = await getPostRecord(env, postId);
+async function handleDownload(request, env, postId) {
+  const viewer = await getCurrentUser(request, env);
+  let post = await getPostRecord(env, postId);
+
+  if (!post && viewer) {
+    const moderatedPost = await getPostRecord(env, postId, true);
+    if (moderatedPost && (moderatedPost.userId === viewer.id || viewer.isAdmin)) {
+      post = moderatedPost;
+    }
+  }
+
   if (!post) {
     return fail("Post not found.", 404);
   }
@@ -2038,11 +2593,17 @@ export default {
         if (url.pathname === "/api/reports" && request.method === "POST") {
           return await handleCreateReport(request, env);
         }
+        if (url.pathname === "/api/appeals" && request.method === "POST") {
+          return await handleCreateAppeal(request, env);
+        }
         if (url.pathname === "/api/mod/reports" && request.method === "GET") {
           return await handleModerationOverview(request, env);
         }
         if (url.pathname === "/api/mod/action" && request.method === "POST") {
           return await handleModerationAction(request, env);
+        }
+        if (url.pathname.startsWith("/api/mod/appeals/") && url.pathname.endsWith("/review") && request.method === "POST") {
+          return await handleAppealReview(request, env, url.pathname.split("/")[4]);
         }
         if ((url.pathname === "/api/upload" || url.pathname === "/api/posts") && request.method === "POST") {
           return await handleCreatePost(request, env);
@@ -2069,7 +2630,7 @@ export default {
           return await handleCommentCreate(request, env, url.pathname.split("/")[3]);
         }
         if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/download") && request.method === "GET") {
-          return await handleDownload(env, url.pathname.split("/")[3]);
+          return await handleDownload(request, env, url.pathname.split("/")[3]);
         }
         if (url.pathname.startsWith("/api/posts/") && request.method === "GET") {
           return await handleGetPost(request, env, url.pathname.replace("/api/posts/", "").trim());
@@ -2087,7 +2648,7 @@ export default {
           return await handleGetProfile(request, env, decodeURIComponent(url.pathname.split("/")[3]));
         }
         if (url.pathname.startsWith("/api/image/") && request.method === "GET") {
-          return await handleImage(env, url.pathname.replace("/api/image/", "").trim());
+          return await handleImage(request, env, url.pathname.replace("/api/image/", "").trim());
         }
         if (url.pathname.startsWith("/api/")) {
           return fail("API route not found.", 404);

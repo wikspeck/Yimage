@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, Box, Button, Card, CircularProgress, Input, Option, Select, Sheet, Stack, Textarea, Typography } from "@mui/joy";
 import ImagePreviewCard from "./ImagePreviewCard";
 import TurnstileWidget from "./TurnstileWidget";
-import { createPost, getCategories } from "../api/yimageApi";
+import { createAppeal, createPost, getCategories } from "../api/yimageApi";
 import { validateImageFile } from "../utils/validateImageFile";
 
 export default function UploadBox({ onPostCreated }) {
@@ -20,6 +20,10 @@ export default function UploadBox({ onPostCreated }) {
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [createdPost, setCreatedPost] = useState(null);
+  const [appealMessage, setAppealMessage] = useState("");
+  const [appealNotice, setAppealNotice] = useState("");
+  const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
 
   useEffect(() => {
     if (!selectedFile) {
@@ -61,6 +65,7 @@ export default function UploadBox({ onPostCreated }) {
   function resetMessages() {
     setErrorMessage("");
     setSuccessMessage("");
+    setAppealNotice("");
   }
 
   function handleFileSelection(file) {
@@ -141,7 +146,8 @@ export default function UploadBox({ onPostCreated }) {
         imageFile: selectedFile
       });
 
-      setSuccessMessage("Post published successfully.");
+      setCreatedPost(post);
+      setSuccessMessage(post.moderationNotice || "Post published successfully.");
       resetForm();
       onPostCreated?.(post);
     } catch (error) {
@@ -149,6 +155,33 @@ export default function UploadBox({ onPostCreated }) {
     } finally {
       setIsUploading(false);
       setTurnstileResetKey((current) => current + 1);
+    }
+  }
+
+  async function handleAppealSubmit() {
+    if (!createdPost?.canAppeal || !createdPost?.post?.id) {
+      return;
+    }
+    if (!appealMessage.trim()) {
+      setAppealNotice("Add a short explanation before sending your appeal.");
+      return;
+    }
+
+    setIsSubmittingAppeal(true);
+    setAppealNotice("");
+
+    try {
+      await createAppeal({
+        contentId: createdPost.post.id,
+        contentType: "post",
+        message: appealMessage.trim()
+      });
+      setAppealNotice("Appeal submitted.");
+      setAppealMessage("");
+    } catch (error) {
+      setAppealNotice(error.message || "Could not submit your appeal.");
+    } finally {
+      setIsSubmittingAppeal(false);
     }
   }
 
@@ -313,6 +346,47 @@ export default function UploadBox({ onPostCreated }) {
 
       {errorMessage ? <Alert color="danger" variant="soft">{errorMessage}</Alert> : null}
       {successMessage ? <Alert color="success" variant="soft">{successMessage}</Alert> : null}
+      {createdPost?.canAppeal ? (
+        <Card variant="outlined" className="content-card">
+          <Stack spacing={1.5}>
+            <Typography level="title-lg">Automatic safety review</Typography>
+            <Typography level="body-sm" textColor="neutral.400">
+              Your post was hidden by automatic safety moderation. You can appeal this decision.
+            </Typography>
+            {createdPost.aiFinding ? (
+              <Typography level="body-sm" textColor="neutral.300">
+                Risk {createdPost.aiFinding.riskScore} • {(createdPost.aiFinding.labels || []).join(", ") || "image safety review"} • {createdPost.aiFinding.reason}
+              </Typography>
+            ) : null}
+            <Textarea
+              value={appealMessage}
+              onChange={(event) => setAppealMessage(event.target.value)}
+              minRows={3}
+              maxRows={6}
+              placeholder="Explain why you believe this image should be restored."
+              sx={{ borderRadius: "18px" }}
+            />
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "stretch", sm: "center" }}>
+              <Button loading={isSubmittingAppeal} onClick={handleAppealSubmit} sx={{ borderRadius: "999px" }}>
+                Appeal
+              </Button>
+              <Button
+                variant="plain"
+                color="neutral"
+                onClick={() => {
+                  if (createdPost?.post?.id) {
+                    window.location.assign(`/${createdPost.post.id}`);
+                  }
+                }}
+                sx={{ borderRadius: "999px" }}
+              >
+                Open post
+              </Button>
+            </Stack>
+            {appealNotice ? <Alert color={appealNotice === "Appeal submitted." ? "success" : "warning"} variant="soft">{appealNotice}</Alert> : null}
+          </Stack>
+        </Card>
+      ) : null}
     </Stack>
   );
 }

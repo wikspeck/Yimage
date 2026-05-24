@@ -21,7 +21,13 @@ export default function CreatePostPage() {
           </Stack>
         </Card>
 
-        <UploadBox onPostCreated={(post) => navigate(`/${post.id}`)} />
+        <UploadBox
+          onPostCreated={(result) => {
+            if (result?.post?.moderationStatus === "active") {
+              navigate(`/${result.post.id}`);
+            }
+          }}
+        />
       </Stack>
     </div>
   );

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, AspectRatio, Button, Card, CircularProgress, Link, Stack, Textarea, Typography } from "@mui/joy";
 import { useNavigate, useParams } from "react-router-dom";
-import { createComment, deletePost, getPost, getPostComments, replyToComment, repostPost, toggleFollow, voteOnComment, voteOnPost } from "../api/yimageApi";
+import { createAppeal, createComment, deletePost, getPost, getPostComments, replyToComment, repostPost, toggleFollow, voteOnComment, voteOnPost } from "../api/yimageApi";
 import AuthPromptCard from "../components/AuthPromptCard";
 import BackButton from "../components/BackButton";
 import CommentThread from "../components/CommentThread";
@@ -54,6 +54,9 @@ export default function PostPage() {
   const [reportOpen, setReportOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [moderationReview, setModerationReview] = useState(null);
+  const [appealMessage, setAppealMessage] = useState("");
+  const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -63,9 +66,10 @@ export default function PostPage() {
       setError("");
 
       try {
-        const [nextPost, nextComments] = await Promise.all([getPost(postId), getPostComments(postId)]);
+        const [postResult, nextComments] = await Promise.all([getPost(postId), getPostComments(postId)]);
         if (isMounted) {
-          setPost(nextPost);
+          setPost(postResult.post);
+          setModerationReview(postResult.moderationReview || null);
           setComments(nextComments);
         }
       } catch (loadError) {
@@ -184,6 +188,38 @@ export default function PostPage() {
     }
   }
 
+  async function handleAppealSubmit() {
+    if (!appealMessage.trim()) {
+      setError("Add a short explanation before sending your appeal.");
+      return;
+    }
+
+    setIsSubmittingAppeal(true);
+    setError("");
+
+    try {
+      await createAppeal({
+        contentId: post.id,
+        contentType: "post",
+        message: appealMessage.trim()
+      });
+      setModerationReview((current) => ({
+        ...(current || {}),
+        appeal: {
+          id: "pending",
+          message: appealMessage.trim(),
+          status: "pending"
+        }
+      }));
+      setToastMessage("Appeal submitted.");
+      setAppealMessage("");
+    } catch (appealError) {
+      setError(appealError.message || "Could not submit your appeal.");
+    } finally {
+      setIsSubmittingAppeal(false);
+    }
+  }
+
   async function handleDeletePost() {
     const isAllowed = Boolean(user && (user.id === post.userId || user.isAdmin));
     if (!isAllowed) {
@@ -253,6 +289,11 @@ export default function PostPage() {
               </AspectRatio>
 
               <Stack spacing={1}>
+                {moderationReview ? (
+                  <Alert color="warning" variant="soft">
+                    {moderationReview.message}
+                  </Alert>
+                ) : null}
                 <Typography level="h1" sx={{ letterSpacing: "-0.05em", fontSize: { xs: "1.8rem", md: "2.4rem" } }}>
                   {post.title}
                 </Typography>
@@ -313,6 +354,38 @@ export default function PostPage() {
                   onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
                 />
               </div>
+
+              {moderationReview ? (
+                <Card variant="outlined" className="content-card">
+                  <Stack spacing={1.25}>
+                    <Typography level="title-md">Appeal moderation</Typography>
+                    {moderationReview.aiFinding ? (
+                      <Typography level="body-sm" textColor="neutral.400">
+                        Risk {moderationReview.aiFinding.riskScore} • {(moderationReview.aiFinding.labels || []).join(", ") || "image safety review"} • {moderationReview.aiFinding.aiReason}
+                      </Typography>
+                    ) : null}
+                    {moderationReview.appeal?.status === "pending" ? (
+                      <Alert color="neutral" variant="soft">
+                        You already have a pending appeal for this post.
+                      </Alert>
+                    ) : (
+                      <>
+                        <Textarea
+                          minRows={3}
+                          maxRows={6}
+                          value={appealMessage}
+                          onChange={(event) => setAppealMessage(event.target.value)}
+                          placeholder="Explain why you think this post should be restored."
+                          sx={{ borderRadius: "18px" }}
+                        />
+                        <Button loading={isSubmittingAppeal} onClick={handleAppealSubmit} sx={{ borderRadius: "999px", alignSelf: "flex-start" }}>
+                          Appeal
+                        </Button>
+                      </>
+                    )}
+                  </Stack>
+                </Card>
+              ) : null}
 
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap" className="post-detail-secondary-actions">
                 <Button variant="soft" color="neutral" component="a" href={`https://yimage.org/${post.id}`} sx={{ borderRadius: "999px" }}>

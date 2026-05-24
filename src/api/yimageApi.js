@@ -54,7 +54,7 @@ export async function createPost({ title, description, imageFile, categoryId = "
     body: formData
   });
 
-  return data.post;
+  return data;
 }
 
 export async function getPosts(options = {}) {
@@ -69,8 +69,7 @@ export async function getPosts(options = {}) {
 }
 
 export async function getPost(id) {
-  const data = await request(`/api/posts/${id}`);
-  return data.post;
+  return request(`/api/posts/${id}`);
 }
 
 export async function getPostComments(id) {
@@ -233,6 +232,16 @@ export async function createReport(payload) {
   });
 }
 
+export async function createAppeal(payload) {
+  return request("/api/appeals", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function getModerationReports() {
   return request("/api/mod/reports");
 }
@@ -244,6 +253,16 @@ export async function applyModerationAction(payload) {
       "Content-Type": "application/json"
     },
     body: JSON.stringify(payload)
+  });
+}
+
+export async function reviewModerationAppeal(appealId, decision) {
+  return request(`/api/mod/appeals/${appealId}/review`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ decision })
   });
 }
 
