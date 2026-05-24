@@ -102,7 +102,7 @@ export default function UploadBox({ onPostCreated }) {
     resetMessages();
 
     try {
-      const response = await createPost({
+      const post = await createPost({
         title: title.trim(),
         description: description.trim(),
         imageFile: selectedFile
@@ -110,7 +110,7 @@ export default function UploadBox({ onPostCreated }) {
 
       setSuccessMessage("Post published successfully.");
       resetForm();
-      onPostCreated?.(response.post);
+      onPostCreated?.(post);
     } catch (error) {
       setErrorMessage(error.message || "Upload failed. Try again.");
     } finally {
@@ -133,10 +133,10 @@ export default function UploadBox({ onPostCreated }) {
         <Stack spacing={2.5}>
           <Stack spacing={1}>
             <Typography level="h2" sx={{ letterSpacing: "-0.05em", fontSize: { xs: "2rem", md: "2.6rem" } }}>
-              Share an image in one calm step
+              Publish a new post
             </Typography>
             <Typography level="body-md" textColor="neutral.400" sx={{ maxWidth: 620 }}>
-              Give the post a title, add context if you want, and upload an image directly through the Yimage Worker.
+              Add a title, a short caption if you want, and upload one image directly to R2 through the Yimage Worker.
             </Typography>
           </Stack>
 
@@ -246,7 +246,7 @@ export default function UploadBox({ onPostCreated }) {
                 px: 3
               }}
             >
-              {isUploading ? <CircularProgress size="sm" color="neutral" /> : "Upload"}
+              {isUploading ? <CircularProgress size="sm" color="neutral" /> : "Publish post"}
             </Button>
             {selectedFile ? (
               <Button variant="plain" color="neutral" onClick={handleRemove} sx={{ borderRadius: "999px" }}>

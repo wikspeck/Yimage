@@ -1,0 +1,26 @@
+import { Card, Stack, Typography } from "@mui/joy";
+import { useNavigate } from "react-router-dom";
+import UploadBox from "../components/UploadBox";
+
+export default function CreatePostPage() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="page-shell">
+      <Stack spacing={3}>
+        <Card variant="outlined" className="content-card">
+          <Stack spacing={1}>
+            <Typography level="h1" sx={{ letterSpacing: "-0.05em" }}>
+              Create a post
+            </Typography>
+            <Typography level="body-md" textColor="neutral.400">
+              Images still go to R2. This screen now saves the post metadata, author, and counters in D1.
+            </Typography>
+          </Stack>
+        </Card>
+
+        <UploadBox onPostCreated={(post) => navigate(`/${post.id}`)} />
+      </Stack>
+    </div>
+  );
+}

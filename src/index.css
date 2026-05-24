@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  font-family: Inter, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Sora", "Segoe UI", sans-serif;
   background: #0b0d12;
 }
 
@@ -16,7 +16,10 @@ body,
 }
 
 body {
-  background: #0b0d12;
+  background:
+    radial-gradient(circle at top, rgba(110, 153, 255, 0.18), transparent 28%),
+    radial-gradient(circle at 80% 20%, rgba(255, 138, 101, 0.14), transparent 22%),
+    linear-gradient(180deg, #090b11 0%, #0f1219 100%);
 }
 
 img {
@@ -28,4 +31,59 @@ button,
 input,
 textarea {
   font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+}
+
+.page-shell {
+  width: min(100%, 1040px);
+  margin: 0 auto;
+  padding: 24px 16px 12px;
+}
+
+.hero-card,
+.content-card,
+.auth-card {
+  border-radius: 30px;
+  background: rgba(18, 20, 28, 0.9);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
+}
+
+.hero-card {
+  overflow: hidden;
+  position: relative;
+}
+
+.hero-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(135deg, rgba(122, 162, 255, 0.18), rgba(255, 255, 255, 0.02));
+  pointer-events: none;
+}
+
+.auth-shell {
+  width: min(100%, 520px);
+  margin: 0 auto;
+  padding: 48px 16px 12px;
+}
+
+@media (max-width: 640px) {
+  .page-shell,
+  .auth-shell {
+    padding-top: 20px;
+  }
 }

@@ -21,5 +21,12 @@
       "binding": "YIMAGE_BUCKET",
       "bucket_name": "yimage-uploads"
     }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "yimage-db",
+      "database_id": "3822f512-a018-4541-80e4-e7796bc622a3"
+    }
   ]
 }

@@ -5,12 +5,12 @@ export default function Footer() {
     <Sheet
       variant="plain"
       sx={{
-        py: 3,
+        py: 4,
         textAlign: "center"
       }}
     >
       <Typography level="body-sm" textColor="neutral.500">
-        Yimage frontend prototype for Cloudflare Pages. Upload simulation only for now.
+        Yimage on Cloudflare Pages, Workers, R2, and D1.
       </Typography>
     </Sheet>
   );
