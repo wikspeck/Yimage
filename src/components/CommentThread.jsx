@@ -3,6 +3,27 @@ import { Button, Card, Stack, Textarea, Typography } from "@mui/joy";
 import { formatRelativeTime } from "../utils/formatters";
 import ReportDialog from "./ReportDialog";
 
+function MiniArrow({ direction = "up" }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 14,
+        height: 14,
+        transform: direction === "down" ? "rotate(180deg)" : "none"
+      }}
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 18V6" />
+        <path d="M7 11l5-5 5 5" />
+      </svg>
+    </span>
+  );
+}
+
 function VotePill({ active = false, children, onClick, label }) {
   return (
     <Button
@@ -41,7 +62,7 @@ function CommentNode({ comment, isLoggedIn, onRequireLogin, onReply, onVote, dep
   }
 
   return (
-    <Stack spacing={1.2} sx={{ ml: depth ? { xs: 1.5, sm: 2.5 } : 0 }}>
+    <Stack spacing={1.2} sx={{ ml: depth ? { xs: 1.25, sm: 2.25 } : 0 }}>
       <Card variant="outlined" className="comment-card">
         <Stack spacing={1}>
           <Stack direction="row" justifyContent="space-between" spacing={1}>
@@ -61,7 +82,7 @@ function CommentNode({ comment, isLoggedIn, onRequireLogin, onReply, onVote, dep
               onClick={() => (isLoggedIn ? onVote(comment.id, "up") : onRequireLogin?.())}
               label="Upvote comment"
             >
-              ↑
+              <MiniArrow direction="up" />
             </VotePill>
             <Typography level="body-sm" sx={{ minWidth: 18, textAlign: "center" }}>
               {comment.score}
@@ -71,7 +92,7 @@ function CommentNode({ comment, isLoggedIn, onRequireLogin, onReply, onVote, dep
               onClick={() => (isLoggedIn ? onVote(comment.id, "down") : onRequireLogin?.())}
               label="Downvote comment"
             >
-              ↓
+              <MiniArrow direction="down" />
             </VotePill>
             <Button
               size="sm"

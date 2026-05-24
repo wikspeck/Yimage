@@ -200,6 +200,25 @@ a {
 .post-detail-comments {
   min-width: 0;
   align-self: stretch;
+  height: 100%;
+}
+
+.comment-panel-shell {
+  min-height: 100%;
+}
+
+.comment-composer-card {
+  border-radius: 18px;
+  background: #020202;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.comment-thread-list {
+  padding-bottom: 4px;
+}
+
+.post-detail-secondary-actions {
+  padding-top: 2px;
 }
 
 .comment-vote-pill {
@@ -284,6 +303,15 @@ a {
   .download-button {
     width: 100%;
     justify-content: center;
+  }
+
+  .post-detail-secondary-actions > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .comment-card {
+    border-radius: 18px;
   }
 }
 

@@ -47,7 +47,6 @@ export default function PostPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [actionNotice, setActionNotice] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -147,10 +146,12 @@ export default function PostPage() {
   }
 
   async function handleCopyLink() {
-    await navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    setToastMessage("Copied link to clipboard.");
-    window.setTimeout(() => setCopied(false), 1600);
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setToastMessage("Copied link to clipboard.");
+    } catch {
+      setError("Could not copy this link.");
+    }
   }
 
   async function handleShare() {
@@ -214,7 +215,11 @@ export default function PostPage() {
         <div className="post-detail-layout">
           <Card variant="outlined" className="content-card post-detail-media-card">
             <Stack spacing={2}>
-              <AspectRatio ratio="4/5" className="viewer-frame" sx={{ borderRadius: "20px", overflow: "hidden", bgcolor: "#050505" }}>
+              <AspectRatio
+                ratio="4/5"
+                className="viewer-frame"
+                sx={{ borderRadius: "20px", overflow: "hidden", bgcolor: "#050505" }}
+              >
                 <img src={post.imageUrl} alt={post.title} style={{ objectFit: "contain" }} />
               </AspectRatio>
 
@@ -224,11 +229,16 @@ export default function PostPage() {
                 </Typography>
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
                   <Typography level="body-sm" textColor="neutral.400">by</Typography>
-                  <Link underline="hover" color="neutral" onClick={() => navigate(`/u/${post.authorUsername}`)} sx={{ cursor: "pointer" }}>
+                  <Link
+                    underline="hover"
+                    color="neutral"
+                    onClick={() => navigate(`/u/${post.authorUsername}`)}
+                    sx={{ cursor: "pointer" }}
+                  >
                     @{post.authorUsername}
                   </Link>
                   <Typography level="body-sm" textColor="neutral.500">
-                    • {formatRelativeTime(post.createdAt)} • {formatFullDate(post.createdAt)}
+                    {formatRelativeTime(post.createdAt)} / {formatFullDate(post.createdAt)}
                   </Typography>
                 </Stack>
                 <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
@@ -260,79 +270,96 @@ export default function PostPage() {
                 onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
               />
 
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap">
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap" className="post-detail-secondary-actions">
                 <Button variant="soft" color="neutral" component="a" href={`https://yimage.org/${post.id}`} sx={{ borderRadius: "999px" }}>
                   Share page
                 </Button>
-                <Button variant="soft" color="neutral" onClick={handleCopyLink} sx={{ borderRadius: "999px" }}>
-                  {copied ? "Copied" : "Copy link"}
+                <Button variant="plain" color="neutral" onClick={handleCopyLink} sx={{ borderRadius: "999px" }}>
+                  Copy link
                 </Button>
                 {user && user.username !== post.authorUsername ? (
                   <Button variant="plain" color="neutral" onClick={handleFollowToggle} sx={{ borderRadius: "999px" }}>
                     {post.authorProfile?.isFollowing ? "Unfollow" : "Follow"}
                   </Button>
                 ) : null}
-                <Button variant="plain" color="neutral" onClick={() => setReportOpen(true)} sx={{ borderRadius: "999px" }}>
-                  Report
-                </Button>
               </Stack>
             </Stack>
           </Card>
 
-          <Stack spacing={2} id="comments" className="post-detail-comments">
-            <Typography level="title-lg">Comments</Typography>
+          <Card variant="outlined" className="content-card post-detail-comments">
+            <Stack spacing={2.25} id="comments" className="comment-panel-shell">
+              <Stack spacing={0.4}>
+                <Typography level="title-lg">Comments</Typography>
+                <Typography level="body-sm" textColor="neutral.500">
+                  Keep the post visible while you read, reply, and vote.
+                </Typography>
+              </Stack>
 
-            {user ? (
-              <Card variant="outlined" className="content-card">
-                <Stack component="form" spacing={1.5} onSubmit={handleCreateComment}>
-                  <Textarea
-                    minRows={3}
-                    maxRows={6}
-                    maxLength={400}
-                    placeholder="Write a comment"
-                    value={commentText}
-                    onChange={(event) => setCommentText(event.target.value)}
-                    sx={{ borderRadius: "18px" }}
-                  />
-                  <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1} alignItems={{ xs: "stretch", sm: "center" }}>
-                    <Typography level="body-sm" textColor="neutral.500">
-                      Commenting as @{user.username}
-                    </Typography>
-                    <Button type="submit" loading={isSubmittingComment} disabled={!commentText.trim()} sx={{ borderRadius: "999px" }}>
-                      Post comment
-                    </Button>
+              {user ? (
+                <Card variant="outlined" className="comment-composer-card">
+                  <Stack component="form" spacing={1.5} onSubmit={handleCreateComment}>
+                    <Textarea
+                      minRows={3}
+                      maxRows={6}
+                      maxLength={400}
+                      placeholder="Write a comment"
+                      value={commentText}
+                      onChange={(event) => setCommentText(event.target.value)}
+                      sx={{ borderRadius: "18px" }}
+                    />
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      justifyContent="space-between"
+                      spacing={1}
+                      alignItems={{ xs: "stretch", sm: "center" }}
+                    >
+                      <Typography level="body-sm" textColor="neutral.500">
+                        Commenting as @{user.username}
+                      </Typography>
+                      <Button type="submit" loading={isSubmittingComment} disabled={!commentText.trim()} sx={{ borderRadius: "999px" }}>
+                        Post comment
+                      </Button>
+                    </Stack>
                   </Stack>
-                </Stack>
-              </Card>
-            ) : (
-              <AuthPromptCard
-                onLogin={() => navigate(`/login?next=/${post.id}`)}
-                onSignup={() => navigate(`/signup?next=/${post.id}`)}
-                message="Log in to vote, reply, and join the comment thread."
-              />
-            )}
-
-            {!comments.length ? (
-              <Card variant="outlined" className="content-card">
-                <Typography level="body-md" textColor="neutral.400">No comments yet.</Typography>
-              </Card>
-            ) : (
-              comments.map((comment) => (
-                <CommentThread
-                  key={comment.id}
-                  comment={comment}
-                  isLoggedIn={Boolean(user)}
-                  onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
-                  onReply={handleReply}
-                  onVote={handleCommentVote}
+                </Card>
+              ) : (
+                <AuthPromptCard
+                  onLogin={() => navigate(`/login?next=/${post.id}`)}
+                  onSignup={() => navigate(`/signup?next=/${post.id}`)}
+                  message="Log in to vote, reply, and join the comment thread."
                 />
-              ))
-            )}
-          </Stack>
+              )}
+
+              {!comments.length ? (
+                <Card variant="outlined" className="content-card">
+                  <Typography level="body-md" textColor="neutral.400">No comments yet.</Typography>
+                </Card>
+              ) : (
+                <Stack spacing={1.5} className="comment-thread-list">
+                  {comments.map((comment) => (
+                    <CommentThread
+                      key={comment.id}
+                      comment={comment}
+                      isLoggedIn={Boolean(user)}
+                      onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
+                      onReply={handleReply}
+                      onVote={handleCommentVote}
+                    />
+                  ))}
+                </Stack>
+              )}
+            </Stack>
+          </Card>
         </div>
 
         <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} targetType="post" targetId={post.id} title="Report post" />
-        <ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} url={window.location.href} title="Share post" onCopied={setToastMessage} />
+        <ShareDialog
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          url={window.location.href}
+          title="Share post"
+          onCopied={setToastMessage}
+        />
         <ToastNotice open={Boolean(toastMessage)} message={toastMessage} onClose={() => setToastMessage("")} />
       </Stack>
     </div>
