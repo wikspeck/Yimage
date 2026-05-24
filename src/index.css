@@ -292,6 +292,13 @@ a {
   border-color: #ffffff !important;
 }
 
+.turnstile-shell {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  overflow-x: auto;
+}
+
 @media (max-width: 640px) {
   .page-shell,
   .auth-shell {

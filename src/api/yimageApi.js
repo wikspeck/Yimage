@@ -40,12 +40,13 @@ async function request(url, init = {}) {
   }
 }
 
-export async function createPost({ title, description, imageFile, categoryId = "", hashtags = "" }) {
+export async function createPost({ title, description, imageFile, categoryId = "", hashtags = "", turnstileToken = "" }) {
   const formData = new FormData();
   formData.append("title", title);
   formData.append("description", description);
   formData.append("categoryId", categoryId);
   formData.append("hashtags", hashtags);
+  formData.append("turnstileToken", turnstileToken);
   formData.append("image", imageFile);
 
   const data = await request("/api/posts", {
@@ -77,25 +78,25 @@ export async function getPostComments(id) {
   return data.comments;
 }
 
-export async function loginUser({ email, password }) {
+export async function loginUser({ email, password, turnstileToken }) {
   const data = await request("/api/auth/login", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email, password, turnstileToken })
   });
 
   return data.user;
 }
 
-export async function signupUser({ username, email, password }) {
+export async function signupUser({ username, email, password, turnstileToken }) {
   const data = await request("/api/auth/signup", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ username, email, password })
+    body: JSON.stringify({ username, email, password, turnstileToken })
   });
 
   return data.user;
@@ -169,25 +170,25 @@ export async function getCategories() {
   return data.categories;
 }
 
-export async function createComment(id, text) {
+export async function createComment(id, text, turnstileToken) {
   const data = await request(`/api/posts/${id}/comments`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ text })
+    body: JSON.stringify({ text, turnstileToken })
   });
 
   return data.comment;
 }
 
-export async function replyToComment(postId, text, parentId) {
+export async function replyToComment(postId, text, parentId, turnstileToken) {
   const data = await request(`/api/posts/${postId}/comments`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ text, parentId })
+    body: JSON.stringify({ text, parentId, turnstileToken })
   });
 
   return data.comment;

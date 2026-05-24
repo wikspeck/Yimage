@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Alert, Box, Button, Card, CircularProgress, Input, Option, Select, Sheet, Stack, Textarea, Typography } from "@mui/joy";
 import ImagePreviewCard from "./ImagePreviewCard";
+import TurnstileWidget from "./TurnstileWidget";
 import { createPost, getCategories } from "../api/yimageApi";
 import { validateImageFile } from "../utils/validateImageFile";
 
@@ -15,6 +16,8 @@ export default function UploadBox({ onPostCreated }) {
   const [previewUrl, setPreviewUrl] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -134,6 +137,7 @@ export default function UploadBox({ onPostCreated }) {
         description: description.trim(),
         categoryId,
         hashtags,
+        turnstileToken,
         imageFile: selectedFile
       });
 
@@ -144,6 +148,7 @@ export default function UploadBox({ onPostCreated }) {
       setErrorMessage(error.message || "Upload failed. Try again.");
     } finally {
       setIsUploading(false);
+      setTurnstileResetKey((current) => current + 1);
     }
   }
 
@@ -285,10 +290,11 @@ export default function UploadBox({ onPostCreated }) {
           ) : null}
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} alignItems={{ xs: "stretch", sm: "center" }}>
+            <TurnstileWidget onTokenChange={setTurnstileToken} resetKey={turnstileResetKey} />
             <Button
               size="lg"
               onClick={handleUpload}
-              disabled={!selectedFile || !title.trim() || isUploading}
+              disabled={!selectedFile || !title.trim() || isUploading || !turnstileToken}
               sx={{
                 borderRadius: "999px",
                 px: 3

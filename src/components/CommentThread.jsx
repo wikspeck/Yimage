@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button, Card, Stack, Textarea, Typography } from "@mui/joy";
 import { formatRelativeTime } from "../utils/formatters";
 import ReportDialog from "./ReportDialog";
+import TurnstileWidget from "./TurnstileWidget";
 
 function MiniArrow({ direction = "up" }) {
   return (
@@ -43,6 +44,8 @@ function CommentNode({ comment, isLoggedIn, onRequireLogin, onReply, onVote, dep
   const [replyOpen, setReplyOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleReplySubmit(event) {
@@ -53,11 +56,12 @@ function CommentNode({ comment, isLoggedIn, onRequireLogin, onReply, onVote, dep
 
     setIsSubmitting(true);
     try {
-      await onReply(comment.id, replyText.trim());
+      await onReply(comment.id, replyText.trim(), turnstileToken);
       setReplyText("");
       setReplyOpen(false);
     } finally {
       setIsSubmitting(false);
+      setTurnstileResetKey((current) => current + 1);
     }
   }
 
@@ -119,11 +123,12 @@ function CommentNode({ comment, isLoggedIn, onRequireLogin, onReply, onVote, dep
                 onChange={(event) => setReplyText(event.target.value)}
                 sx={{ borderRadius: "14px" }}
               />
+              <TurnstileWidget onTokenChange={setTurnstileToken} resetKey={turnstileResetKey} />
               <Stack direction="row" spacing={1} justifyContent="flex-end">
                 <Button size="sm" variant="plain" color="neutral" onClick={() => setReplyOpen(false)} sx={{ borderRadius: "999px" }}>
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" loading={isSubmitting} disabled={!replyText.trim()} sx={{ borderRadius: "999px" }}>
+                <Button type="submit" size="sm" loading={isSubmitting} disabled={!replyText.trim() || !turnstileToken} sx={{ borderRadius: "999px" }}>
                   Reply
                 </Button>
               </Stack>

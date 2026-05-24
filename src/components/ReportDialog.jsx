@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Alert, Button, Modal, ModalClose, ModalDialog, Option, Select, Stack, Textarea, Typography, Input } from "@mui/joy";
 import { createReport } from "../api/yimageApi";
+import TurnstileWidget from "./TurnstileWidget";
 
 const REPORT_OPTIONS = [
   "spam",
@@ -19,6 +20,8 @@ export default function ReportDialog({ open, onClose, targetType, targetId, titl
   const [claimantName, setClaimantName] = useState("");
   const [claimantEmail, setClaimantEmail] = useState("");
   const [copyrightDescription, setCopyrightDescription] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,6 +38,7 @@ export default function ReportDialog({ open, onClose, targetType, targetId, titl
         targetId,
         reason,
         details,
+        turnstileToken,
         claimantName,
         claimantEmail,
         copyrightDescription
@@ -51,6 +55,7 @@ export default function ReportDialog({ open, onClose, targetType, targetId, titl
       setError(submitError.message || "Could not submit report.");
     } finally {
       setIsSubmitting(false);
+      setTurnstileResetKey((current) => current + 1);
     }
   }
 
@@ -88,7 +93,8 @@ export default function ReportDialog({ open, onClose, targetType, targetId, titl
               />
             </>
           ) : null}
-          <Button type="submit" loading={isSubmitting} sx={{ borderRadius: "14px" }}>
+          <TurnstileWidget onTokenChange={setTurnstileToken} resetKey={turnstileResetKey} />
+          <Button type="submit" loading={isSubmitting} disabled={!turnstileToken} sx={{ borderRadius: "14px" }}>
             Submit report
           </Button>
         </Stack>

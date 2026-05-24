@@ -9,6 +9,7 @@ import PostActionBar from "../components/PostActionBar";
 import ReportDialog from "../components/ReportDialog";
 import ShareDialog from "../components/ShareDialog";
 import ToastNotice from "../components/ToastNotice";
+import TurnstileWidget from "../components/TurnstileWidget";
 import { useAuth } from "../context/AuthContext";
 import { formatFullDate, formatRelativeTime } from "../utils/formatters";
 
@@ -43,6 +44,8 @@ export default function PostPage() {
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
+  const [commentTurnstileToken, setCommentTurnstileToken] = useState("");
+  const [commentTurnstileResetKey, setCommentTurnstileResetKey] = useState(0);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
@@ -119,7 +122,7 @@ export default function PostPage() {
     setError("");
 
     try {
-      const comment = await createComment(postId, commentText);
+      const comment = await createComment(postId, commentText, commentTurnstileToken);
       setComments((current) => [...current, comment]);
       setCommentText("");
       setPost((current) => ({ ...current, commentsCount: current.commentsCount + 1 }));
@@ -127,11 +130,12 @@ export default function PostPage() {
       setError(actionError.message || "Could not add comment.");
     } finally {
       setIsSubmittingComment(false);
+      setCommentTurnstileResetKey((current) => current + 1);
     }
   }
 
-  async function handleReply(parentId, text) {
-    const reply = await replyToComment(postId, text, parentId);
+  async function handleReply(parentId, text, turnstileToken) {
+    const reply = await replyToComment(postId, text, parentId, turnstileToken);
     setComments((current) => appendReply(current, reply));
     setPost((current) => ({ ...current, commentsCount: current.commentsCount + 1 }));
   }
@@ -315,6 +319,7 @@ export default function PostPage() {
                       onChange={(event) => setCommentText(event.target.value)}
                       sx={{ borderRadius: "18px" }}
                     />
+                    <TurnstileWidget onTokenChange={setCommentTurnstileToken} resetKey={commentTurnstileResetKey} />
                     <Stack
                       direction={{ xs: "column", sm: "row" }}
                       justifyContent="space-between"
@@ -324,7 +329,7 @@ export default function PostPage() {
                       <Typography level="body-sm" textColor="neutral.500">
                         Commenting as @{user.username}
                       </Typography>
-                      <Button type="submit" loading={isSubmittingComment} disabled={!commentText.trim()} sx={{ borderRadius: "999px" }}>
+                      <Button type="submit" loading={isSubmittingComment} disabled={!commentText.trim() || !commentTurnstileToken} sx={{ borderRadius: "999px" }}>
                         Post comment
                       </Button>
                     </Stack>

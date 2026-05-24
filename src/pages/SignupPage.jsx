@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Alert, Button, Card, Input, Stack, Typography } from "@mui/joy";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
+import TurnstileWidget from "../components/TurnstileWidget";
 import { useAuth } from "../context/AuthContext";
 
 export default function SignupPage() {
@@ -11,6 +12,8 @@ export default function SignupPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -20,12 +23,13 @@ export default function SignupPage() {
     setIsSubmitting(true);
 
     try {
-      await signup({ username, email, password });
+      await signup({ username, email, password, turnstileToken });
       navigate(searchParams.get("next") || "/");
     } catch (submitError) {
       setError(submitError.message || "Could not create account.");
     } finally {
       setIsSubmitting(false);
+      setTurnstileResetKey((current) => current + 1);
     }
   }
 
@@ -49,8 +53,9 @@ export default function SignupPage() {
             <Input placeholder="Username" value={username} onChange={(event) => setUsername(event.target.value)} sx={{ borderRadius: "18px" }} />
             <Input placeholder="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} sx={{ borderRadius: "18px" }} />
             <Input placeholder="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} sx={{ borderRadius: "18px" }} />
+            <TurnstileWidget onTokenChange={setTurnstileToken} resetKey={turnstileResetKey} />
 
-            <Button type="submit" loading={isSubmitting} sx={{ borderRadius: "999px" }}>
+            <Button type="submit" loading={isSubmitting} disabled={!turnstileToken} sx={{ borderRadius: "999px" }}>
               Create account
             </Button>
 

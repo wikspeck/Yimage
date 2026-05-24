@@ -339,6 +339,45 @@ async function parseJsonBody(request) {
   }
 }
 
+async function verifyTurnstileToken(env, request, token) {
+  const responseToken = normalizeText(token);
+
+  if (!responseToken) {
+    return fail("Please complete the Turnstile check.");
+  }
+
+  if (!env.TURNSTILE_SECRET_KEY) {
+    console.error("TURNSTILE_SECRET_KEY is missing.");
+    return fail("Turnstile is not configured correctly.", 500);
+  }
+
+  try {
+    const formData = new URLSearchParams();
+    formData.set("secret", env.TURNSTILE_SECRET_KEY);
+    formData.set("response", responseToken);
+
+    const remoteIp = request.headers.get("CF-Connecting-IP");
+    if (remoteIp) {
+      formData.set("remoteip", remoteIp);
+    }
+
+    const verification = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await verification.json().catch(() => null);
+    if (!verification.ok || !data?.success) {
+      return fail("Turnstile verification failed.", 403);
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Turnstile verification request failed.", error);
+    return fail("Could not verify Turnstile right now.", 500);
+  }
+}
+
 async function getCurrentUser(request, env) {
   const token = getCookie(request, SESSION_COOKIE);
   if (!token) {
@@ -763,6 +802,10 @@ async function createSession(env, userId) {
 
 async function handleSignup(request, env) {
   const body = await parseJsonBody(request);
+  const turnstileFailure = await verifyTurnstileToken(env, request, body.turnstileToken);
+  if (turnstileFailure) {
+    return turnstileFailure;
+  }
   const username = normalizeUsername(body.username);
   const email = normalizeEmail(body.email);
   const password = String(body.password || "");
@@ -814,6 +857,10 @@ async function handleSignup(request, env) {
 
 async function handleLogin(request, env) {
   const body = await parseJsonBody(request);
+  const turnstileFailure = await verifyTurnstileToken(env, request, body.turnstileToken);
+  if (turnstileFailure) {
+    return turnstileFailure;
+  }
   const email = normalizeEmail(body.email);
   const password = String(body.password || "");
 
@@ -974,6 +1021,10 @@ async function handleAvatarUpload(request, env) {
 async function handleCreatePost(request, env) {
   const user = await requireUser(request, env);
   const formData = await request.formData();
+  const turnstileFailure = await verifyTurnstileToken(env, request, formData.get("turnstileToken"));
+  if (turnstileFailure) {
+    return turnstileFailure;
+  }
   const title = normalizeText(formData.get("title"));
   const description = normalizeText(formData.get("description"));
   const categoryId = normalizeText(formData.get("categoryId"));
@@ -1240,6 +1291,10 @@ async function handleCommentCreate(request, env, postId) {
   }
 
   const body = await parseJsonBody(request);
+  const turnstileFailure = await verifyTurnstileToken(env, request, body.turnstileToken);
+  if (turnstileFailure) {
+    return turnstileFailure;
+  }
   const text = normalizeText(body.text);
   const parentId = normalizeText(body.parentId);
 
@@ -1339,6 +1394,10 @@ async function handleCategoriesList(env) {
 async function handleCreateReport(request, env) {
   const reporter = await getCurrentUser(request, env);
   const body = await parseJsonBody(request);
+  const turnstileFailure = await verifyTurnstileToken(env, request, body.turnstileToken);
+  if (turnstileFailure) {
+    return turnstileFailure;
+  }
   const targetType = normalizeText(body.targetType);
   const targetId = normalizeText(body.targetId);
   const reason = normalizeText(body.reason).toLowerCase();
