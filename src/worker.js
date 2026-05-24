@@ -1413,6 +1413,34 @@ async function handleRepost(request, env, postId) {
   });
 }
 
+async function handleDeletePost(request, env, postId) {
+  const user = await requireUser(request, env);
+  const post = await getPostRecord(env, postId, true);
+
+  if (!post) {
+    return fail("Post not found.", 404);
+  }
+
+  const canDelete = user.id === post.userId || Boolean(user.isAdmin);
+  if (!canDelete) {
+    return fail("Forbidden.", 403);
+  }
+
+  await env.DB.prepare("UPDATE posts SET moderation_status = ? WHERE id = ?")
+    .bind(MODERATION_STATES.REMOVED, postId)
+    .run();
+
+  if (user.isAdmin) {
+    await env.DB.prepare(
+      "INSERT INTO moderation_actions (id, moderator_id, target_type, target_id, action, notes, created_at) VALUES (?, ?, 'post', ?, 'remove', ?, ?)"
+    )
+      .bind(createId("mod_"), user.id, postId, "Post deleted by moderator.", toIsoDate())
+      .run();
+  }
+
+  return success({ message: "Post deleted." });
+}
+
 async function handleCommentsList(request, env, postId) {
   const post = await getPostRecord(env, postId);
   if (!post) {
@@ -2027,6 +2055,9 @@ export default {
         }
         if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/repost") && request.method === "POST") {
           return await handleRepost(request, env, url.pathname.split("/")[3]);
+        }
+        if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/delete") && request.method === "POST") {
+          return await handleDeletePost(request, env, url.pathname.split("/")[3]);
         }
         if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/like") && request.method === "POST") {
           return await handleLike(request, env, url.pathname.split("/")[3]);

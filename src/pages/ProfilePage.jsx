@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Alert, Avatar, Button, Card, CircularProgress, Input, Stack, Textarea, Typography } from "@mui/joy";
 import { useNavigate, useParams } from "react-router-dom";
-import { getUserProfile, toggleFollow } from "../api/yimageApi";
+import { deletePost, getUserProfile, toggleFollow } from "../api/yimageApi";
 import BackButton from "../components/BackButton";
 import PostCard from "../components/PostCard";
 import ReportDialog from "../components/ReportDialog";
@@ -164,6 +164,37 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleDeletePost(post) {
+    const isAllowed = Boolean(user && (user.id === post.userId || user.isAdmin));
+    if (!isAllowed) {
+      return;
+    }
+
+    const confirmed = window.confirm("Are you sure you want to delete this post?");
+    if (!confirmed) {
+      return;
+    }
+
+    setError("");
+    setNotice("");
+
+    try {
+      await deletePost(post.id);
+      setPosts((current) => current.filter((item) => item.id !== post.id));
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              postsCount: Math.max(0, Number(current.postsCount || 0) - 1)
+            }
+          : current
+      );
+      setNotice("Post deleted.");
+    } catch (deleteError) {
+      setError(deleteError.message || "Could not delete this post.");
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="page-shell">
@@ -312,6 +343,8 @@ export default function ProfilePage() {
               onDownvote={() => navigate(`/${post.id}`)}
               onRepost={() => navigate(`/${post.id}`)}
               onShare={() => handleSharePost(post.id)}
+              canDelete={Boolean(user && (user.id === post.userId || user.isAdmin))}
+              onDelete={() => handleDeletePost(post)}
               onHashtagClick={(tag) => navigate(`/?hashtag=${encodeURIComponent(tag)}`)}
               onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
               onRequireLogin={() => navigate(`/login?next=/${post.id}`)}

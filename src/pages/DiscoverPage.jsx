@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Box, Button, Card, CircularProgress, Input, Option, Select, Stack, Typography } from "@mui/joy";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getCategories, getPosts, repostPost, toggleFollow, voteOnPost } from "../api/yimageApi";
+import { deletePost, getCategories, getPosts, repostPost, toggleFollow, voteOnPost } from "../api/yimageApi";
 import PostCard from "../components/PostCard";
 import ShareDialog from "../components/ShareDialog";
 import ToastNotice from "../components/ToastNotice";
@@ -169,6 +169,32 @@ export default function DiscoverPage() {
     }
   }
 
+  async function handleDelete(post) {
+    const isAllowed = Boolean(user && (user.id === post.userId || user.isAdmin));
+    if (!isAllowed) {
+      return;
+    }
+
+    const confirmed = window.confirm("Are you sure you want to delete this post?");
+    if (!confirmed) {
+      return;
+    }
+
+    setBusyPostId(post.id);
+    setPostsError("");
+    setNotice("");
+
+    try {
+      await deletePost(post.id);
+      setPosts((current) => current.filter((item) => item.id !== post.id));
+      setNotice("Post deleted.");
+    } catch (error) {
+      setPostsError(error.message || "Could not delete this post.");
+    } finally {
+      setBusyPostId("");
+    }
+  }
+
   return (
     <Box className="page-shell">
       <Stack spacing={3}>
@@ -256,6 +282,8 @@ export default function DiscoverPage() {
               onRepost={() => handleRepost(post.id)}
               onShare={() => handleShare(post.id)}
               onToggleFollow={() => handleToggleFollow(post)}
+              canDelete={Boolean(user && (user.id === post.userId || user.isAdmin))}
+              onDelete={() => handleDelete(post)}
               onHashtagClick={(tag) => {
                 setSearchText(`#${tag}`);
                 updateFilters({ hashtag: tag, query: "" });

@@ -95,6 +95,18 @@ function ReportIcon() {
   );
 }
 
+function TrashIcon() {
+  return (
+    <Icon size={16}>
+      <path d="M9 4.75h6" />
+      <path d="M5.5 7.25h13" />
+      <path d="M8 7.25v10.25c0 .7.55 1.25 1.25 1.25h5.5c.7 0 1.25-.55 1.25-1.25V7.25" />
+      <path d="M10.5 10.25v5.5" />
+      <path d="M13.5 10.25v5.5" />
+    </Icon>
+  );
+}
+
 export default function PostActionBar({
   post,
   isLoggedIn,
@@ -105,6 +117,8 @@ export default function PostActionBar({
   onShare,
   onReport,
   onComment,
+  onDelete,
+  canDelete = false,
   onRequireLogin
 }) {
   const score = post.score ?? post.likeCount ?? 0;
@@ -199,6 +213,18 @@ export default function PostActionBar({
           >
             <ReportIcon />
           </Button>
+          {canDelete ? (
+            <Button
+              size="sm"
+              variant="plain"
+              color="danger"
+              onClick={() => onDelete?.()}
+              className="icon-button icon-button-danger"
+              aria-label="Delete post"
+            >
+              <TrashIcon />
+            </Button>
+          ) : null}
         </Stack>
       </Stack>
 

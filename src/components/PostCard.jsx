@@ -16,6 +16,8 @@ export default function PostCard({
   onHashtagClick,
   onAuthorClick,
   onToggleFollow,
+  canDelete,
+  onDelete,
   onRequireLogin
 }) {
   const [reportOpen, setReportOpen] = useState(false);
@@ -111,6 +113,8 @@ export default function PostCard({
             onRepost={onRepost}
             onShare={onShare}
             onReport={() => setReportOpen(true)}
+            onDelete={onDelete}
+            canDelete={canDelete}
             onComment={() => window.location.assign(`/${post.id}#comments`)}
             onRequireLogin={onRequireLogin}
           />

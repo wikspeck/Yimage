@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, AspectRatio, Button, Card, CircularProgress, Link, Stack, Textarea, Typography } from "@mui/joy";
 import { useNavigate, useParams } from "react-router-dom";
-import { createComment, getPost, getPostComments, replyToComment, repostPost, toggleFollow, voteOnComment, voteOnPost } from "../api/yimageApi";
+import { createComment, deletePost, getPost, getPostComments, replyToComment, repostPost, toggleFollow, voteOnComment, voteOnPost } from "../api/yimageApi";
 import AuthPromptCard from "../components/AuthPromptCard";
 import BackButton from "../components/BackButton";
 import CommentThread from "../components/CommentThread";
@@ -184,6 +184,31 @@ export default function PostPage() {
     }
   }
 
+  async function handleDeletePost() {
+    const isAllowed = Boolean(user && (user.id === post.userId || user.isAdmin));
+    if (!isAllowed) {
+      return;
+    }
+
+    const confirmed = window.confirm("Are you sure you want to delete this post?");
+    if (!confirmed) {
+      return;
+    }
+
+    setIsBusy(true);
+    setError("");
+    setActionNotice("");
+
+    try {
+      await deletePost(post.id);
+      navigate("/", { replace: true });
+    } catch (deleteError) {
+      setError(deleteError.message || "Could not delete this post.");
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="page-shell">
@@ -282,6 +307,8 @@ export default function PostPage() {
                   onRepost={handleRepost}
                   onShare={handleShare}
                   onReport={() => setReportOpen(true)}
+                  onDelete={handleDeletePost}
+                  canDelete={Boolean(user && (user.id === post.userId || user.isAdmin))}
                   onComment={() => document.getElementById("comments")?.scrollIntoView({ behavior: "smooth", block: "start" })}
                   onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
                 />

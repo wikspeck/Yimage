@@ -165,6 +165,12 @@ export async function repostPost(id) {
   return data;
 }
 
+export async function deletePost(id) {
+  return request(`/api/posts/${id}/delete`, {
+    method: "POST"
+  });
+}
+
 export async function getCategories() {
   const data = await request("/api/categories");
   return data.categories;

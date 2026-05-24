@@ -129,6 +129,16 @@ a {
   border-color: #ffffff !important;
 }
 
+.icon-button-danger {
+  border-color: rgba(255, 102, 102, 0.45) !important;
+  color: #ff6b6b !important;
+}
+
+.icon-button-danger:hover {
+  border-color: rgba(255, 122, 122, 0.7) !important;
+  background: rgba(255, 107, 107, 0.08) !important;
+}
+
 .icon-button .action-icon-wrap,
 .icon-button .action-icon-boxed,
 .download-button .action-icon-wrap,
