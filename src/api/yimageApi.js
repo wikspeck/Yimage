@@ -28,6 +28,10 @@ async function request(url, init = {}) {
 
     return readResponse(response);
   } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error("Could not reach the Yimage API.");
+    }
+
     if (error instanceof Error) {
       throw error;
     }

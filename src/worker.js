@@ -12,6 +12,10 @@ const MAX_COMMENT_LENGTH = 400;
 const SESSION_COOKIE = "yimage_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const POST_ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+// Cloudflare Workers currently reject PBKDF2 iteration counts above 100000.
+// We store the iteration count inside each hash string so future verification
+// stays in sync with whatever limit/version created that password.
+const PBKDF2_ITERATIONS = 100000;
 
 function json(data, init = {}) {
   const headers = new Headers(init.headers || {});
@@ -122,7 +126,7 @@ function toPostResponse(post, viewerHasLiked = false) {
     userId: post.userId,
     authorUsername: post.authorUsername,
     title: post.title,
-    description: post.description,
+    description: post.description || "",
     imageKey: post.imageKey,
     imageUrl: `/api/image/${post.id}`,
     createdAt: post.createdAt,
@@ -150,7 +154,6 @@ function bytesToBase64(bytes) {
 async function hashPassword(password) {
   const salt = new Uint8Array(16);
   crypto.getRandomValues(salt);
-  const iterations = 120000;
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
@@ -162,14 +165,14 @@ async function hashPassword(password) {
     {
       name: "PBKDF2",
       salt,
-      iterations,
+      iterations: PBKDF2_ITERATIONS,
       hash: "SHA-256"
     },
     keyMaterial,
     256
   );
 
-  return `${iterations}$${bytesToBase64(salt)}$${bytesToBase64(new Uint8Array(derivedBits))}`;
+  return `${PBKDF2_ITERATIONS}$${bytesToBase64(salt)}$${bytesToBase64(new Uint8Array(derivedBits))}`;
 }
 
 async function verifyPassword(password, storedHash) {
@@ -180,26 +183,38 @@ async function verifyPassword(password, storedHash) {
     return false;
   }
 
-  const salt = Uint8Array.from(atob(saltBase64), (character) => character.charCodeAt(0));
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
-  const derivedBits = await crypto.subtle.deriveBits(
-    {
-      name: "PBKDF2",
-      salt,
-      iterations,
-      hash: "SHA-256"
-    },
-    keyMaterial,
-    256
-  );
+  if (iterations > PBKDF2_ITERATIONS) {
+    console.error("Stored password hash uses unsupported PBKDF2 iterations in Cloudflare Workers.", {
+      iterations
+    });
+    return false;
+  }
 
-  return bytesToBase64(new Uint8Array(derivedBits)) === expectedHash;
+  try {
+    const salt = Uint8Array.from(atob(saltBase64), (character) => character.charCodeAt(0));
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(password),
+      "PBKDF2",
+      false,
+      ["deriveBits"]
+    );
+    const derivedBits = await crypto.subtle.deriveBits(
+      {
+        name: "PBKDF2",
+        salt,
+        iterations,
+        hash: "SHA-256"
+      },
+      keyMaterial,
+      256
+    );
+
+    return bytesToBase64(new Uint8Array(derivedBits)) === expectedHash;
+  } catch (error) {
+    console.error("Password verification failed.", error);
+    return false;
+  }
 }
 
 async function parseJsonBody(request) {
@@ -266,13 +281,13 @@ async function getPostRecord(env, postId) {
         posts.author_id AS userId,
         users.username AS authorUsername,
         posts.title,
-        posts.description,
+        COALESCE(posts.description, '') AS description,
         posts.image_key AS imageKey,
-        posts.image_mime_type AS imageMimeType,
+        COALESCE(posts.image_mime_type, 'application/octet-stream') AS imageMimeType,
         posts.created_at AS createdAt,
-        posts.like_count AS likeCount,
-        posts.comments_count AS commentsCount,
-        posts.views
+        COALESCE(posts.like_count, 0) AS likeCount,
+        COALESCE(posts.comments_count, 0) AS commentsCount,
+        COALESCE(posts.views, 0) AS views
       FROM posts
       INNER JOIN users ON users.id = posts.author_id
       WHERE posts.id = ?
@@ -312,13 +327,13 @@ async function listPosts(env, userId) {
         posts.author_id AS userId,
         users.username AS authorUsername,
         posts.title,
-        posts.description,
+        COALESCE(posts.description, '') AS description,
         posts.image_key AS imageKey,
-        posts.image_mime_type AS imageMimeType,
+        COALESCE(posts.image_mime_type, 'application/octet-stream') AS imageMimeType,
         posts.created_at AS createdAt,
-        posts.like_count AS likeCount,
-        posts.comments_count AS commentsCount,
-        posts.views
+        COALESCE(posts.like_count, 0) AS likeCount,
+        COALESCE(posts.comments_count, 0) AS commentsCount,
+        COALESCE(posts.views, 0) AS views
       FROM posts
       INNER JOIN users ON users.id = posts.author_id
       ORDER BY posts.created_at DESC, posts.id DESC
@@ -511,16 +526,18 @@ async function handleCreatePost(request, env) {
   }
 
   let postId = "";
+  let foundAvailableId = false;
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
     postId = createPostId();
     const existingPost = await env.DB.prepare("SELECT id FROM posts WHERE id = ? LIMIT 1").bind(postId).first();
     if (!existingPost) {
+      foundAvailableId = true;
       break;
     }
   }
 
-  if (!postId) {
+  if (!foundAvailableId) {
     return fail("Could not create post id.", 500);
   }
 
@@ -803,6 +820,11 @@ export default {
         return thrown;
       }
 
+      console.error("Unhandled Worker error", {
+        method: request.method,
+        pathname: url.pathname,
+        error: thrown instanceof Error ? thrown.message : String(thrown)
+      });
       return fail(thrown?.message || "Unexpected server error.", 500);
     }
   }
