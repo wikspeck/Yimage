@@ -112,6 +112,26 @@ export async function likePost(id) {
   return data.post;
 }
 
+export async function voteOnPost(id, vote) {
+  const data = await request(`/api/posts/${id}/vote`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ vote })
+  });
+
+  return data;
+}
+
+export async function repostPost(id) {
+  const data = await request(`/api/posts/${id}/repost`, {
+    method: "POST"
+  });
+
+  return data;
+}
+
 export async function createComment(id, text) {
   const data = await request(`/api/posts/${id}/comments`, {
     method: "POST",

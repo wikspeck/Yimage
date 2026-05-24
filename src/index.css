@@ -69,31 +69,40 @@ a {
 
 .post-preview-media {
   width: 100%;
-  min-height: 220px;
-  max-height: 520px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #000000;
+  background: #050505;
   padding: 12px;
-  text-align: center;
+}
+
+.post-preview-canvas {
+  width: min(100%, 320px);
+  aspect-ratio: 9 / 16;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  padding: 12px;
+  border-radius: 18px;
+  background: #050505;
+  overflow: hidden;
 }
 
 .post-preview-image {
   width: auto;
+  height: auto;
   max-width: 100%;
-  max-height: 496px;
+  max-height: 100%;
   object-fit: contain;
   object-position: center;
   border-radius: 16px;
-  background: #000000;
-  margin-left: auto;
-  margin-right: auto;
+  background: transparent;
+  margin: auto;
 }
 
 .icon-button,
-.download-button,
-.use-button {
+.download-button {
   min-width: auto !important;
   min-height: 40px !important;
   padding: 6px 8px !important;
@@ -103,14 +112,15 @@ a {
   color: #ffffff !important;
 }
 
+.icon-button-active {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-color: #ffffff !important;
+}
+
 .download-button {
   gap: 6px;
   padding: 6px 10px !important;
-}
-
-.use-button {
-  border: 1px solid rgba(255, 255, 255, 0.16) !important;
-  background: #000000 !important;
 }
 
 .action-icon-wrap {
@@ -147,12 +157,14 @@ a {
   }
 
   .post-preview-media {
-    min-height: 180px;
     padding: 10px;
   }
 
+  .post-preview-canvas {
+    width: min(100%, 280px);
+  }
+
   .post-preview-image {
-    max-height: 380px;
     border-radius: 14px;
   }
 }

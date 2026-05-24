@@ -64,15 +64,6 @@ function CommentIcon() {
   );
 }
 
-function UseIcon() {
-  return (
-    <Icon boxed>
-      <path d="M12 3.8 13.8 8.2 18.2 10 13.8 11.8 12 16.2 10.2 11.8 5.8 10 10.2 8.2z" />
-      <path d="M18 14.5 18.8 16.2 20.5 17 18.8 17.8 18 19.5 17.2 17.8 15.5 17 17.2 16.2z" />
-    </Icon>
-  );
-}
-
 function SaveIcon() {
   return (
     <Icon>
@@ -90,10 +81,18 @@ export default function PostActionBar({
   onUpvote,
   onDownvote,
   onRepost,
-  onUse,
   onComment,
   onRequireLogin
 }) {
+  const score = post.score ?? post.likeCount ?? 0;
+  const isUpvoted = post.viewerVote === "up";
+  const isDownvoted = post.viewerVote === "down";
+  const isReposted = Boolean(post.hasReposted);
+
+  function getButtonClassName(isActive, extraClassName = "") {
+    return `${extraClassName} icon-button${isActive ? " icon-button-active" : ""}`.trim();
+  }
+
   return (
     <Stack spacing={1.1} className="post-actions-shell">
       <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" flexWrap="wrap" className="post-actions-row">
@@ -104,20 +103,20 @@ export default function PostActionBar({
             color="neutral"
             onClick={() => (isLoggedIn ? onUpvote?.() : onRequireLogin?.())}
             loading={isBusy}
-            className="icon-button"
+            className={getButtonClassName(isUpvoted)}
             aria-label="Upvote"
           >
             <UpIcon />
           </Button>
           <Typography level="title-sm" sx={{ minWidth: 24, textAlign: "center", color: "#ffffff" }}>
-            {post.likeCount}
+            {score}
           </Typography>
           <Button
             size="sm"
             variant="plain"
             color="neutral"
             onClick={() => (isLoggedIn ? onDownvote?.() : onRequireLogin?.())}
-            className="icon-button"
+            className={getButtonClassName(isDownvoted)}
             aria-label="Downvote"
           >
             <DownIcon />
@@ -140,20 +139,10 @@ export default function PostActionBar({
             variant="plain"
             color="neutral"
             onClick={() => (isLoggedIn ? onRepost?.() : onRequireLogin?.())}
-            className="icon-button"
+            className={getButtonClassName(isReposted)}
             aria-label="Repost"
           >
             <RepostIcon />
-          </Button>
-          <Button
-            size="sm"
-            variant="plain"
-            color="neutral"
-            onClick={() => onUse?.()}
-            className="use-button"
-            aria-label="Use"
-          >
-            <UseIcon />
           </Button>
           <Button
             size="sm"
@@ -177,6 +166,9 @@ export default function PostActionBar({
             {post.commentsCount}
           </Typography>
         </Stack>
+        <Typography level="body-sm" sx={{ color: "rgba(255,255,255,0.72)" }}>
+          {post.repostCount ?? 0} reposts
+        </Typography>
         <Typography level="body-sm" sx={{ color: "rgba(255,255,255,0.72)" }}>
           {post.views} views
         </Typography>

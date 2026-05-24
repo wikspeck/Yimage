@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, Box, Button, Card, CircularProgress, Stack, Typography } from "@mui/joy";
 import { useNavigate } from "react-router-dom";
-import { getPosts, likePost } from "../api/yimageApi";
+import { getPosts, repostPost, voteOnPost } from "../api/yimageApi";
 import PostCard from "../components/PostCard";
 import { useAuth } from "../context/AuthContext";
 
@@ -11,6 +11,7 @@ export default function DiscoverPage() {
   const [posts, setPosts] = useState([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [postsError, setPostsError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busyPostId, setBusyPostId] = useState("");
 
   useEffect(() => {
@@ -43,12 +44,14 @@ export default function DiscoverPage() {
     };
   }, []);
 
-  async function handleLike(postId) {
+  async function handleVote(postId, vote) {
     setBusyPostId(postId);
+    setPostsError("");
+    setNotice("");
 
     try {
-      const updatedPost = await likePost(postId);
-      setPosts((current) => current.map((post) => (post.id === postId ? updatedPost : post)));
+      const result = await voteOnPost(postId, vote);
+      setPosts((current) => current.map((post) => (post.id === postId ? result.post : post)));
     } catch (error) {
       setPostsError(error.message || "Could not update vote.");
     } finally {
@@ -56,25 +59,19 @@ export default function DiscoverPage() {
     }
   }
 
-  function handleDownvotePlaceholder() {
-    setPostsError("Downvote support is coming soon.");
-  }
-
   async function handleRepost(postId) {
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/${postId}`);
-      setPostsError("Post link copied.");
-    } catch {
-      setPostsError("Could not copy the post link.");
-    }
-  }
+    setBusyPostId(postId);
+    setPostsError("");
+    setNotice("");
 
-  async function handleUse(post) {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}${post.imageUrl}`);
-      setPostsError("Image URL copied.");
-    } catch {
-      setPostsError("Could not copy the image URL.");
+      const result = await repostPost(postId);
+      setPosts((current) => current.map((post) => (post.id === postId ? result.post : post)));
+      setNotice(result.message || "Repost updated.");
+    } catch (error) {
+      setPostsError(error.message || "Could not repost this post.");
+    } finally {
+      setBusyPostId("");
     }
   }
 
@@ -103,6 +100,7 @@ export default function DiscoverPage() {
         </Card>
 
         {postsError ? <Alert color="danger" variant="soft">{postsError}</Alert> : null}
+        {notice ? <Alert color="neutral" variant="soft">{notice}</Alert> : null}
 
         {isLoadingPosts ? (
           <Card variant="outlined" className="content-card">
@@ -128,10 +126,9 @@ export default function DiscoverPage() {
               post={post}
               isLoggedIn={Boolean(user)}
               isBusy={busyPostId === post.id}
-              onUpvote={() => handleLike(post.id)}
-              onDownvote={handleDownvotePlaceholder}
+              onUpvote={() => handleVote(post.id, "up")}
+              onDownvote={() => handleVote(post.id, "down")}
               onRepost={() => handleRepost(post.id)}
-              onUse={() => handleUse(post)}
               onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
             />
           ))}

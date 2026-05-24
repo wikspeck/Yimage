@@ -120,7 +120,7 @@ function toPublicUser(user) {
   };
 }
 
-function toPostResponse(post, viewerHasLiked = false) {
+function toPostResponse(post, viewerVote = null, viewerHasReposted = false, repostsRemainingToday = 3) {
   return {
     id: post.id,
     userId: post.userId,
@@ -131,9 +131,14 @@ function toPostResponse(post, viewerHasLiked = false) {
     imageUrl: `/api/image/${post.id}`,
     createdAt: post.createdAt,
     likeCount: Number(post.likeCount || 0),
+    score: Number(post.score ?? (post.likeCount || 0)),
     commentsCount: Number(post.commentsCount || 0),
     views: Number(post.views || 0),
-    hasLiked: Boolean(viewerHasLiked)
+    repostCount: Number(post.repostCount || 0),
+    hasLiked: viewerVote === "up",
+    viewerVote,
+    hasReposted: Boolean(viewerHasReposted),
+    repostsRemainingToday: Number(repostsRemainingToday)
   };
 }
 
@@ -286,8 +291,10 @@ async function getPostRecord(env, postId) {
         COALESCE(posts.image_mime_type, 'application/octet-stream') AS imageMimeType,
         posts.created_at AS createdAt,
         COALESCE(posts.like_count, 0) AS likeCount,
+        COALESCE(posts.score, COALESCE(posts.like_count, 0)) AS score,
         COALESCE(posts.comments_count, 0) AS commentsCount,
-        COALESCE(posts.views, 0) AS views
+        COALESCE(posts.views, 0) AS views,
+        COALESCE(posts.repost_count, 0) AS repostCount
       FROM posts
       INNER JOIN users ON users.id = posts.author_id
       WHERE posts.id = ?
@@ -300,14 +307,33 @@ async function getPostRecord(env, postId) {
   return row || null;
 }
 
-async function getViewerLikeMap(env, userId, postIds) {
+async function getViewerVoteMap(env, userId, postIds) {
   if (!userId || !postIds.length) {
     return {};
   }
 
   const placeholders = postIds.map(() => "?").join(", ");
   const rows = await env.DB.prepare(
-    `SELECT post_id AS postId FROM likes WHERE user_id = ? AND post_id IN (${placeholders})`
+    `SELECT post_id AS postId, vote FROM votes WHERE user_id = ? AND post_id IN (${placeholders})`
+  )
+    .bind(userId, ...postIds)
+    .all();
+
+  const result = {};
+  (rows.results || []).forEach((row) => {
+    result[row.postId] = row.vote;
+  });
+  return result;
+}
+
+async function getViewerRepostMap(env, userId, postIds) {
+  if (!userId || !postIds.length) {
+    return {};
+  }
+
+  const placeholders = postIds.map(() => "?").join(", ");
+  const rows = await env.DB.prepare(
+    `SELECT post_id AS postId FROM reposts WHERE user_id = ? AND post_id IN (${placeholders})`
   )
     .bind(userId, ...postIds)
     .all();
@@ -317,6 +343,19 @@ async function getViewerLikeMap(env, userId, postIds) {
     result[row.postId] = true;
   });
   return result;
+}
+
+async function getRepostsRemainingToday(env, userId) {
+  if (!userId) {
+    return 3;
+  }
+
+  const dayStart = toIsoDate(Date.now() - 24 * 60 * 60 * 1000);
+  const row = await env.DB.prepare("SELECT COUNT(*) AS count FROM reposts WHERE user_id = ? AND created_at >= ?")
+    .bind(userId, dayStart)
+    .first();
+  const used = Number(row?.count || 0);
+  return Math.max(0, 3 - used);
 }
 
 async function listPosts(env, userId) {
@@ -332,19 +371,25 @@ async function listPosts(env, userId) {
         COALESCE(posts.image_mime_type, 'application/octet-stream') AS imageMimeType,
         posts.created_at AS createdAt,
         COALESCE(posts.like_count, 0) AS likeCount,
+        COALESCE(posts.score, COALESCE(posts.like_count, 0)) AS score,
         COALESCE(posts.comments_count, 0) AS commentsCount,
         COALESCE(posts.views, 0) AS views
+        ,
+        COALESCE(posts.repost_count, 0) AS repostCount
       FROM posts
       INNER JOIN users ON users.id = posts.author_id
-      ORDER BY posts.created_at DESC, posts.id DESC
+      ORDER BY COALESCE(posts.repost_count, 0) DESC, COALESCE(posts.score, COALESCE(posts.like_count, 0)) DESC, posts.created_at DESC, posts.id DESC
       LIMIT 50
     `
   ).all();
 
   const posts = rows.results || [];
-  const likesByPost = await getViewerLikeMap(env, userId, posts.map((post) => post.id));
+  const postIds = posts.map((post) => post.id);
+  const votesByPost = await getViewerVoteMap(env, userId, postIds);
+  const repostsByPost = await getViewerRepostMap(env, userId, postIds);
+  const repostsRemainingToday = await getRepostsRemainingToday(env, userId);
 
-  return posts.map((post) => toPostResponse(post, likesByPost[post.id]));
+  return posts.map((post) => toPostResponse(post, votesByPost[post.id] || null, repostsByPost[post.id], repostsRemainingToday));
 }
 
 async function createSession(env, userId) {
@@ -573,7 +618,7 @@ async function handleCreatePost(request, env) {
   const post = await getPostRecord(env, postId);
   return success(
     {
-      post: toPostResponse(post, false)
+      post: toPostResponse(post, null, false, 3)
     },
     { status: 201 }
   );
@@ -596,10 +641,12 @@ async function handleGetPost(request, env, postId) {
   post.views = Number(post.views || 0) + 1;
 
   const user = await getCurrentUser(request, env);
-  const likes = await getViewerLikeMap(env, user?.id, [postId]);
+  const votes = await getViewerVoteMap(env, user?.id, [postId]);
+  const reposts = await getViewerRepostMap(env, user?.id, [postId]);
+  const repostsRemainingToday = await getRepostsRemainingToday(env, user?.id);
 
   return success({
-    post: toPostResponse(post, likes[postId])
+    post: toPostResponse(post, votes[postId] || null, reposts[postId], repostsRemainingToday)
   });
 }
 
@@ -632,7 +679,104 @@ async function handleLike(request, env, postId) {
 
   const updatedPost = await getPostRecord(env, postId);
   return success({
-    post: toPostResponse(updatedPost, hasLiked)
+    post: toPostResponse(updatedPost, hasLiked ? "up" : null, false, 3)
+  });
+}
+
+async function handleVote(request, env, postId) {
+  const user = await requireUser(request, env);
+  const post = await getPostRecord(env, postId);
+
+  if (!post) {
+    return fail("Post not found.", 404);
+  }
+
+  const body = await parseJsonBody(request);
+  const nextVote = body.vote === "up" || body.vote === "down" ? body.vote : null;
+
+  if (!nextVote) {
+    return fail("Vote must be up or down.", 400);
+  }
+
+  const existingVote = await env.DB.prepare("SELECT vote FROM votes WHERE user_id = ? AND post_id = ? LIMIT 1")
+    .bind(user.id, postId)
+    .first();
+
+  let finalVote = nextVote;
+  let scoreDelta = 0;
+
+  if (!existingVote) {
+    await env.DB.prepare("INSERT INTO votes (post_id, user_id, vote, created_at) VALUES (?, ?, ?, ?)")
+      .bind(postId, user.id, nextVote, toIsoDate())
+      .run();
+    scoreDelta = nextVote === "up" ? 1 : -1;
+  } else if (existingVote.vote === nextVote) {
+    await env.DB.prepare("DELETE FROM votes WHERE user_id = ? AND post_id = ?").bind(user.id, postId).run();
+    scoreDelta = nextVote === "up" ? -1 : 1;
+    finalVote = null;
+  } else {
+    await env.DB.prepare("UPDATE votes SET vote = ?, created_at = ? WHERE user_id = ? AND post_id = ?")
+      .bind(nextVote, toIsoDate(), user.id, postId)
+      .run();
+    scoreDelta = nextVote === "up" ? 2 : -2;
+  }
+
+  await env.DB.prepare("UPDATE posts SET score = COALESCE(score, COALESCE(like_count, 0)) + ?, like_count = COALESCE(score, COALESCE(like_count, 0)) + ? WHERE id = ?")
+    .bind(scoreDelta, scoreDelta, postId)
+    .run();
+
+  const updatedPost = await getPostRecord(env, postId);
+  const repostsRemainingToday = await getRepostsRemainingToday(env, user.id);
+  const viewerReposts = await getViewerRepostMap(env, user.id, [postId]);
+
+  return success({
+    post: toPostResponse(updatedPost, finalVote, viewerReposts[postId], repostsRemainingToday)
+  });
+}
+
+async function handleRepost(request, env, postId) {
+  const user = await requireUser(request, env);
+  const post = await getPostRecord(env, postId);
+
+  if (!post) {
+    return fail("Post not found.", 404);
+  }
+
+  const remainingBefore = await getRepostsRemainingToday(env, user.id);
+  if (remainingBefore <= 0) {
+    return fail("You have no reposts left today.", 429);
+  }
+
+  const existing = await env.DB.prepare("SELECT id FROM reposts WHERE user_id = ? AND post_id = ? LIMIT 1")
+    .bind(user.id, postId)
+    .first();
+
+  let active = false;
+
+  if (existing) {
+    await env.DB.prepare("DELETE FROM reposts WHERE id = ?").bind(existing.id).run();
+    await env.DB.prepare("UPDATE posts SET repost_count = CASE WHEN repost_count > 0 THEN repost_count - 1 ELSE 0 END WHERE id = ?")
+      .bind(postId)
+      .run();
+  } else {
+    await env.DB.prepare("INSERT INTO reposts (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)")
+      .bind(createId("repost_"), postId, user.id, toIsoDate())
+      .run();
+    await env.DB.prepare("UPDATE posts SET repost_count = COALESCE(repost_count, 0) + 1 WHERE id = ?")
+      .bind(postId)
+      .run();
+    active = true;
+  }
+
+  const updatedPost = await getPostRecord(env, postId);
+  const votes = await getViewerVoteMap(env, user.id, [postId]);
+  const repostsRemainingToday = await getRepostsRemainingToday(env, user.id);
+
+  return success({
+    message: active
+      ? `You reposted. ${repostsRemainingToday} reposts left today.`
+      : `Repost removed. ${repostsRemainingToday} reposts left today.`,
+    post: toPostResponse(updatedPost, votes[postId] || null, active, repostsRemainingToday)
   });
 }
 
@@ -784,6 +928,14 @@ export default {
 
       if (url.pathname === "/api/posts" && request.method === "GET") {
         return await handleListPosts(request, env);
+      }
+
+      if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/vote") && request.method === "POST") {
+        return await handleVote(request, env, url.pathname.split("/")[3]);
+      }
+
+      if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/repost") && request.method === "POST") {
+        return await handleRepost(request, env, url.pathname.split("/")[3]);
       }
 
       if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/like") && request.method === "POST") {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, AspectRatio, Button, Card, CircularProgress, Stack, Textarea, Typography } from "@mui/joy";
 import { useNavigate, useParams } from "react-router-dom";
-import { createComment, getPost, getPostComments, likePost } from "../api/yimageApi";
+import { createComment, getPost, getPostComments, repostPost, voteOnPost } from "../api/yimageApi";
 import AuthPromptCard from "../components/AuthPromptCard";
 import BackButton from "../components/BackButton";
 import PostActionBar from "../components/PostActionBar";
@@ -53,12 +53,14 @@ export default function PostPage() {
     };
   }, [postId]);
 
-  async function handleLike() {
+  async function handleVote(vote) {
     setIsBusy(true);
+    setError("");
+    setActionNotice("");
 
     try {
-      const updatedPost = await likePost(postId);
-      setPost(updatedPost);
+      const result = await voteOnPost(postId, vote);
+      setPost(result.post);
     } catch (actionError) {
       setError(actionError.message || "Could not update vote.");
     } finally {
@@ -66,25 +68,19 @@ export default function PostPage() {
     }
   }
 
-  function handleDownvotePlaceholder() {
-    setActionNotice("Downvote support is coming soon.");
-  }
-
   async function handleRepost() {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setActionNotice("Post link copied.");
-    } catch {
-      setActionNotice("Could not copy the post link.");
-    }
-  }
+    setIsBusy(true);
+    setError("");
+    setActionNotice("");
 
-  async function handleUse() {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}${post.imageUrl}`);
-      setActionNotice("Image URL copied.");
-    } catch {
-      setActionNotice("Could not copy the image URL.");
+      const result = await repostPost(postId);
+      setPost(result.post);
+      setActionNotice(result.message || "Repost updated.");
+    } catch (actionError) {
+      setError(actionError.message || "Could not repost this post.");
+    } finally {
+      setIsBusy(false);
     }
   }
 
@@ -145,7 +141,7 @@ export default function PostPage() {
 
         <Card variant="outlined" className="content-card">
           <Stack spacing={2.5}>
-            <AspectRatio ratio="4/3" className="viewer-frame" sx={{ borderRadius: "20px", overflow: "hidden", bgcolor: "#05070b" }}>
+            <AspectRatio ratio="4/3" className="viewer-frame" sx={{ borderRadius: "20px", overflow: "hidden", bgcolor: "#050505" }}>
               <img src={post.imageUrl} alt={post.title} style={{ objectFit: "contain" }} />
             </AspectRatio>
 
@@ -167,10 +163,9 @@ export default function PostPage() {
               post={post}
               isLoggedIn={Boolean(user)}
               isBusy={isBusy}
-              onUpvote={handleLike}
-              onDownvote={handleDownvotePlaceholder}
+              onUpvote={() => handleVote("up")}
+              onDownvote={() => handleVote("down")}
               onRepost={handleRepost}
-              onUse={handleUse}
               onComment={() => document.getElementById("comments")?.scrollIntoView({ behavior: "smooth", block: "start" })}
               onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
             />

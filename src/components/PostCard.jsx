@@ -3,7 +3,7 @@ import { Link as RouterLink } from "react-router-dom";
 import PostActionBar from "./PostActionBar";
 import { formatRelativeTime } from "../utils/formatters";
 
-export default function PostCard({ post, isLoggedIn, isBusy, onUpvote, onDownvote, onRepost, onUse, onRequireLogin }) {
+export default function PostCard({ post, isLoggedIn, isBusy, onUpvote, onDownvote, onRepost, onRequireLogin }) {
   return (
     <Card
       variant="outlined"
@@ -11,8 +11,8 @@ export default function PostCard({ post, isLoggedIn, isBusy, onUpvote, onDownvot
       sx={{
         p: { xs: 2, md: 2.5 },
         borderRadius: "22px",
-        bgcolor: "rgba(18, 20, 28, 0.96)",
-        borderColor: "rgba(255,255,255,0.08)"
+        bgcolor: "#000000",
+        borderColor: "rgba(255,255,255,0.12)"
       }}
     >
       <Stack spacing={2}>
@@ -20,13 +20,15 @@ export default function PostCard({ post, isLoggedIn, isBusy, onUpvote, onDownvot
           sx={{
             borderRadius: "20px",
             overflow: "hidden",
-            bgcolor: "#000000",
-            border: "1px solid rgba(255,255,255,0.08)"
+            bgcolor: "#050505",
+            border: "1px solid rgba(255,255,255,0.12)"
           }}
         >
           <Link component={RouterLink} to={`/${post.id}`} underline="none" color="neutral">
             <div className="post-preview-media">
-              <img src={post.imageUrl} alt={post.title} className="post-preview-image" />
+              <div className="post-preview-canvas">
+                <img src={post.imageUrl} alt={post.title} className="post-preview-image" />
+              </div>
             </div>
           </Link>
         </Sheet>
@@ -57,7 +59,6 @@ export default function PostCard({ post, isLoggedIn, isBusy, onUpvote, onDownvot
           onUpvote={onUpvote}
           onDownvote={onDownvote}
           onRepost={onRepost}
-          onUse={onUse}
           onComment={() => window.location.assign(`/${post.id}#comments`)}
           onRequireLogin={onRequireLogin}
         />
