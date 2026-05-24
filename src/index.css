@@ -87,28 +87,25 @@ a {
 }
 
 .post-preview-canvas {
-  width: min(100%, 320px);
+  width: 100%;
   aspect-ratio: 9 / 16;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto;
-  padding: 12px;
+  padding: 10px;
   border-radius: 18px;
   background: #050505;
   overflow: hidden;
 }
 
 .post-preview-image {
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   object-position: center;
   border-radius: 16px;
   background: transparent;
-  margin: auto;
 }
 
 .icon-button,
@@ -221,6 +218,19 @@ a {
   margin: 0;
 }
 
+.post-author-row {
+  row-gap: 8px;
+}
+
+.inline-follow-button {
+  min-height: 28px !important;
+  padding: 0 10px !important;
+  border-radius: 999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+}
+
 .comment-panel-shell {
   min-height: 100%;
 }
@@ -237,6 +247,12 @@ a {
 
 .post-detail-secondary-actions {
   padding-top: 2px;
+}
+
+.post-detail-action-panel {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 0;
 }
 
 .comment-vote-pill {
@@ -270,7 +286,7 @@ a {
   }
 
   .post-preview-canvas {
-    width: min(100%, 280px);
+    width: 100%;
   }
 
   .post-preview-image {

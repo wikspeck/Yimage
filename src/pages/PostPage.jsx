@@ -227,16 +227,27 @@ export default function PostPage() {
                 <Typography level="h1" sx={{ letterSpacing: "-0.05em", fontSize: { xs: "1.8rem", md: "2.4rem" } }}>
                   {post.title}
                 </Typography>
-                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center" className="post-author-row">
                   <Typography level="body-sm" textColor="neutral.400">by</Typography>
                   <Link
                     underline="hover"
                     color="neutral"
                     onClick={() => navigate(`/u/${post.authorUsername}`)}
-                    sx={{ cursor: "pointer" }}
+                    sx={{ cursor: "pointer", fontWeight: 600 }}
                   >
                     @{post.authorUsername}
                   </Link>
+                  {user && user.username !== post.authorUsername ? (
+                    <Button
+                      size="sm"
+                      variant={post.authorProfile?.isFollowing ? "soft" : "plain"}
+                      color="neutral"
+                      onClick={handleFollowToggle}
+                      className="inline-follow-button"
+                    >
+                      {post.authorProfile?.isFollowing ? "Following" : "Follow"}
+                    </Button>
+                  ) : null}
                   <Typography level="body-sm" textColor="neutral.500">
                     {formatRelativeTime(post.createdAt)} / {formatFullDate(post.createdAt)}
                   </Typography>
@@ -257,18 +268,20 @@ export default function PostPage() {
                 {post.description ? <Typography level="body-lg" textColor="neutral.300">{post.description}</Typography> : null}
               </Stack>
 
-              <PostActionBar
-                post={post}
-                isLoggedIn={Boolean(user)}
-                isBusy={isBusy}
-                onUpvote={() => handleVote("up")}
-                onDownvote={() => handleVote("down")}
-                onRepost={handleRepost}
-                onShare={handleShare}
-                onReport={() => setReportOpen(true)}
-                onComment={() => document.getElementById("comments")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
-              />
+              <div className="post-detail-action-panel">
+                <PostActionBar
+                  post={post}
+                  isLoggedIn={Boolean(user)}
+                  isBusy={isBusy}
+                  onUpvote={() => handleVote("up")}
+                  onDownvote={() => handleVote("down")}
+                  onRepost={handleRepost}
+                  onShare={handleShare}
+                  onReport={() => setReportOpen(true)}
+                  onComment={() => document.getElementById("comments")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
+                />
+              </div>
 
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap" className="post-detail-secondary-actions">
                 <Button variant="soft" color="neutral" component="a" href={`https://yimage.org/${post.id}`} sx={{ borderRadius: "999px" }}>
@@ -277,11 +290,6 @@ export default function PostPage() {
                 <Button variant="plain" color="neutral" onClick={handleCopyLink} sx={{ borderRadius: "999px" }}>
                   Copy link
                 </Button>
-                {user && user.username !== post.authorUsername ? (
-                  <Button variant="plain" color="neutral" onClick={handleFollowToggle} sx={{ borderRadius: "999px" }}>
-                    {post.authorProfile?.isFollowing ? "Unfollow" : "Follow"}
-                  </Button>
-                ) : null}
               </Stack>
             </Stack>
           </Card>
