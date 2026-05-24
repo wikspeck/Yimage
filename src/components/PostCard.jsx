@@ -15,6 +15,7 @@ export default function PostCard({
   onShare,
   onHashtagClick,
   onAuthorClick,
+  onToggleFollow,
   onRequireLogin
 }) {
   const [reportOpen, setReportOpen] = useState(false);
@@ -58,14 +59,25 @@ export default function PostCard({
                 {formatRelativeTime(post.createdAt)}
               </Typography>
             </Stack>
-            <Typography
-              level="body-sm"
-              textColor="neutral.400"
-              sx={{ cursor: onAuthorClick ? "pointer" : "default" }}
-              onClick={onAuthorClick}
-            >
-              by @{post.authorUsername}
-            </Typography>
+            <Stack direction="row" spacing={0.9} alignItems="center" useFlexGap flexWrap="wrap" className="post-author-row">
+              <Typography
+                level="body-sm"
+                textColor="neutral.400"
+                sx={{ cursor: onAuthorClick ? "pointer" : "default" }}
+                onClick={onAuthorClick}
+              >
+                @{post.authorUsername}
+              </Typography>
+              {onToggleFollow && isLoggedIn ? (
+                <button
+                  type="button"
+                  className="inline-follow-button inline-follow-button-compact"
+                  onClick={onToggleFollow}
+                >
+                  {post.authorProfile?.isFollowing ? "Following" : "Follow"}
+                </button>
+              ) : null}
+            </Stack>
             <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
               {post.category ? (
                 <Typography level="body-sm" className="post-tag-chip">

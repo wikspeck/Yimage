@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Box, Button, Card, CircularProgress, Input, Option, Select, Stack, Typography } from "@mui/joy";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getCategories, getPosts, repostPost, voteOnPost } from "../api/yimageApi";
+import { getCategories, getPosts, repostPost, toggleFollow, voteOnPost } from "../api/yimageApi";
 import PostCard from "../components/PostCard";
 import ShareDialog from "../components/ShareDialog";
 import ToastNotice from "../components/ToastNotice";
@@ -151,6 +151,24 @@ export default function DiscoverPage() {
     }
   }
 
+  async function handleToggleFollow(post) {
+    try {
+      const profile = await toggleFollow(post.authorUsername);
+      setPosts((current) =>
+        current.map((item) =>
+          item.authorUsername === post.authorUsername
+            ? {
+                ...item,
+                authorProfile: profile
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      setPostsError(error.message || "Could not update follow status.");
+    }
+  }
+
   return (
     <Box className="page-shell">
       <Stack spacing={3}>
@@ -237,6 +255,7 @@ export default function DiscoverPage() {
               onDownvote={() => handleVote(post.id, "down")}
               onRepost={() => handleRepost(post.id)}
               onShare={() => handleShare(post.id)}
+              onToggleFollow={() => handleToggleFollow(post)}
               onHashtagClick={(tag) => {
                 setSearchText(`#${tag}`);
                 updateFilters({ hashtag: tag, query: "" });
