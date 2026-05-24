@@ -18,11 +18,11 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onDiscover
         mx: { xs: 2, md: 3 },
         mt: { xs: 2, md: 3 },
         px: { xs: 2, md: 3 },
-        py: 2,
-        borderRadius: "24px",
-        bgcolor: "rgba(14, 16, 24, 0.8)",
+        py: 1.5,
+        borderRadius: "18px",
+        bgcolor: "rgba(14, 16, 24, 0.92)",
         borderColor: "rgba(255,255,255,0.08)",
-        backdropFilter: "blur(18px)"
+        backdropFilter: "blur(14px)"
       }}
     >
       <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2} flexWrap="wrap">
@@ -43,7 +43,7 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onDiscover
               Yimage
             </Typography>
             <Typography level="body-sm" textColor="neutral.400">
-              Discover and share standout images.
+              Social image sharing
             </Typography>
           </Box>
         </Stack>

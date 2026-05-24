@@ -1,19 +1,17 @@
 import { useEffect, useState } from "react";
-import { Alert, Box, Button, Card, CircularProgress, Stack, Tab, TabList, Tabs, Typography } from "@mui/joy";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { getPosts, repostPost, voteOnPost } from "../api/yimageApi";
+import { Alert, Box, Button, Card, CircularProgress, Stack, Typography } from "@mui/joy";
+import { useNavigate } from "react-router-dom";
+import { getPosts, likePost } from "../api/yimageApi";
 import PostCard from "../components/PostCard";
 import { useAuth } from "../context/AuthContext";
 
 export default function DiscoverPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [posts, setPosts] = useState([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [postsError, setPostsError] = useState("");
   const [busyPostId, setBusyPostId] = useState("");
-  const sort = searchParams.get("sort") || "hot";
 
   useEffect(() => {
     let isMounted = true;
@@ -23,7 +21,7 @@ export default function DiscoverPage() {
       setPostsError("");
 
       try {
-        const nextPosts = await getPosts(sort);
+        const nextPosts = await getPosts("new");
         if (isMounted) {
           setPosts(nextPosts);
         }
@@ -43,27 +41,16 @@ export default function DiscoverPage() {
     return () => {
       isMounted = false;
     };
-  }, [sort]);
+  }, []);
 
-  async function handleVote(postId, vote) {
+  async function handleLike(postId) {
     setBusyPostId(postId);
+
     try {
-      const updatedPost = await voteOnPost(postId, vote);
+      const updatedPost = await likePost(postId);
       setPosts((current) => current.map((post) => (post.id === postId ? updatedPost : post)));
     } catch (error) {
-      setPostsError(error.message || "Could not update vote.");
-    } finally {
-      setBusyPostId("");
-    }
-  }
-
-  async function handleRepost(postId) {
-    setBusyPostId(postId);
-    try {
-      const updatedPost = await repostPost(postId);
-      setPosts((current) => current.map((post) => (post.id === postId ? updatedPost : post)));
-    } catch (error) {
-      setPostsError(error.message || "Could not repost.");
+      setPostsError(error.message || "Could not update like.");
     } finally {
       setBusyPostId("");
     }
@@ -72,16 +59,13 @@ export default function DiscoverPage() {
   return (
     <Box className="page-shell">
       <Stack spacing={3}>
-        <Card variant="outlined" className="hero-card">
+        <Card variant="outlined" className="content-card">
           <Stack spacing={1.5}>
-            <Typography level="body-sm" textColor="primary.300" sx={{ letterSpacing: "0.08em", textTransform: "uppercase" }}>
-              Image-first discovery
+            <Typography level="h1" sx={{ letterSpacing: "-0.06em", fontSize: { xs: "2rem", md: "2.8rem" } }}>
+              Discover
             </Typography>
-            <Typography level="h1" sx={{ letterSpacing: "-0.06em", fontSize: { xs: "2.4rem", md: "4rem" }, maxWidth: 760 }}>
-              Explore fresh posts, strong visuals, and simple social feedback.
-            </Typography>
-            <Typography level="body-lg" textColor="neutral.400" sx={{ maxWidth: 700 }}>
-              Yimage now separates browsing from publishing, so anyone can explore while logged-in users can post, vote, comment, repost, and download.
+            <Typography level="body-md" textColor="neutral.400" sx={{ maxWidth: 640 }}>
+              A simple image feed backed by D1 metadata and R2 image storage.
             </Typography>
             <Stack direction="row" spacing={1}>
               <Button variant="solid" color="primary" onClick={() => navigate(user ? "/create" : "/login?next=/create")} sx={{ borderRadius: "999px" }}>
@@ -95,17 +79,6 @@ export default function DiscoverPage() {
             </Stack>
           </Stack>
         </Card>
-
-        <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2} alignItems={{ md: "center" }}>
-          <Typography level="title-lg">Discover</Typography>
-          <Tabs value={sort} onChange={(_event, value) => setSearchParams(value === "hot" ? {} : { sort: value })}>
-            <TabList sx={{ borderRadius: "999px", bgcolor: "rgba(255,255,255,0.04)" }}>
-              <Tab value="hot">Hot</Tab>
-              <Tab value="new">New</Tab>
-              <Tab value="top">Top</Tab>
-            </TabList>
-          </Tabs>
-        </Stack>
 
         {postsError ? <Alert color="danger" variant="soft">{postsError}</Alert> : null}
 
@@ -133,8 +106,7 @@ export default function DiscoverPage() {
               post={post}
               isLoggedIn={Boolean(user)}
               isBusy={busyPostId === post.id}
-              onVote={(vote) => handleVote(post.id, vote)}
-              onRepost={() => handleRepost(post.id)}
+              onLike={() => handleLike(post.id)}
               onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
             />
           ))}

@@ -26,11 +26,8 @@ export default function ProfilePage() {
           <Stack spacing={1}>
             <Typography level="title-lg">Profile placeholder</Typography>
             <Typography level="body-md" textColor="neutral.400">
-              Public profiles can come next. For now this page confirms account persistence and shows starter stats.
+              Public profiles can come next. For now this page confirms that your account is stored in D1 and your session stays active.
             </Typography>
-            <Typography level="body-sm">Posts: {user.stats.posts}</Typography>
-            <Typography level="body-sm">Upvotes received: {user.stats.upvotesReceived}</Typography>
-            <Typography level="body-sm">Downloads received: {user.stats.downloadsReceived}</Typography>
           </Stack>
         </Card>
       </Stack>

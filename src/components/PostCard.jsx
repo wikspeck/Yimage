@@ -1,16 +1,16 @@
-import { AspectRatio, Card, Link, Sheet, Stack, Typography } from "@mui/joy";
+import { AspectRatio, Card, Link, Stack, Typography } from "@mui/joy";
 import { Link as RouterLink } from "react-router-dom";
 import PostActionBar from "./PostActionBar";
 import { formatRelativeTime } from "../utils/formatters";
 
-export default function PostCard({ post, isLoggedIn, isBusy, onVote, onRepost, onRequireLogin }) {
+export default function PostCard({ post, isLoggedIn, isBusy, onLike, onRequireLogin }) {
   return (
     <Card
       variant="outlined"
       sx={{
         p: { xs: 2, md: 2.5 },
-        borderRadius: "28px",
-        bgcolor: "rgba(18, 20, 28, 0.92)",
+        borderRadius: "22px",
+        bgcolor: "rgba(18, 20, 28, 0.96)",
         borderColor: "rgba(255,255,255,0.08)"
       }}
     >
@@ -40,16 +40,13 @@ export default function PostCard({ post, isLoggedIn, isBusy, onVote, onRepost, o
           ) : null}
         </Stack>
 
-        <Sheet sx={{ bgcolor: "transparent" }}>
-          <PostActionBar
-            post={post}
-            isLoggedIn={isLoggedIn}
-            isBusy={isBusy}
-            onVote={onVote}
-            onRepost={onRepost}
-            onRequireLogin={onRequireLogin}
-          />
-        </Sheet>
+        <PostActionBar
+          post={post}
+          isLoggedIn={isLoggedIn}
+          isBusy={isBusy}
+          onLike={onLike}
+          onRequireLogin={onRequireLogin}
+        />
       </Stack>
     </Card>
   );

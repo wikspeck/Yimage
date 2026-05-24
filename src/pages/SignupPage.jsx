@@ -37,7 +37,7 @@ export default function SignupPage() {
               Sign up
             </Typography>
             <Typography level="body-md" textColor="neutral.400">
-              Create a Yimage account to publish posts and join discussions.
+              Create a Yimage account to publish posts and join the feed.
             </Typography>
           </div>
 

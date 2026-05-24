@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Alert, AspectRatio, Button, Card, CircularProgress, Stack, Textarea, Typography } from "@mui/joy";
 import { useNavigate, useParams } from "react-router-dom";
-import { createComment, getPost, getPostComments, repostPost, voteOnPost } from "../api/yimageApi";
+import { createComment, getPost, getPostComments, likePost } from "../api/yimageApi";
 import AuthPromptCard from "../components/AuthPromptCard";
 import PostActionBar from "../components/PostActionBar";
 import { useAuth } from "../context/AuthContext";
@@ -51,25 +51,14 @@ export default function PostPage() {
     };
   }, [postId]);
 
-  async function handleVote(vote) {
+  async function handleLike() {
     setIsBusy(true);
-    try {
-      const updatedPost = await voteOnPost(postId, vote);
-      setPost(updatedPost);
-    } catch (actionError) {
-      setError(actionError.message || "Could not update vote.");
-    } finally {
-      setIsBusy(false);
-    }
-  }
 
-  async function handleRepost() {
-    setIsBusy(true);
     try {
-      const updatedPost = await repostPost(postId);
+      const updatedPost = await likePost(postId);
       setPost(updatedPost);
     } catch (actionError) {
-      setError(actionError.message || "Could not repost.");
+      setError(actionError.message || "Could not update like.");
     } finally {
       setIsBusy(false);
     }
@@ -130,7 +119,7 @@ export default function PostPage() {
 
         <Card variant="outlined" className="content-card">
           <Stack spacing={2.5}>
-            <AspectRatio ratio="4/3" sx={{ borderRadius: "24px", overflow: "hidden", bgcolor: "#05070b" }}>
+            <AspectRatio ratio="4/3" sx={{ borderRadius: "20px", overflow: "hidden", bgcolor: "#05070b" }}>
               <img src={post.imageUrl} alt={post.title} style={{ objectFit: "contain" }} />
             </AspectRatio>
 
@@ -152,8 +141,7 @@ export default function PostPage() {
               post={post}
               isLoggedIn={Boolean(user)}
               isBusy={isBusy}
-              onVote={handleVote}
-              onRepost={handleRepost}
+              onLike={handleLike}
               onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
             />
 
@@ -200,7 +188,7 @@ export default function PostPage() {
             <AuthPromptCard
               onLogin={() => navigate(`/login?next=/${post.id}`)}
               onSignup={() => navigate(`/signup?next=/${post.id}`)}
-              message="Log in to vote, repost, and join the comment thread."
+              message="Log in to like posts and join the comment thread."
             />
           )}
 

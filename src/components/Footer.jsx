@@ -10,7 +10,7 @@ export default function Footer() {
       }}
     >
       <Typography level="body-sm" textColor="neutral.500">
-        Yimage on Cloudflare Pages, Workers, R2, and D1.
+        Yimage on Cloudflare Pages, Workers, R2, and D1
       </Typography>
     </Sheet>
   );

@@ -14,7 +14,7 @@ export default function CreatePostPage() {
               Create a post
             </Typography>
             <Typography level="body-md" textColor="neutral.400">
-              Images still go to R2. This screen now saves the post metadata, author, and counters in D1.
+              Upload one image to R2 and save the post record in D1.
             </Typography>
           </Stack>
         </Card>

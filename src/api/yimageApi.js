@@ -1,23 +1,39 @@
-async function readJson(response) {
-  const data = await response.json().catch(() => ({
-    ok: false,
-    message: "Unexpected server response"
-  }));
+async function readResponse(response) {
+  const contentType = response.headers.get("content-type") || "";
 
-  if (!response.ok || data.ok === false) {
-    throw new Error(data.message || "Request failed");
+  if (contentType.includes("application/json")) {
+    const data = await response.json().catch(() => null);
+
+    if (!data) {
+      throw new Error("The server returned invalid JSON.");
+    }
+
+    if (!response.ok || data.ok === false) {
+      throw new Error(data.message || `Request failed with status ${response.status}.`);
+    }
+
+    return data;
   }
 
-  return data;
+  const text = await response.text().catch(() => "");
+  throw new Error(text.trim() || `The server returned ${response.status} ${response.statusText || "response"}.`);
 }
 
 async function request(url, init = {}) {
-  const response = await fetch(url, {
-    credentials: "include",
-    ...init
-  });
+  try {
+    const response = await fetch(url, {
+      credentials: "include",
+      ...init
+    });
 
-  return readJson(response);
+    return readResponse(response);
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+
+    throw new Error("Could not reach the Yimage API.");
+  }
 }
 
 export async function createPost({ title, description, imageFile }) {
@@ -84,20 +100,8 @@ export async function getCurrentUser() {
   return data.user;
 }
 
-export async function voteOnPost(id, vote) {
-  const data = await request(`/api/posts/${id}/vote`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ vote })
-  });
-
-  return data.post;
-}
-
-export async function repostPost(id) {
-  const data = await request(`/api/posts/${id}/repost`, {
+export async function likePost(id) {
+  const data = await request(`/api/posts/${id}/like`, {
     method: "POST"
   });
 

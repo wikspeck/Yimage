@@ -5,8 +5,7 @@ export default function PostActionBar({
   post,
   isLoggedIn,
   isBusy,
-  onVote,
-  onRepost,
+  onLike,
   onRequireLogin,
   showCounts = true
 }) {
@@ -14,33 +13,13 @@ export default function PostActionBar({
     <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
       <Button
         size="sm"
-        variant={post.viewerVote === "up" ? "solid" : "soft"}
-        color={post.viewerVote === "up" ? "success" : "neutral"}
-        onClick={() => (isLoggedIn ? onVote("up") : onRequireLogin?.())}
+        variant={post.hasLiked ? "solid" : "soft"}
+        color={post.hasLiked ? "primary" : "neutral"}
+        onClick={() => (isLoggedIn ? onLike() : onRequireLogin?.())}
         loading={isBusy}
         sx={{ borderRadius: "999px" }}
       >
-        Upvote
-      </Button>
-      <Button
-        size="sm"
-        variant={post.viewerVote === "down" ? "solid" : "soft"}
-        color={post.viewerVote === "down" ? "danger" : "neutral"}
-        onClick={() => (isLoggedIn ? onVote("down") : onRequireLogin?.())}
-        loading={isBusy}
-        sx={{ borderRadius: "999px" }}
-      >
-        Downvote
-      </Button>
-      <Button
-        size="sm"
-        variant="soft"
-        color="neutral"
-        onClick={() => (isLoggedIn ? onRepost() : onRequireLogin?.())}
-        loading={isBusy}
-        sx={{ borderRadius: "999px" }}
-      >
-        Repost
+        {post.hasLiked ? "Liked" : "Like"}
       </Button>
       <Button
         size="sm"
@@ -54,13 +33,12 @@ export default function PostActionBar({
       </Button>
       {showCounts ? (
         <>
-          <Chip size="sm" variant="soft">Score {post.score}</Chip>
+          <Chip size="sm" variant="soft">Likes {post.likeCount}</Chip>
           <Chip size="sm" variant="soft">Comments {post.commentsCount}</Chip>
-          <Chip size="sm" variant="soft">Reposts {post.repostCount}</Chip>
-          <Chip size="sm" variant="soft">Downloads {post.downloads}</Chip>
+          <Chip size="sm" variant="soft">Views {post.views}</Chip>
         </>
       ) : null}
-      {!showCounts ? <Typography level="body-sm">Score {post.score}</Typography> : null}
+      {!showCounts ? <Typography level="body-sm">Likes {post.likeCount}</Typography> : null}
     </Stack>
   );
 }

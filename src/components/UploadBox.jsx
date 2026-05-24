@@ -124,9 +124,9 @@ export default function UploadBox({ onPostCreated }) {
         variant="outlined"
         sx={{
           p: { xs: 2, md: 3 },
-          borderRadius: "32px",
+          borderRadius: "22px",
           borderColor: isDragging ? "primary.400" : "rgba(255,255,255,0.08)",
-          bgcolor: isDragging ? "rgba(122, 162, 255, 0.08)" : "rgba(18, 20, 28, 0.94)",
+          bgcolor: "rgba(18, 20, 28, 0.96)",
           transition: "all 0.2s ease"
         }}
       >
@@ -136,7 +136,7 @@ export default function UploadBox({ onPostCreated }) {
               Publish a new post
             </Typography>
             <Typography level="body-md" textColor="neutral.400" sx={{ maxWidth: 620 }}>
-              Add a title, a short caption if you want, and upload one image directly to R2 through the Yimage Worker.
+              Add a title, an optional caption, and one image.
             </Typography>
           </Stack>
 
@@ -175,7 +175,7 @@ export default function UploadBox({ onPostCreated }) {
             variant="soft"
             sx={{
               p: { xs: 3, md: 4 },
-              borderRadius: "28px",
+              borderRadius: "18px",
               border: "1.5px dashed",
               borderColor: isDragging ? "primary.400" : "rgba(255,255,255,0.12)",
               bgcolor: "rgba(255,255,255,0.02)",
@@ -196,7 +196,7 @@ export default function UploadBox({ onPostCreated }) {
                 sx={{
                   width: 52,
                   height: 52,
-                  borderRadius: "18px",
+                  borderRadius: "14px",
                   display: "grid",
                   placeItems: "center",
                   bgcolor: "rgba(255,255,255,0.05)",

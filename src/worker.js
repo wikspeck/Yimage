@@ -14,14 +14,30 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const POST_ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 function json(data, init = {}) {
-  return Response.json(data, init);
+  const headers = new Headers(init.headers || {});
+  headers.set("Content-Type", "application/json; charset=utf-8");
+  return new Response(JSON.stringify(data), {
+    ...init,
+    headers
+  });
 }
 
-function error(message, status = 400) {
+function success(data, init = {}) {
+  return json(
+    {
+      ok: true,
+      ...data
+    },
+    init
+  );
+}
+
+function fail(message, status = 400, details) {
   return json(
     {
       ok: false,
-      message
+      message,
+      ...(details ? { details } : {})
     },
     { status }
   );
@@ -42,16 +58,16 @@ function clearSessionCookie() {
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
 }
 
+function normalizeText(value) {
+  return String(value || "").trim();
+}
+
 function normalizeEmail(value) {
-  return String(value || "").trim().toLowerCase();
+  return normalizeText(value).toLowerCase();
 }
 
 function normalizeUsername(value) {
-  return String(value || "").trim();
-}
-
-function normalizeText(value) {
-  return String(value || "").trim();
+  return normalizeText(value);
 }
 
 function isValidEmail(email) {
@@ -71,9 +87,9 @@ function createId(prefix = "") {
 }
 
 function createPostId() {
-  const buffer = new Uint8Array(4);
-  crypto.getRandomValues(buffer);
-  return Array.from(buffer, (item) => POST_ID_CHARS[item % POST_ID_CHARS.length]).join("");
+  const values = new Uint8Array(4);
+  crypto.getRandomValues(values);
+  return Array.from(values, (item) => POST_ID_CHARS[item % POST_ID_CHARS.length]).join("");
 }
 
 function getImageKey(id, extension) {
@@ -82,7 +98,7 @@ function getImageKey(id, extension) {
 
 function getImageFilename(post) {
   const extension = ALLOWED_IMAGE_TYPES[post.imageMimeType] || "jpg";
-  const safeTitle = (post.title || "yimage")
+  const safeTitle = normalizeText(post.title)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
@@ -96,48 +112,39 @@ function toPublicUser(user) {
     id: user.id,
     username: user.username,
     email: user.email,
-    createdAt: user.createdAt,
-    stats: {
-      posts: user.posts,
-      upvotesReceived: user.upvotesReceived,
-      downloadsReceived: user.downloadsReceived
-    }
+    createdAt: user.createdAt
   };
 }
 
-function toPostResponse(post, viewerVote = null) {
+function toPostResponse(post, viewerHasLiked = false) {
   return {
     id: post.id,
-    authorId: post.authorId,
+    userId: post.userId,
     authorUsername: post.authorUsername,
     title: post.title,
     description: post.description,
     imageKey: post.imageKey,
     imageUrl: `/api/image/${post.id}`,
     createdAt: post.createdAt,
-    upvotes: post.upvotes,
-    downvotes: post.downvotes,
-    score: post.score,
-    downloads: post.downloads,
-    views: post.views,
-    repostCount: post.repostCount,
-    commentsCount: post.commentsCount,
-    viewerVote
+    likeCount: Number(post.likeCount || 0),
+    commentsCount: Number(post.commentsCount || 0),
+    views: Number(post.views || 0),
+    hasLiked: Boolean(viewerHasLiked)
   };
 }
 
 async function sha256Hex(input) {
-  const data = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest("SHA-256", data);
+  const buffer = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", buffer);
   return Array.from(new Uint8Array(digest), (item) => item.toString(16).padStart(2, "0")).join("");
 }
 
 function bytesToBase64(bytes) {
-  let text = "";
+  let output = "";
   bytes.forEach((item) => {
-    text += String.fromCharCode(item);
+    output += String.fromCharCode(item);
   });
-  return btoa(text);
+  return btoa(output);
 }
 
 async function hashPassword(password) {
@@ -151,7 +158,6 @@ async function hashPassword(password) {
     false,
     ["deriveBits"]
   );
-
   const derivedBits = await crypto.subtle.deriveBits(
     {
       name: "PBKDF2",
@@ -163,8 +169,7 @@ async function hashPassword(password) {
     256
   );
 
-  const hash = bytesToBase64(new Uint8Array(derivedBits));
-  return `${iterations}$${bytesToBase64(salt)}$${hash}`;
+  return `${iterations}$${bytesToBase64(salt)}$${bytesToBase64(new Uint8Array(derivedBits))}`;
 }
 
 async function verifyPassword(password, storedHash) {
@@ -175,7 +180,7 @@ async function verifyPassword(password, storedHash) {
     return false;
   }
 
-  const saltBytes = Uint8Array.from(atob(saltBase64), (character) => character.charCodeAt(0));
+  const salt = Uint8Array.from(atob(saltBase64), (character) => character.charCodeAt(0));
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
@@ -183,11 +188,10 @@ async function verifyPassword(password, storedHash) {
     false,
     ["deriveBits"]
   );
-
   const derivedBits = await crypto.subtle.deriveBits(
     {
       name: "PBKDF2",
-      salt: saltBytes,
+      salt,
       iterations,
       hash: "SHA-256"
     },
@@ -195,34 +199,18 @@ async function verifyPassword(password, storedHash) {
     256
   );
 
-  const actualHash = bytesToBase64(new Uint8Array(derivedBits));
-  return actualHash === expectedHash;
+  return bytesToBase64(new Uint8Array(derivedBits)) === expectedHash;
 }
 
 async function parseJsonBody(request) {
   try {
     return await request.json();
   } catch {
-    throw new Error("Invalid JSON body");
+    throw new Error("Invalid JSON body.");
   }
 }
 
-function getRecentBoost(createdAt) {
-  const ageHours = Math.max(0, (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60));
-  return Math.max(0, 48 - ageHours);
-}
-
-function getHotScore(post) {
-  return (
-    post.score * 3 +
-    post.repostCount * 5 +
-    post.commentsCount * 2 +
-    post.downloads +
-    getRecentBoost(post.createdAt)
-  );
-}
-
-async function getUserBySession(request, env) {
+async function getCurrentUser(request, env) {
   const token = getCookie(request, SESSION_COOKIE);
 
   if (!token) {
@@ -238,10 +226,7 @@ async function getUserBySession(request, env) {
         users.id,
         users.username,
         users.email,
-        users.created_at AS createdAt,
-        users.posts_count AS posts,
-        users.upvotes_received AS upvotesReceived,
-        users.downloads_received AS downloadsReceived
+        users.created_at AS createdAt
       FROM sessions
       INNER JOIN users ON users.id = sessions.user_id
       WHERE sessions.token_hash = ?
@@ -264,21 +249,10 @@ async function getUserBySession(request, env) {
 }
 
 async function requireUser(request, env) {
-  const user = await getUserBySession(request, env);
+  const user = await getCurrentUser(request, env);
 
   if (!user) {
-    throw new Response(
-      JSON.stringify({
-        ok: false,
-        message: "You must be logged in to do that."
-      }),
-      {
-        status: 401,
-        headers: {
-          "Content-Type": "application/json"
-        }
-      }
-    );
+    throw fail("You must be logged in to do that.", 401);
   }
 
   return user;
@@ -289,20 +263,16 @@ async function getPostRecord(env, postId) {
     `
       SELECT
         posts.id,
-        posts.author_id AS authorId,
+        posts.author_id AS userId,
         users.username AS authorUsername,
         posts.title,
         posts.description,
         posts.image_key AS imageKey,
         posts.image_mime_type AS imageMimeType,
         posts.created_at AS createdAt,
-        posts.upvotes,
-        posts.downvotes,
-        posts.score,
-        posts.downloads,
-        posts.views,
-        posts.repost_count AS repostCount,
-        posts.comments_count AS commentsCount
+        posts.like_count AS likeCount,
+        posts.comments_count AS commentsCount,
+        posts.views
       FROM posts
       INNER JOIN users ON users.id = posts.author_id
       WHERE posts.id = ?
@@ -315,83 +285,68 @@ async function getPostRecord(env, postId) {
   return row || null;
 }
 
-async function getViewerVote(env, postId, userId) {
-  if (!userId) {
-    return null;
+async function getViewerLikeMap(env, userId, postIds) {
+  if (!userId || !postIds.length) {
+    return {};
   }
 
-  const vote = await env.DB.prepare("SELECT vote FROM votes WHERE post_id = ? AND user_id = ? LIMIT 1")
-    .bind(postId, userId)
-    .first();
+  const placeholders = postIds.map(() => "?").join(", ");
+  const rows = await env.DB.prepare(
+    `SELECT post_id AS postId FROM likes WHERE user_id = ? AND post_id IN (${placeholders})`
+  )
+    .bind(userId, ...postIds)
+    .all();
 
-  return vote?.vote || null;
+  const result = {};
+  (rows.results || []).forEach((row) => {
+    result[row.postId] = true;
+  });
+  return result;
 }
 
-async function listPosts(env, userId, sort = "hot") {
+async function listPosts(env, userId) {
   const rows = await env.DB.prepare(
     `
       SELECT
         posts.id,
-        posts.author_id AS authorId,
+        posts.author_id AS userId,
         users.username AS authorUsername,
         posts.title,
         posts.description,
         posts.image_key AS imageKey,
         posts.image_mime_type AS imageMimeType,
         posts.created_at AS createdAt,
-        posts.upvotes,
-        posts.downvotes,
-        posts.score,
-        posts.downloads,
-        posts.views,
-        posts.repost_count AS repostCount,
-        posts.comments_count AS commentsCount
+        posts.like_count AS likeCount,
+        posts.comments_count AS commentsCount,
+        posts.views
       FROM posts
       INNER JOIN users ON users.id = posts.author_id
+      ORDER BY posts.created_at DESC, posts.id DESC
+      LIMIT 50
     `
   ).all();
 
-  const records = (rows.results || []).map((row) => ({
-    ...row
-  }));
+  const posts = rows.results || [];
+  const likesByPost = await getViewerLikeMap(env, userId, posts.map((post) => post.id));
 
-  const votesByPost = {};
+  return posts.map((post) => toPostResponse(post, likesByPost[post.id]));
+}
 
-  if (userId && records.length) {
-    const placeholders = records.map(() => "?").join(", ");
-    const voteRows = await env.DB.prepare(
-      `SELECT post_id AS postId, vote FROM votes WHERE user_id = ? AND post_id IN (${placeholders})`
-    )
-      .bind(userId, ...records.map((post) => post.id))
-      .all();
+async function createSession(env, userId) {
+  const token = createId("sess_");
+  const tokenHash = await sha256Hex(token);
+  const sessionId = createId("session_");
+  const createdAt = toIsoDate();
+  const expiresAt = toIsoDate(Date.now() + SESSION_TTL_SECONDS * 1000);
 
-    (voteRows.results || []).forEach((row) => {
-      votesByPost[row.postId] = row.vote;
-    });
-  }
+  await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(userId).run();
+  await env.DB.prepare(
+    "INSERT INTO sessions (id, user_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)"
+  )
+    .bind(sessionId, userId, tokenHash, createdAt, expiresAt)
+    .run();
 
-  const sorted = records.sort((left, right) => {
-    if (sort === "new") {
-      return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
-    }
-
-    if (sort === "top") {
-      if (right.score !== left.score) {
-        return right.score - left.score;
-      }
-      return right.downloads - left.downloads;
-    }
-
-    const hotDifference = getHotScore(right) - getHotScore(left);
-
-    if (hotDifference !== 0) {
-      return hotDifference;
-    }
-
-    return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
-  });
-
-  return sorted.slice(0, 50).map((post) => toPostResponse(post, votesByPost[post.id] || null));
+  return token;
 }
 
 async function handleSignup(request, env) {
@@ -401,73 +356,45 @@ async function handleSignup(request, env) {
   const password = String(body.password || "");
 
   if (!isValidUsername(username)) {
-    return error("Username must be 3 to 24 characters and use only letters, numbers, or underscores.");
+    return fail("Username must be 3 to 24 characters and use only letters, numbers, or underscores.");
   }
 
   if (!isValidEmail(email)) {
-    return error("Please enter a valid email address.");
+    return fail("Please enter a valid email address.");
   }
 
   if (password.length < 8) {
-    return error("Password must be at least 8 characters.");
+    return fail("Password must be at least 8 characters.");
   }
 
-  const existingUser = await env.DB.prepare(
-    "SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1"
-  )
+  const existingUser = await env.DB.prepare("SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1")
     .bind(username, email)
     .first();
 
   if (existingUser) {
-    return error("That username or email is already in use.", 409);
+    return fail("That username or email is already in use.", 409);
   }
 
   const userId = createId("user_");
-  const passwordHash = await hashPassword(password);
   const createdAt = toIsoDate();
+  const passwordHash = await hashPassword(password);
 
   await env.DB.prepare(
-    `
-      INSERT INTO users (
-        id,
-        username,
-        email,
-        password_hash,
-        created_at,
-        posts_count,
-        upvotes_received,
-        downloads_received
-      ) VALUES (?, ?, ?, ?, ?, 0, 0, 0)
-    `
+    "INSERT INTO users (id, username, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)"
   )
     .bind(userId, username, email, passwordHash, createdAt)
     .run();
 
-  const token = createId("sess_");
-  const tokenHash = await sha256Hex(token);
-  const sessionId = createId("session_");
-  const expiresAt = toIsoDate(Date.now() + SESSION_TTL_SECONDS * 1000);
+  const token = await createSession(env, userId);
 
-  await env.DB.prepare(
-    "INSERT INTO sessions (id, user_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)"
-  )
-    .bind(sessionId, userId, tokenHash, createdAt, expiresAt)
-    .run();
-
-  const user = {
-    id: userId,
-    username,
-    email,
-    createdAt,
-    posts: 0,
-    upvotesReceived: 0,
-    downloadsReceived: 0
-  };
-
-  return json(
+  return success(
     {
-      ok: true,
-      user: toPublicUser(user)
+      user: toPublicUser({
+        id: userId,
+        username,
+        email,
+        createdAt
+      })
     },
     {
       status: 201,
@@ -483,6 +410,10 @@ async function handleLogin(request, env) {
   const email = normalizeEmail(body.email);
   const password = String(body.password || "");
 
+  if (!email || !password) {
+    return fail("Email and password are required.");
+  }
+
   const user = await env.DB.prepare(
     `
       SELECT
@@ -490,10 +421,7 @@ async function handleLogin(request, env) {
         username,
         email,
         password_hash AS passwordHash,
-        created_at AS createdAt,
-        posts_count AS posts,
-        upvotes_received AS upvotesReceived,
-        downloads_received AS downloadsReceived
+        created_at AS createdAt
       FROM users
       WHERE email = ?
       LIMIT 1
@@ -503,31 +431,19 @@ async function handleLogin(request, env) {
     .first();
 
   if (!user) {
-    return error("Invalid email or password.", 401);
+    return fail("Invalid email or password.", 401);
   }
 
   const validPassword = await verifyPassword(password, user.passwordHash);
 
   if (!validPassword) {
-    return error("Invalid email or password.", 401);
+    return fail("Invalid email or password.", 401);
   }
 
-  const token = createId("sess_");
-  const tokenHash = await sha256Hex(token);
-  const sessionId = createId("session_");
-  const createdAt = toIsoDate();
-  const expiresAt = toIsoDate(Date.now() + SESSION_TTL_SECONDS * 1000);
+  const token = await createSession(env, user.id);
 
-  await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(user.id).run();
-  await env.DB.prepare(
-    "INSERT INTO sessions (id, user_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)"
-  )
-    .bind(sessionId, user.id, tokenHash, createdAt, expiresAt)
-    .run();
-
-  return json(
+  return success(
     {
-      ok: true,
       user: toPublicUser(user)
     },
     {
@@ -546,10 +462,8 @@ async function handleLogout(request, env) {
     await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(tokenHash).run();
   }
 
-  return json(
-    {
-      ok: true
-    },
+  return success(
+    {},
     {
       headers: {
         "Set-Cookie": clearSessionCookie()
@@ -558,11 +472,9 @@ async function handleLogout(request, env) {
   );
 }
 
-async function handleCurrentUser(request, env) {
-  const user = await getUserBySession(request, env);
-
-  return json({
-    ok: true,
+async function handleMe(request, env) {
+  const user = await getCurrentUser(request, env);
+  return success({
     user: user ? toPublicUser(user) : null
   });
 }
@@ -575,43 +487,41 @@ async function handleCreatePost(request, env) {
   const image = formData.get("image");
 
   if (!title) {
-    return error("Title is required.");
+    return fail("Title is required.");
   }
 
   if (title.length > MAX_TITLE_LENGTH) {
-    return error(`Title must be ${MAX_TITLE_LENGTH} characters or fewer.`);
+    return fail(`Title must be ${MAX_TITLE_LENGTH} characters or fewer.`);
   }
 
   if (description.length > MAX_DESCRIPTION_LENGTH) {
-    return error(`Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`);
+    return fail(`Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`);
   }
 
   if (!(image instanceof File)) {
-    return error("Image file is required.");
+    return fail("Image file is required.");
   }
 
   if (!ALLOWED_IMAGE_TYPES[image.type]) {
-    return error("Only JPG, PNG, WEBP, and GIF images are allowed.");
+    return fail("Only JPG, PNG, WEBP, and GIF images are allowed.");
   }
 
   if (image.size > MAX_FILE_SIZE) {
-    return error("Image must be 10 MB or smaller.");
+    return fail("Image must be 10 MB or smaller.");
   }
 
   let postId = "";
-  let existingPost = null;
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
     postId = createPostId();
-    existingPost = await env.DB.prepare("SELECT id FROM posts WHERE id = ? LIMIT 1").bind(postId).first();
-
+    const existingPost = await env.DB.prepare("SELECT id FROM posts WHERE id = ? LIMIT 1").bind(postId).first();
     if (!existingPost) {
       break;
     }
   }
 
-  if (existingPost) {
-    return error("Could not generate a unique post id. Please try again.", 500);
+  if (!postId) {
+    return fail("Could not create post id.", 500);
   }
 
   const extension = ALLOWED_IMAGE_TYPES[image.type];
@@ -634,195 +544,86 @@ async function handleCreatePost(request, env) {
         image_key,
         image_mime_type,
         created_at,
-        upvotes,
-        downvotes,
-        score,
-        views,
-        downloads,
-        repost_count,
-        comments_count
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0)
+        like_count,
+        comments_count,
+        views
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0)
     `
   )
     .bind(postId, user.id, title, description, imageKey, image.type, createdAt)
     .run();
 
-  await env.DB.prepare("UPDATE users SET posts_count = posts_count + 1 WHERE id = ?").bind(user.id).run();
-
   const post = await getPostRecord(env, postId);
-
-  return json(
+  return success(
     {
-      ok: true,
-      post: toPostResponse(post, null)
+      post: toPostResponse(post, false)
     },
-    {
-      status: 201
-    }
+    { status: 201 }
   );
 }
 
 async function handleListPosts(request, env) {
-  const url = new URL(request.url);
-  const sort = ["hot", "new", "top"].includes(url.searchParams.get("sort")) ? url.searchParams.get("sort") : "hot";
-  const user = await getUserBySession(request, env);
-  const posts = await listPosts(env, user?.id, sort);
-
-  return json({
-    ok: true,
-    posts
-  });
+  const user = await getCurrentUser(request, env);
+  const posts = await listPosts(env, user?.id);
+  return success({ posts });
 }
 
 async function handleGetPost(request, env, postId) {
   const post = await getPostRecord(env, postId);
 
   if (!post) {
-    return error("Post not found.", 404);
+    return fail("Post not found.", 404);
   }
 
   await env.DB.prepare("UPDATE posts SET views = views + 1 WHERE id = ?").bind(postId).run();
-  post.views += 1;
+  post.views = Number(post.views || 0) + 1;
 
-  const user = await getUserBySession(request, env);
-  const viewerVote = await getViewerVote(env, postId, user?.id);
+  const user = await getCurrentUser(request, env);
+  const likes = await getViewerLikeMap(env, user?.id, [postId]);
 
-  return json({
-    ok: true,
-    post: toPostResponse(post, viewerVote)
+  return success({
+    post: toPostResponse(post, likes[postId])
   });
 }
 
-async function handleVote(request, env, postId) {
+async function handleLike(request, env, postId) {
   const user = await requireUser(request, env);
   const post = await getPostRecord(env, postId);
 
   if (!post) {
-    return error("Post not found.", 404);
+    return fail("Post not found.", 404);
   }
 
-  const body = await parseJsonBody(request);
-  const nextVote = body.vote === "up" || body.vote === "down" ? body.vote : "";
-
-  if (!nextVote) {
-    return error('Vote must be "up" or "down".');
-  }
-
-  const currentVote = await env.DB.prepare("SELECT vote FROM votes WHERE post_id = ? AND user_id = ? LIMIT 1")
-    .bind(postId, user.id)
+  const existingLike = await env.DB.prepare("SELECT user_id FROM likes WHERE user_id = ? AND post_id = ? LIMIT 1")
+    .bind(user.id, postId)
     .first();
 
-  let upvoteDelta = 0;
-  let downvoteDelta = 0;
-  let scoreDelta = 0;
-  let userUpvoteDelta = 0;
+  let hasLiked = false;
 
-  if (!currentVote) {
-    await env.DB.prepare("INSERT INTO votes (post_id, user_id, vote, created_at) VALUES (?, ?, ?, ?)")
-      .bind(postId, user.id, nextVote, toIsoDate())
+  if (existingLike) {
+    await env.DB.prepare("DELETE FROM likes WHERE user_id = ? AND post_id = ?").bind(user.id, postId).run();
+    await env.DB.prepare("UPDATE posts SET like_count = CASE WHEN like_count > 0 THEN like_count - 1 ELSE 0 END WHERE id = ?")
+      .bind(postId)
       .run();
-
-    if (nextVote === "up") {
-      upvoteDelta = 1;
-      scoreDelta = 1;
-      userUpvoteDelta = 1;
-    } else {
-      downvoteDelta = 1;
-      scoreDelta = -1;
-    }
-  } else if (currentVote.vote === nextVote) {
-    await env.DB.prepare("DELETE FROM votes WHERE post_id = ? AND user_id = ?").bind(postId, user.id).run();
-
-    if (nextVote === "up") {
-      upvoteDelta = -1;
-      scoreDelta = -1;
-      userUpvoteDelta = -1;
-    } else {
-      downvoteDelta = -1;
-      scoreDelta = 1;
-    }
   } else {
-    await env.DB.prepare("UPDATE votes SET vote = ?, created_at = ? WHERE post_id = ? AND user_id = ?")
-      .bind(nextVote, toIsoDate(), postId, user.id)
+    await env.DB.prepare("INSERT INTO likes (user_id, post_id, created_at) VALUES (?, ?, ?)")
+      .bind(user.id, postId, toIsoDate())
       .run();
-
-    if (nextVote === "up") {
-      upvoteDelta = 1;
-      downvoteDelta = -1;
-      scoreDelta = 2;
-      userUpvoteDelta = 1;
-    } else {
-      upvoteDelta = -1;
-      downvoteDelta = 1;
-      scoreDelta = -2;
-      userUpvoteDelta = -1;
-    }
-  }
-
-  await env.DB.prepare(
-    `
-      UPDATE posts
-      SET upvotes = upvotes + ?, downvotes = downvotes + ?, score = score + ?
-      WHERE id = ?
-    `
-  )
-    .bind(upvoteDelta, downvoteDelta, scoreDelta, postId)
-    .run();
-
-  if (userUpvoteDelta !== 0) {
-    await env.DB.prepare("UPDATE users SET upvotes_received = upvotes_received + ? WHERE id = ?")
-      .bind(userUpvoteDelta, post.authorId)
-      .run();
+    await env.DB.prepare("UPDATE posts SET like_count = like_count + 1 WHERE id = ?").bind(postId).run();
+    hasLiked = true;
   }
 
   const updatedPost = await getPostRecord(env, postId);
-  const viewerVote = await getViewerVote(env, postId, user.id);
-
-  return json({
-    ok: true,
-    post: toPostResponse(updatedPost, viewerVote)
+  return success({
+    post: toPostResponse(updatedPost, hasLiked)
   });
 }
 
-async function handleRepost(request, env, postId) {
-  const user = await requireUser(request, env);
+async function handleCommentsList(env, postId) {
   const post = await getPostRecord(env, postId);
 
   if (!post) {
-    return error("Post not found.", 404);
-  }
-
-  const dayAgo = toIsoDate(Date.now() - 24 * 60 * 60 * 1000);
-  const recentRepost = await env.DB.prepare(
-    "SELECT id FROM reposts WHERE user_id = ? AND created_at >= ? LIMIT 1"
-  )
-    .bind(user.id, dayAgo)
-    .first();
-
-  if (recentRepost) {
-    return error("You can only repost once every 24 hours.", 429);
-  }
-
-  await env.DB.prepare("INSERT INTO reposts (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)")
-    .bind(createId("repost_"), postId, user.id, toIsoDate())
-    .run();
-
-  await env.DB.prepare("UPDATE posts SET repost_count = repost_count + 1 WHERE id = ?").bind(postId).run();
-
-  const updatedPost = await getPostRecord(env, postId);
-  const viewerVote = await getViewerVote(env, postId, user.id);
-
-  return json({
-    ok: true,
-    post: toPostResponse(updatedPost, viewerVote)
-  });
-}
-
-async function handleListComments(env, postId) {
-  const post = await getPostRecord(env, postId);
-
-  if (!post) {
-    return error("Post not found.", 404);
+    return fail("Post not found.", 404);
   }
 
   const rows = await env.DB.prepare(
@@ -837,35 +638,34 @@ async function handleListComments(env, postId) {
       FROM comments
       INNER JOIN users ON users.id = comments.author_id
       WHERE comments.post_id = ?
-      ORDER BY comments.created_at ASC
+      ORDER BY comments.created_at ASC, comments.id ASC
     `
   )
     .bind(postId)
     .all();
 
-  return json({
-    ok: true,
+  return success({
     comments: rows.results || []
   });
 }
 
-async function handleCreateComment(request, env, postId) {
+async function handleCommentCreate(request, env, postId) {
   const user = await requireUser(request, env);
   const post = await getPostRecord(env, postId);
 
   if (!post) {
-    return error("Post not found.", 404);
+    return fail("Post not found.", 404);
   }
 
   const body = await parseJsonBody(request);
   const text = normalizeText(body.text);
 
   if (!text) {
-    return error("Comment cannot be empty.");
+    return fail("Comment cannot be empty.");
   }
 
   if (text.length > MAX_COMMENT_LENGTH) {
-    return error(`Comment must be ${MAX_COMMENT_LENGTH} characters or fewer.`);
+    return fail(`Comment must be ${MAX_COMMENT_LENGTH} characters or fewer.`);
   }
 
   const comment = {
@@ -883,50 +683,32 @@ async function handleCreateComment(request, env, postId) {
 
   await env.DB.prepare("UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?").bind(postId).run();
 
-  return json(
+  return success(
     {
-      ok: true,
       comment
     },
-    {
-      status: 201
-    }
+    { status: 201 }
   );
-}
-
-async function findImageObject(bucket, post) {
-  if (!post?.imageKey) {
-    return null;
-  }
-
-  const object = await bucket.get(post.imageKey);
-
-  if (!object) {
-    return null;
-  }
-
-  return object;
 }
 
 async function handleImage(env, postId) {
   const post = await getPostRecord(env, postId);
 
   if (!post) {
-    return error("Image not found.", 404);
+    return fail("Image not found.", 404);
   }
 
-  const object = await findImageObject(env.YIMAGE_BUCKET, post);
+  const object = await env.YIMAGE_BUCKET.get(post.imageKey);
 
   if (!object) {
-    return error("Image not found.", 404);
+    return fail("Image not found.", 404);
   }
 
-  const headers = new Headers();
-  headers.set("Content-Type", post.imageMimeType || object.httpMetadata?.contentType || "application/octet-stream");
-  headers.set("Cache-Control", "public, max-age=3600");
-
   return new Response(object.body, {
-    headers
+    headers: {
+      "Content-Type": post.imageMimeType || object.httpMetadata?.contentType || "application/octet-stream",
+      "Cache-Control": "public, max-age=3600"
+    }
   });
 }
 
@@ -934,27 +716,21 @@ async function handleDownload(env, postId) {
   const post = await getPostRecord(env, postId);
 
   if (!post) {
-    return error("Post not found.", 404);
+    return fail("Post not found.", 404);
   }
 
-  const object = await findImageObject(env.YIMAGE_BUCKET, post);
+  const object = await env.YIMAGE_BUCKET.get(post.imageKey);
 
   if (!object) {
-    return error("Image not found.", 404);
+    return fail("Image not found.", 404);
   }
 
-  await env.DB.prepare("UPDATE posts SET downloads = downloads + 1 WHERE id = ?").bind(postId).run();
-  await env.DB.prepare("UPDATE users SET downloads_received = downloads_received + 1 WHERE id = ?")
-    .bind(post.authorId)
-    .run();
-
-  const headers = new Headers();
-  headers.set("Content-Type", post.imageMimeType || object.httpMetadata?.contentType || "application/octet-stream");
-  headers.set("Content-Disposition", `attachment; filename="${getImageFilename(post)}"`);
-  headers.set("Cache-Control", "no-store");
-
   return new Response(object.body, {
-    headers
+    headers: {
+      "Content-Type": post.imageMimeType || object.httpMetadata?.contentType || "application/octet-stream",
+      "Content-Disposition": `attachment; filename="${getImageFilename(post)}"`,
+      "Cache-Control": "no-store"
+    }
   });
 }
 
@@ -963,85 +739,71 @@ export default {
     const url = new URL(request.url);
 
     try {
-      if (url.pathname === "/api/health") {
-        return json({
-          ok: true,
+      if (url.pathname === "/api/health" && request.method === "GET") {
+        return success({
           message: "Yimage Worker API is working"
         });
       }
 
       if (url.pathname === "/api/auth/signup" && request.method === "POST") {
-        return handleSignup(request, env);
+        return await handleSignup(request, env);
       }
 
       if (url.pathname === "/api/auth/login" && request.method === "POST") {
-        return handleLogin(request, env);
+        return await handleLogin(request, env);
       }
 
       if (url.pathname === "/api/auth/logout" && request.method === "POST") {
-        return handleLogout(request, env);
+        return await handleLogout(request, env);
       }
 
       if (url.pathname === "/api/auth/me" && request.method === "GET") {
-        return handleCurrentUser(request, env);
+        return await handleMe(request, env);
       }
 
       if ((url.pathname === "/api/upload" || url.pathname === "/api/posts") && request.method === "POST") {
-        return handleCreatePost(request, env);
+        return await handleCreatePost(request, env);
       }
 
       if (url.pathname === "/api/posts" && request.method === "GET") {
-        return handleListPosts(request, env);
+        return await handleListPosts(request, env);
       }
 
-      if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/vote") && request.method === "POST") {
-        const postId = url.pathname.split("/")[3];
-        return handleVote(request, env, postId);
+      if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/like") && request.method === "POST") {
+        return await handleLike(request, env, url.pathname.split("/")[3]);
       }
 
-      if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/repost") && request.method === "POST") {
-        const postId = url.pathname.split("/")[3];
-        return handleRepost(request, env, postId);
+      if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/comments") && request.method === "GET") {
+        return await handleCommentsList(env, url.pathname.split("/")[3]);
       }
 
-      if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/comments")) {
-        const postId = url.pathname.split("/")[3];
-
-        if (request.method === "GET") {
-          return handleListComments(env, postId);
-        }
-
-        if (request.method === "POST") {
-          return handleCreateComment(request, env, postId);
-        }
+      if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/comments") && request.method === "POST") {
+        return await handleCommentCreate(request, env, url.pathname.split("/")[3]);
       }
 
       if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/download") && request.method === "GET") {
-        const postId = url.pathname.split("/")[3];
-        return handleDownload(env, postId);
+        return await handleDownload(env, url.pathname.split("/")[3]);
       }
 
       if (url.pathname.startsWith("/api/posts/") && request.method === "GET") {
-        const postId = url.pathname.replace("/api/posts/", "").trim();
-        return handleGetPost(request, env, postId);
+        return await handleGetPost(request, env, url.pathname.replace("/api/posts/", "").trim());
       }
 
       if (url.pathname.startsWith("/api/image/") && request.method === "GET") {
-        const postId = url.pathname.replace("/api/image/", "").trim();
-        return handleImage(env, postId);
+        return await handleImage(env, url.pathname.replace("/api/image/", "").trim());
       }
 
       if (url.pathname.startsWith("/api/")) {
-        return error("API route not found.", 404);
+        return fail("API route not found.", 404);
       }
 
-      return error("Not found.", 404);
+      return fail("Not found.", 404);
     } catch (thrown) {
       if (thrown instanceof Response) {
         return thrown;
       }
 
-      return error(thrown?.message || "Unexpected server error.", 500);
+      return fail(thrown?.message || "Unexpected server error.", 500);
     }
   }
 };

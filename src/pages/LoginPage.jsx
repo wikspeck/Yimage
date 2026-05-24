@@ -36,7 +36,7 @@ export default function LoginPage() {
               Log in
             </Typography>
             <Typography level="body-md" textColor="neutral.400">
-              Jump back into posting, voting, commenting, and reposting.
+              Jump back into posting, liking, and commenting.
             </Typography>
           </div>
 
