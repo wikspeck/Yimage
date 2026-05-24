@@ -1,5 +1,6 @@
 import { Card, Stack, Typography } from "@mui/joy";
 import { useNavigate } from "react-router-dom";
+import BackButton from "../components/BackButton";
 import UploadBox from "../components/UploadBox";
 
 export default function CreatePostPage() {
@@ -8,6 +9,7 @@ export default function CreatePostPage() {
   return (
     <div className="page-shell">
       <Stack spacing={3}>
+        <BackButton fallbackTo="/" label="Back" />
         <Card variant="outlined" className="content-card">
           <Stack spacing={1}>
             <Typography level="h1" sx={{ letterSpacing: "-0.05em" }}>

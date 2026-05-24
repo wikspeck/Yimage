@@ -50,10 +50,18 @@ export default function DiscoverPage() {
       const updatedPost = await likePost(postId);
       setPosts((current) => current.map((post) => (post.id === postId ? updatedPost : post)));
     } catch (error) {
-      setPostsError(error.message || "Could not update like.");
+      setPostsError(error.message || "Could not update vote.");
     } finally {
       setBusyPostId("");
     }
+  }
+
+  function handleDownvotePlaceholder() {
+    setPostsError("Downvotes are coming soon.");
+  }
+
+  function handleRepostPlaceholder() {
+    setPostsError("Repost is coming soon.");
   }
 
   return (
@@ -67,7 +75,7 @@ export default function DiscoverPage() {
             <Typography level="body-md" textColor="neutral.400" sx={{ maxWidth: 640 }}>
               A simple image feed backed by D1 metadata and R2 image storage.
             </Typography>
-            <Stack direction="row" spacing={1}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
               <Button variant="solid" color="primary" onClick={() => navigate(user ? "/create" : "/login?next=/create")} sx={{ borderRadius: "999px" }}>
                 Create post
               </Button>
@@ -106,7 +114,9 @@ export default function DiscoverPage() {
               post={post}
               isLoggedIn={Boolean(user)}
               isBusy={busyPostId === post.id}
-              onLike={() => handleLike(post.id)}
+              onUpvote={() => handleLike(post.id)}
+              onDownvote={handleDownvotePlaceholder}
+              onRepost={handleRepostPlaceholder}
               onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
             />
           ))}

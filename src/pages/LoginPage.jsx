@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Alert, Button, Card, Input, Stack, Typography } from "@mui/joy";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import BackButton from "../components/BackButton";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginPage() {
@@ -29,31 +30,34 @@ export default function LoginPage() {
 
   return (
     <div className="auth-shell">
-      <Card variant="outlined" className="auth-card">
-        <Stack component="form" spacing={2} onSubmit={handleSubmit}>
-          <div>
-            <Typography level="h1" sx={{ letterSpacing: "-0.05em", mb: 0.5 }}>
+      <Stack spacing={2}>
+        <BackButton fallbackTo="/" label="Back" />
+        <Card variant="outlined" className="auth-card">
+          <Stack component="form" spacing={2} onSubmit={handleSubmit}>
+            <div>
+              <Typography level="h1" sx={{ letterSpacing: "-0.05em", mb: 0.5 }}>
+                Log in
+              </Typography>
+              <Typography level="body-md" textColor="neutral.400">
+                Jump back into posting, liking, and commenting.
+              </Typography>
+            </div>
+
+            {error ? <Alert color="danger" variant="soft">{error}</Alert> : null}
+
+            <Input placeholder="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} sx={{ borderRadius: "18px" }} />
+            <Input placeholder="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} sx={{ borderRadius: "18px" }} />
+
+            <Button type="submit" loading={isSubmitting} sx={{ borderRadius: "999px" }}>
               Log in
+            </Button>
+
+            <Typography level="body-sm" textColor="neutral.400">
+              Need an account? <Link to="/signup">Sign up</Link>
             </Typography>
-            <Typography level="body-md" textColor="neutral.400">
-              Jump back into posting, liking, and commenting.
-            </Typography>
-          </div>
-
-          {error ? <Alert color="danger" variant="soft">{error}</Alert> : null}
-
-          <Input placeholder="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} sx={{ borderRadius: "18px" }} />
-          <Input placeholder="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} sx={{ borderRadius: "18px" }} />
-
-          <Button type="submit" loading={isSubmitting} sx={{ borderRadius: "999px" }}>
-            Log in
-          </Button>
-
-          <Typography level="body-sm" textColor="neutral.400">
-            Need an account? <Link to="/signup">Sign up</Link>
-          </Typography>
-        </Stack>
-      </Card>
+          </Stack>
+        </Card>
+      </Stack>
     </div>
   );
 }

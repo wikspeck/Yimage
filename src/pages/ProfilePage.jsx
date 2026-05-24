@@ -1,4 +1,5 @@
 import { Card, Stack, Typography } from "@mui/joy";
+import BackButton from "../components/BackButton";
 import { useAuth } from "../context/AuthContext";
 import { formatFullDate } from "../utils/formatters";
 
@@ -8,6 +9,7 @@ export default function ProfilePage() {
   return (
     <div className="page-shell">
       <Stack spacing={3}>
+        <BackButton fallbackTo="/" label="Back" />
         <Card variant="outlined" className="content-card">
           <Stack spacing={1}>
             <Typography level="h1" sx={{ letterSpacing: "-0.05em" }}>

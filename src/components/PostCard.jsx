@@ -3,10 +3,11 @@ import { Link as RouterLink } from "react-router-dom";
 import PostActionBar from "./PostActionBar";
 import { formatRelativeTime } from "../utils/formatters";
 
-export default function PostCard({ post, isLoggedIn, isBusy, onLike, onRequireLogin }) {
+export default function PostCard({ post, isLoggedIn, isBusy, onUpvote, onDownvote, onRepost, onRequireLogin }) {
   return (
     <Card
       variant="outlined"
+      className="post-card"
       sx={{
         p: { xs: 2, md: 2.5 },
         borderRadius: "22px",
@@ -44,7 +45,9 @@ export default function PostCard({ post, isLoggedIn, isBusy, onLike, onRequireLo
           post={post}
           isLoggedIn={isLoggedIn}
           isBusy={isBusy}
-          onLike={onLike}
+          onUpvote={onUpvote}
+          onDownvote={onDownvote}
+          onRepost={onRepost}
           onRequireLogin={onRequireLogin}
         />
       </Stack>

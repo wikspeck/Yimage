@@ -1,4 +1,4 @@
-import { Avatar, Box, Button, Sheet, Stack, Typography } from "@mui/joy";
+import { Box, Button, Sheet, Stack, Typography } from "@mui/joy";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -11,6 +11,7 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onDiscover
   return (
     <Sheet
       variant="outlined"
+      className="app-header"
       sx={{
         position: "sticky",
         top: 0,
@@ -26,18 +27,19 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onDiscover
       }}
     >
       <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2} flexWrap="wrap">
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ cursor: "pointer" }} onClick={onDiscover}>
-          <Avatar
-            variant="soft"
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ cursor: "pointer", minWidth: 0 }} onClick={onDiscover}>
+          <Box
+            component="img"
+            src="/yimage-logo-dark.png"
+            alt="Yimage logo"
             sx={{
-              borderRadius: "16px",
-              bgcolor: "rgba(255,255,255,0.08)",
-              color: "#f3f5ff",
-              fontWeight: 700
+              width: { xs: 34, sm: 40 },
+              height: { xs: 34, sm: 40 },
+              borderRadius: "12px",
+              objectFit: "cover",
+              flexShrink: 0
             }}
-          >
-            Y
-          </Avatar>
+          />
           <Box>
             <Typography level="title-lg" sx={{ letterSpacing: "-0.04em" }}>
               Yimage
@@ -48,7 +50,7 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onDiscover
           </Box>
         </Stack>
 
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" className="header-actions">
           <Button variant={onDiscoverPage ? "solid" : "soft"} color="neutral" onClick={onDiscover} sx={{ borderRadius: "999px" }}>
             Discover
           </Button>

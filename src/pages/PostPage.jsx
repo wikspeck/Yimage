@@ -3,6 +3,7 @@ import { Alert, AspectRatio, Button, Card, CircularProgress, Stack, Textarea, Ty
 import { useNavigate, useParams } from "react-router-dom";
 import { createComment, getPost, getPostComments, likePost } from "../api/yimageApi";
 import AuthPromptCard from "../components/AuthPromptCard";
+import BackButton from "../components/BackButton";
 import PostActionBar from "../components/PostActionBar";
 import { useAuth } from "../context/AuthContext";
 import { formatFullDate, formatRelativeTime } from "../utils/formatters";
@@ -58,10 +59,18 @@ export default function PostPage() {
       const updatedPost = await likePost(postId);
       setPost(updatedPost);
     } catch (actionError) {
-      setError(actionError.message || "Could not update like.");
+      setError(actionError.message || "Could not update vote.");
     } finally {
       setIsBusy(false);
     }
+  }
+
+  function handleDownvotePlaceholder() {
+    setError("Downvotes are coming soon.");
+  }
+
+  function handleRepostPlaceholder() {
+    setError("Repost is coming soon.");
   }
 
   async function handleCreateComment(event) {
@@ -115,11 +124,12 @@ export default function PostPage() {
   return (
     <div className="page-shell">
       <Stack spacing={3}>
+        <BackButton fallbackTo="/" label="Back" />
         {error ? <Alert color="danger" variant="soft">{error}</Alert> : null}
 
         <Card variant="outlined" className="content-card">
           <Stack spacing={2.5}>
-            <AspectRatio ratio="4/3" sx={{ borderRadius: "20px", overflow: "hidden", bgcolor: "#05070b" }}>
+            <AspectRatio ratio="4/3" className="viewer-frame" sx={{ borderRadius: "20px", overflow: "hidden", bgcolor: "#05070b" }}>
               <img src={post.imageUrl} alt={post.title} style={{ objectFit: "contain" }} />
             </AspectRatio>
 
@@ -141,20 +151,19 @@ export default function PostPage() {
               post={post}
               isLoggedIn={Boolean(user)}
               isBusy={isBusy}
-              onLike={handleLike}
+              onUpvote={handleLike}
+              onDownvote={handleDownvotePlaceholder}
+              onRepost={handleRepostPlaceholder}
               onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
             />
 
-            <Stack direction="row" spacing={1} flexWrap="wrap">
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap">
               <Button variant="soft" color="neutral" component="a" href={`https://yimage.org/${post.id}`} sx={{ borderRadius: "999px" }}>
                 Share page
               </Button>
               <Button variant="soft" color="neutral" onClick={handleCopyLink} sx={{ borderRadius: "999px" }}>
                 {copied ? "Copied" : "Copy link"}
               </Button>
-              <Typography level="body-sm" textColor="neutral.500" sx={{ alignSelf: "center" }}>
-                {post.views} views
-              </Typography>
             </Stack>
           </Stack>
         </Card>
@@ -174,7 +183,7 @@ export default function PostPage() {
                   onChange={(event) => setCommentText(event.target.value)}
                   sx={{ borderRadius: "18px" }}
                 />
-                <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="center">
+                <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1} alignItems={{ xs: "stretch", sm: "center" }}>
                   <Typography level="body-sm" textColor="neutral.500">
                     Commenting as @{user.username}
                   </Typography>
@@ -188,7 +197,7 @@ export default function PostPage() {
             <AuthPromptCard
               onLogin={() => navigate(`/login?next=/${post.id}`)}
               onSignup={() => navigate(`/signup?next=/${post.id}`)}
-              message="Log in to like posts and join the comment thread."
+              message="Log in to vote, repost, and join the comment thread."
             />
           )}
 
