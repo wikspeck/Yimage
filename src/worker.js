@@ -4,6 +4,12 @@ const ALLOWED_IMAGE_TYPES = {
   "image/webp": "webp",
   "image/gif": "gif"
 };
+const ALLOWED_IMAGE_EXTENSIONS = {
+  "image/jpeg": ["jpg", "jpeg"],
+  "image/png": ["png"],
+  "image/webp": ["webp"],
+  "image/gif": ["gif"]
+};
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 120;
@@ -100,6 +106,35 @@ function normalizeOptionalUrl(value) {
 
   if (nextValue.startsWith("/") || /^https?:\/\//i.test(nextValue)) {
     return nextValue;
+  }
+
+  return "";
+}
+
+function getFileExtension(filename) {
+  const normalized = String(filename || "").trim().toLowerCase();
+  const parts = normalized.split(".");
+  return parts.length > 1 ? parts.pop() : "";
+}
+
+function validateUploadedImageFile(file, label = "Image") {
+  if (!(file instanceof File)) {
+    return `${label} file is required.`;
+  }
+
+  const extension = getFileExtension(file.name);
+  const allowedExtensions = ALLOWED_IMAGE_EXTENSIONS[file.type];
+
+  if (!ALLOWED_IMAGE_TYPES[file.type] || !allowedExtensions) {
+    return "Only JPG, PNG, WEBP, and GIF images are allowed.";
+  }
+
+  if (!extension || !allowedExtensions.includes(extension)) {
+    return "The file extension does not match an allowed image type.";
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    return `${label} must be 10 MB or smaller.`;
   }
 
   return "";
@@ -978,14 +1013,9 @@ async function handleAvatarUpload(request, env) {
   const formData = await request.formData();
   const avatar = formData.get("avatar");
 
-  if (!(avatar instanceof File)) {
-    return fail("Avatar image is required.");
-  }
-  if (!ALLOWED_IMAGE_TYPES[avatar.type]) {
-    return fail("Only JPG, PNG, WEBP, and GIF images are allowed.");
-  }
-  if (avatar.size > MAX_FILE_SIZE) {
-    return fail("Avatar image must be 10 MB or smaller.");
+  const avatarValidationMessage = validateUploadedImageFile(avatar, "Avatar image");
+  if (avatarValidationMessage) {
+    return fail(avatarValidationMessage);
   }
 
   const avatarKey = getAvatarKey(user.id, ALLOWED_IMAGE_TYPES[avatar.type]);
@@ -1040,14 +1070,9 @@ async function handleCreatePost(request, env) {
   if (description.length > MAX_DESCRIPTION_LENGTH) {
     return fail(`Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`);
   }
-  if (!(image instanceof File)) {
-    return fail("Image file is required.");
-  }
-  if (!ALLOWED_IMAGE_TYPES[image.type]) {
-    return fail("Only JPG, PNG, WEBP, and GIF images are allowed.");
-  }
-  if (image.size > MAX_FILE_SIZE) {
-    return fail("Image must be 10 MB or smaller.");
+  const imageValidationMessage = validateUploadedImageFile(image, "Image");
+  if (imageValidationMessage) {
+    return fail(imageValidationMessage);
   }
 
   let resolvedCategoryId = null;
