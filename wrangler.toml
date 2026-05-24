@@ -1,8 +1,0 @@
-name = "yimage"
-main = "src/worker.js"
-compatibility_date = "2026-05-24"
-compatibility_flags = ["nodejs_compat"]
-
-[[r2_buckets]]
-binding = "YIMAGE_BUCKET"
-bucket_name = "yimage-uploads"
