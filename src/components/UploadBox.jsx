@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Box, Button, Card, CircularProgress, Sheet, Stack, Typography } from "@mui/joy";
+import { Alert, Box, Button, Card, CircularProgress, Input, Sheet, Stack, Textarea, Typography } from "@mui/joy";
 import ImagePreviewCard from "./ImagePreviewCard";
-import { uploadImage } from "../api/yimageApi";
+import { createPost } from "../api/yimageApi";
 import { validateImageFile } from "../utils/validateImageFile";
 
-export default function UploadBox() {
+export default function UploadBox({ onPostCreated }) {
   const inputRef = useRef(null);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const [isDragging, setIsDragging] = useState(false);
@@ -79,7 +81,18 @@ export default function UploadBox() {
     }
   }
 
+  function resetForm() {
+    setTitle("");
+    setDescription("");
+    handleRemove();
+  }
+
   async function handleUpload() {
+    if (!title.trim()) {
+      setErrorMessage("Add a title before uploading.");
+      return;
+    }
+
     if (!selectedFile) {
       setErrorMessage("Choose an image before uploading.");
       return;
@@ -89,10 +102,17 @@ export default function UploadBox() {
     resetMessages();
 
     try {
-      const response = await uploadImage(selectedFile);
-      setSuccessMessage(response.message);
-    } catch {
-      setErrorMessage("The upload simulation failed. Try again.");
+      const response = await createPost({
+        title: title.trim(),
+        description: description.trim(),
+        imageFile: selectedFile
+      });
+
+      setSuccessMessage("Post published successfully.");
+      resetForm();
+      onPostCreated?.(response.post);
+    } catch (error) {
+      setErrorMessage(error.message || "Upload failed. Try again.");
     } finally {
       setIsUploading(false);
     }
@@ -116,9 +136,35 @@ export default function UploadBox() {
               Share an image in one calm step
             </Typography>
             <Typography level="body-md" textColor="neutral.400" sx={{ maxWidth: 620 }}>
-              Drag in a file or choose one manually. The frontend is ready now, and the backend upload path will connect
-              to Cloudflare Pages Functions and R2 later.
+              Give the post a title, add context if you want, and upload an image directly through the Yimage Worker.
             </Typography>
+          </Stack>
+
+          <Stack spacing={1.25}>
+            <Input
+              placeholder="Title"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              slotProps={{
+                input: {
+                  maxLength: 120
+                }
+              }}
+              sx={{ borderRadius: "18px", minHeight: 48 }}
+            />
+            <Textarea
+              placeholder="Description (optional)"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              minRows={4}
+              maxRows={8}
+              slotProps={{
+                textarea: {
+                  maxLength: 1000
+                }
+              }}
+              sx={{ borderRadius: "18px" }}
+            />
           </Stack>
 
           <Sheet
@@ -194,7 +240,7 @@ export default function UploadBox() {
             <Button
               size="lg"
               onClick={handleUpload}
-              disabled={!selectedFile || isUploading}
+              disabled={!selectedFile || !title.trim() || isUploading}
               sx={{
                 borderRadius: "999px",
                 px: 3
@@ -204,7 +250,7 @@ export default function UploadBox() {
             </Button>
             {selectedFile ? (
               <Button variant="plain" color="neutral" onClick={handleRemove} sx={{ borderRadius: "999px" }}>
-                Reset selection
+                Remove image
               </Button>
             ) : null}
           </Stack>

@@ -1,9 +1,19 @@
-import { Box, Card, Sheet, Stack, Typography } from "@mui/joy";
+import { useEffect, useState } from "react";
+import { Alert, Box, Card, CircularProgress, Sheet, Stack, Typography } from "@mui/joy";
+import { getPosts } from "../api/yimageApi";
 import Footer from "../components/Footer";
 import Header from "../components/Header";
 import UploadBox from "../components/UploadBox";
 
-function PlaceholderPost() {
+function formatDate(value) {
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  }).format(new Date(value));
+}
+
+function PostCard({ post }) {
   return (
     <Card
       variant="outlined"
@@ -16,30 +26,68 @@ function PlaceholderPost() {
       }}
     >
       <Stack spacing={2}>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Sheet sx={{ width: 40, height: 40, borderRadius: "50%", bgcolor: "rgba(255,255,255,0.08)" }} />
-          <Box>
-            <Typography level="title-sm">Future feed preview</Typography>
-            <Typography level="body-sm" textColor="neutral.500">
-              This is where real uploaded image posts can appear later.
-            </Typography>
-          </Box>
+        <Stack direction="row" justifyContent="space-between" spacing={1.5} alignItems="center">
+          <Typography level="title-lg">{post.title}</Typography>
+          <Typography level="body-sm" textColor="neutral.500">
+            {formatDate(post.createdAt)}
+          </Typography>
         </Stack>
+        {post.description ? (
+          <Typography level="body-md" textColor="neutral.300">
+            {post.description}
+          </Typography>
+        ) : null}
         <Sheet
           sx={{
-            minHeight: 220,
+            overflow: "hidden",
             borderRadius: "22px",
             bgcolor: "rgba(255,255,255,0.04)",
             border: "1px solid",
             borderColor: "rgba(255,255,255,0.06)"
           }}
-        />
+        >
+          <img
+            src={post.imageUrl}
+            alt={post.title}
+            style={{
+              width: "100%",
+              maxHeight: 460,
+              objectFit: "cover"
+            }}
+          />
+        </Sheet>
       </Stack>
     </Card>
   );
 }
 
 export default function Home() {
+  const [posts, setPosts] = useState([]);
+  const [isLoadingPosts, setIsLoadingPosts] = useState(true);
+  const [postsError, setPostsError] = useState("");
+
+  async function loadPosts() {
+    setIsLoadingPosts(true);
+    setPostsError("");
+
+    try {
+      const nextPosts = await getPosts();
+      setPosts(nextPosts);
+    } catch (error) {
+      setPostsError(error.message || "Could not load posts.");
+    } finally {
+      setIsLoadingPosts(false);
+    }
+  }
+
+  useEffect(() => {
+    loadPosts();
+  }, []);
+
+  function handlePostCreated(post) {
+    setPosts((current) => [post, ...current.filter((item) => item.id !== post.id)].slice(0, 30));
+  }
+
   return (
     <Box
       sx={{
@@ -62,14 +110,53 @@ export default function Home() {
                 A cleaner upload experience for Yimage.
               </Typography>
               <Typography level="body-lg" textColor="neutral.400" sx={{ maxWidth: 680 }}>
-                Threads-inspired composition, Imgur-like usefulness, and a frontend structure that is ready for a future
-                Cloudflare upload API.
+                Threads-inspired composition, Imgur-like usefulness, and a real backend flow that stores posts in R2.
               </Typography>
             </Stack>
           </Box>
 
-          <UploadBox />
-          <PlaceholderPost />
+          <UploadBox onPostCreated={handlePostCreated} />
+
+          <Stack spacing={1.5}>
+            <Typography level="title-lg" sx={{ px: { xs: 0.5, md: 1 } }}>
+              Recent posts
+            </Typography>
+            {isLoadingPosts ? (
+              <Card
+                variant="outlined"
+                sx={{
+                  p: 3,
+                  borderRadius: "24px",
+                  bgcolor: "rgba(18, 20, 28, 0.92)",
+                  borderColor: "rgba(255,255,255,0.08)"
+                }}
+              >
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <CircularProgress size="sm" />
+                  <Typography level="body-md">Loading posts...</Typography>
+                </Stack>
+              </Card>
+            ) : null}
+            {postsError ? <Alert color="danger" variant="soft">{postsError}</Alert> : null}
+            {!isLoadingPosts && !posts.length && !postsError ? (
+              <Card
+                variant="outlined"
+                sx={{
+                  p: 3,
+                  borderRadius: "24px",
+                  bgcolor: "rgba(18, 20, 28, 0.92)",
+                  borderColor: "rgba(255,255,255,0.08)"
+                }}
+              >
+                <Typography level="body-md" textColor="neutral.400">
+                  No posts yet. Upload the first one to start the feed.
+                </Typography>
+              </Card>
+            ) : null}
+            {posts.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </Stack>
           <Footer />
         </Stack>
       </Box>

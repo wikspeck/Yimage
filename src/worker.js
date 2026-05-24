@@ -15,6 +15,10 @@ function getImageKey(id, extension) {
   return `uploads/${id}.${extension}`;
 }
 
+function getPostKey(id) {
+  return `posts/${id}.json`;
+}
+
 function error(message, status = 400) {
   return json(
     {
@@ -25,7 +29,27 @@ function error(message, status = 400) {
   );
 }
 
+async function readPost(bucket, id) {
+  const postObject = await bucket.get(getPostKey(id));
+
+  if (!postObject) {
+    return null;
+  }
+
+  return JSON.parse(await postObject.text());
+}
+
 async function findImageObject(bucket, id) {
+  const post = await readPost(bucket, id);
+
+  if (post?.imageKey) {
+    const object = await bucket.get(post.imageKey);
+
+    if (object) {
+      return { key: post.imageKey, object };
+    }
+  }
+
   const extensions = ["jpg", "png", "webp", "gif"];
 
   for (const extension of extensions) {
@@ -38,6 +62,16 @@ async function findImageObject(bucket, id) {
   }
 
   return null;
+}
+
+function toPublicPost(post) {
+  return {
+    id: post.id,
+    title: post.title,
+    description: post.description,
+    imageUrl: post.imageUrl,
+    createdAt: post.createdAt
+  };
 }
 
 export default {
@@ -75,7 +109,24 @@ export default {
       }
 
       const formData = await request.formData();
+      const rawTitle = formData.get("title");
+      const rawDescription = formData.get("description");
       const image = formData.get("image");
+
+      const title = typeof rawTitle === "string" ? rawTitle.trim() : "";
+      const description = typeof rawDescription === "string" ? rawDescription.trim() : "";
+
+      if (!title) {
+        return error("Title is required");
+      }
+
+      if (title.length > 120) {
+        return error("Title must be 120 characters or fewer");
+      }
+
+      if (description.length > 1000) {
+        return error("Description must be 1000 characters or fewer");
+      }
 
       if (!image) {
         return error("Image file is required");
@@ -95,19 +146,90 @@ export default {
 
       const id = crypto.randomUUID();
       const extension = ALLOWED_IMAGE_TYPES[image.type];
-      const key = getImageKey(id, extension);
+      const imageKey = getImageKey(id, extension);
+      const createdAt = new Date().toISOString();
+      const imageUrl = `/api/image/${id}`;
 
-      await env.YIMAGE_BUCKET.put(key, image.stream(), {
+      const post = {
+        id,
+        title,
+        description,
+        imageKey,
+        imageUrl,
+        createdAt
+      };
+
+      await env.YIMAGE_BUCKET.put(imageKey, image.stream(), {
         httpMetadata: {
           contentType: image.type
         }
       });
 
+      await env.YIMAGE_BUCKET.put(getPostKey(id), JSON.stringify(post), {
+        httpMetadata: {
+          contentType: "application/json"
+        }
+      });
+
       return json({
         ok: true,
-        id,
-        key,
-        imageUrl: `/api/image/${id}`
+        post: toPublicPost(post)
+      });
+    }
+
+    if (url.pathname === "/api/posts") {
+      if (request.method !== "GET") {
+        return error("Method not allowed", 405);
+      }
+
+      const listing = await env.YIMAGE_BUCKET.list({
+        prefix: "posts/",
+        limit: 30
+      });
+
+      const posts = await Promise.all(
+        listing.objects.map(async (objectInfo) => {
+          const object = await env.YIMAGE_BUCKET.get(objectInfo.key);
+
+          if (!object) {
+            return null;
+          }
+
+          const post = JSON.parse(await object.text());
+          return toPublicPost(post);
+        })
+      );
+
+      const sortedPosts = posts
+        .filter(Boolean)
+        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+
+      return json({
+        ok: true,
+        posts: sortedPosts
+      });
+    }
+
+    if (url.pathname.startsWith("/api/posts/")) {
+      if (request.method !== "GET") {
+        return error("Method not allowed", 405);
+      }
+
+      const id = url.pathname.replace("/api/posts/", "").trim();
+
+      if (!id) {
+        return error("Post id is required");
+      }
+
+      const post = await readPost(env.YIMAGE_BUCKET, id);
+
+      if (!post) {
+        return error("Post not found", 404);
+      }
+
+      return json({
+        ok: true,
+        post: toPublicPost(post)
       });
     }
 
@@ -133,6 +255,7 @@ export default {
       const headers = new Headers();
       const contentType = match.object.httpMetadata?.contentType || "application/octet-stream";
       headers.set("Content-Type", contentType);
+      headers.set("Cache-Control", "public, max-age=3600");
 
       return new Response(match.object.body, {
         headers
