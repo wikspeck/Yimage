@@ -15,6 +15,20 @@ export default {
       });
     }
 
+    // This temporary route confirms the Worker can write to the configured R2 bucket.
+    // Later, real image uploads will use the same env.YIMAGE_BUCKET binding.
+    if (url.pathname === "/api/r2-test") {
+      const key = "test/hello.txt";
+
+      await env.YIMAGE_BUCKET.put(key, "Hello from Yimage R2");
+
+      return json({
+        ok: true,
+        message: "R2 write test successful",
+        key
+      });
+    }
+
     // Any unknown API route returns a JSON 404 response.
     // This keeps API behavior predictable while we add more routes later.
     if (url.pathname.startsWith("/api/")) {
