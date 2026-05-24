@@ -30,7 +30,7 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onDiscover
         <Stack direction="row" spacing={1.5} alignItems="center" sx={{ cursor: "pointer", minWidth: 0 }} onClick={onDiscover}>
           <Box
             component="img"
-            src="/yimage-logo-dark.png"
+            src="/yimage-logo-header.png"
             alt="Yimage logo"
             sx={{
               width: { xs: 34, sm: 40 },

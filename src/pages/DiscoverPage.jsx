@@ -64,6 +64,10 @@ export default function DiscoverPage() {
     setPostsError("Repost is coming soon.");
   }
 
+  function handleUsePlaceholder() {
+    setPostsError("Use is coming soon.");
+  }
+
   return (
     <Box className="page-shell">
       <Stack spacing={3}>
@@ -117,6 +121,7 @@ export default function DiscoverPage() {
               onUpvote={() => handleLike(post.id)}
               onDownvote={handleDownvotePlaceholder}
               onRepost={handleRepostPlaceholder}
+              onUse={handleUsePlaceholder}
               onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
             />
           ))}

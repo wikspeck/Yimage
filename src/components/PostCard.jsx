@@ -1,9 +1,9 @@
-import { AspectRatio, Card, Link, Stack, Typography } from "@mui/joy";
+import { Card, Link, Sheet, Stack, Typography } from "@mui/joy";
 import { Link as RouterLink } from "react-router-dom";
 import PostActionBar from "./PostActionBar";
 import { formatRelativeTime } from "../utils/formatters";
 
-export default function PostCard({ post, isLoggedIn, isBusy, onUpvote, onDownvote, onRepost, onRequireLogin }) {
+export default function PostCard({ post, isLoggedIn, isBusy, onUpvote, onDownvote, onRepost, onUse, onRequireLogin }) {
   return (
     <Card
       variant="outlined"
@@ -16,11 +16,20 @@ export default function PostCard({ post, isLoggedIn, isBusy, onUpvote, onDownvot
       }}
     >
       <Stack spacing={2}>
-        <AspectRatio ratio="16/10" sx={{ borderRadius: "20px", overflow: "hidden", bgcolor: "#05070b" }}>
-          <Link component={RouterLink} to={`/${post.id}`} overlay underline="none">
-            <img src={post.imageUrl} alt={post.title} style={{ objectFit: "cover" }} />
+        <Sheet
+          sx={{
+            borderRadius: "20px",
+            overflow: "hidden",
+            bgcolor: "#000000",
+            border: "1px solid rgba(255,255,255,0.08)"
+          }}
+        >
+          <Link component={RouterLink} to={`/${post.id}`} underline="none" color="neutral">
+            <div className="post-preview-media">
+              <img src={post.imageUrl} alt={post.title} className="post-preview-image" />
+            </div>
           </Link>
-        </AspectRatio>
+        </Sheet>
 
         <Stack spacing={1}>
           <Stack direction="row" justifyContent="space-between" spacing={1.5}>
@@ -48,6 +57,7 @@ export default function PostCard({ post, isLoggedIn, isBusy, onUpvote, onDownvot
           onUpvote={onUpvote}
           onDownvote={onDownvote}
           onRepost={onRepost}
+          onUse={onUse}
           onRequireLogin={onRequireLogin}
         />
       </Stack>

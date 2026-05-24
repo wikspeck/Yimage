@@ -73,6 +73,10 @@ export default function PostPage() {
     setError("Repost is coming soon.");
   }
 
+  function handleUsePlaceholder() {
+    setError("Use is coming soon.");
+  }
+
   async function handleCreateComment(event) {
     event.preventDefault();
     setIsSubmittingComment(true);
@@ -154,6 +158,7 @@ export default function PostPage() {
               onUpvote={handleLike}
               onDownvote={handleDownvotePlaceholder}
               onRepost={handleRepostPlaceholder}
+              onUse={handleUsePlaceholder}
               onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
             />
 

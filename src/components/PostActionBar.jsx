@@ -1,5 +1,29 @@
-import { Button, Chip, Stack, Typography } from "@mui/joy";
+import { Button, Stack, Typography } from "@mui/joy";
 import { getDownloadUrl } from "../api/yimageApi";
+
+function ActionIcon({ src, alt, size = 18, preserveBackground = false }) {
+  return (
+    <span
+      className={preserveBackground ? "action-icon-wrap use-icon-wrap" : "action-icon-wrap"}
+      style={{
+        width: preserveBackground ? size + 10 : size + 6,
+        height: preserveBackground ? size + 10 : size + 6
+      }}
+    >
+      <img
+        src={src}
+        alt={alt}
+        className={preserveBackground ? "action-icon use-icon" : "action-icon"}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          objectPosition: "center"
+        }}
+      />
+    </span>
+  );
+}
 
 export default function PostActionBar({
   post,
@@ -8,71 +32,86 @@ export default function PostActionBar({
   onUpvote,
   onDownvote,
   onRepost,
-  onRequireLogin,
-  showCounts = true
+  onUse,
+  onRequireLogin
 }) {
   return (
-    <Stack spacing={1.25} className="post-actions-shell">
+    <Stack spacing={1.1} className="post-actions-shell">
       <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" flexWrap="wrap" className="post-actions-row">
         <Stack direction="row" spacing={0.75} alignItems="center" className="vote-cluster">
           <Button
             size="sm"
-            variant={post.hasLiked ? "solid" : "soft"}
-            color={post.hasLiked ? "primary" : "neutral"}
+            variant="plain"
+            color="neutral"
             onClick={() => (isLoggedIn ? onUpvote?.() : onRequireLogin?.())}
             loading={isBusy}
-            sx={{ borderRadius: "999px", minWidth: 44, px: 1.25 }}
+            className="icon-button"
             aria-label="Upvote"
           >
-            ↑
+            <ActionIcon src="/icon-upvote.png" alt="Upvote" />
           </Button>
-          <Button
-            size="sm"
-            variant="soft"
-            color="neutral"
-            onClick={() => (isLoggedIn ? onDownvote?.() : onRequireLogin?.())}
-            sx={{ borderRadius: "999px", minWidth: 44, px: 1.25 }}
-            aria-label="Downvote"
-          >
-            ↓
-          </Button>
-          <Typography level="title-sm" sx={{ minWidth: 24, textAlign: "center" }}>
+          <Typography level="title-sm" sx={{ minWidth: 24, textAlign: "center", color: "#ffffff" }}>
             {post.likeCount}
           </Typography>
-        </Stack>
-
-        <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" className="action-cluster">
           <Button
             size="sm"
-            variant="soft"
+            variant="plain"
+            color="neutral"
+            onClick={() => (isLoggedIn ? onDownvote?.() : onRequireLogin?.())}
+            className="icon-button"
+            aria-label="Downvote"
+          >
+            <ActionIcon src="/icon-downvote.png" alt="Downvote" />
+          </Button>
+        </Stack>
+
+        <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" className="action-cluster">
+          <Button
+            size="sm"
+            variant="plain"
             color="neutral"
             onClick={() => (isLoggedIn ? onRepost?.() : onRequireLogin?.())}
-            sx={{ borderRadius: "999px", minWidth: 44, px: 1.25 }}
+            className="icon-button"
             aria-label="Repost"
           >
-            ↻
+            <ActionIcon src="/icon-repost.png" alt="Repost" />
+          </Button>
+          <Button
+            size="sm"
+            variant="plain"
+            color="neutral"
+            onClick={() => onUse?.()}
+            className="use-button"
+            aria-label="Use"
+          >
+            <ActionIcon src="/icon-use.png" alt="Use" preserveBackground />
           </Button>
           <Button
             size="sm"
             component="a"
             href={getDownloadUrl(post.id)}
-            variant="soft"
+            variant="plain"
             color="neutral"
-            sx={{ borderRadius: "999px" }}
+            className="download-button"
+            aria-label="Download"
           >
-            ↓ Download
+            <ActionIcon src="/icon-download.png" alt="Download" />
+            <span>Save</span>
           </Button>
         </Stack>
       </Stack>
 
-      {showCounts ? (
-        <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" alignItems="center" className="post-stats-row">
-          <Chip size="sm" variant="soft">Comments {post.commentsCount}</Chip>
-          <Chip size="sm" variant="soft">Views {post.views}</Chip>
+      <Stack direction="row" spacing={1.25} useFlexGap flexWrap="wrap" alignItems="center" className="post-stats-row">
+        <Stack direction="row" spacing={0.55} alignItems="center">
+          <ActionIcon src="/icon-comment.png" alt="Comments" size={16} />
+          <Typography level="body-sm" sx={{ color: "#ffffff" }}>
+            {post.commentsCount}
+          </Typography>
         </Stack>
-      ) : (
-        <Typography level="body-sm">Score {post.likeCount}</Typography>
-      )}
+        <Typography level="body-sm" sx={{ color: "rgba(255,255,255,0.72)" }}>
+          {post.views} views
+        </Typography>
+      </Stack>
     </Stack>
   );
 }
