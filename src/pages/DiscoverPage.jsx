@@ -1,18 +1,57 @@
-import { useEffect, useState } from "react";
-import { Alert, Box, Button, Card, CircularProgress, Stack, Typography } from "@mui/joy";
-import { useNavigate } from "react-router-dom";
-import { getPosts, repostPost, voteOnPost } from "../api/yimageApi";
+import { useEffect, useMemo, useState } from "react";
+import { Alert, Box, Button, Card, CircularProgress, Input, Option, Select, Stack, Typography } from "@mui/joy";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { getCategories, getPosts, repostPost, voteOnPost } from "../api/yimageApi";
 import PostCard from "../components/PostCard";
 import { useAuth } from "../context/AuthContext";
 
 export default function DiscoverPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [posts, setPosts] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [postsError, setPostsError] = useState("");
   const [notice, setNotice] = useState("");
   const [busyPostId, setBusyPostId] = useState("");
+  const [searchText, setSearchText] = useState(searchParams.get("query") || searchParams.get("hashtag") || "");
+  const selectedCategory = searchParams.get("category") || "";
+
+  const activeFilters = useMemo(
+    () => ({
+      query: searchParams.get("query") || "",
+      category: searchParams.get("category") || "",
+      hashtag: searchParams.get("hashtag") || ""
+    }),
+    [searchParams]
+  );
+
+  useEffect(() => {
+    setSearchText(searchParams.get("query") || searchParams.get("hashtag") || "");
+  }, [searchParams]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCategories() {
+      try {
+        const nextCategories = await getCategories();
+        if (isMounted) {
+          setCategories(nextCategories);
+        }
+      } catch {
+        if (isMounted) {
+          setCategories([]);
+        }
+      }
+    }
+
+    loadCategories();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -22,7 +61,7 @@ export default function DiscoverPage() {
       setPostsError("");
 
       try {
-        const nextPosts = await getPosts("new");
+        const nextPosts = await getPosts(activeFilters);
         if (isMounted) {
           setPosts(nextPosts);
         }
@@ -38,11 +77,24 @@ export default function DiscoverPage() {
     }
 
     loadPosts();
-
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [activeFilters]);
+
+  function updateFilters(next) {
+    const params = new URLSearchParams(searchParams);
+
+    Object.entries(next).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+
+    setSearchParams(params);
+  }
 
   async function handleVote(postId, vote) {
     setBusyPostId(postId);
@@ -84,14 +136,45 @@ export default function DiscoverPage() {
               Discover
             </Typography>
             <Typography level="body-md" textColor="neutral.400" sx={{ maxWidth: 640 }}>
-              A simple image feed backed by D1 metadata and R2 image storage.
+              Search by title, creator, hashtag, or category and explore what is rising across Yimage.
             </Typography>
+
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+              <Input
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder="Search titles, creators, hashtags"
+                sx={{ flex: 1, borderRadius: "999px" }}
+              />
+              <Select
+                value={selectedCategory}
+                onChange={(_, value) => updateFilters({ category: value || "" })}
+                placeholder="All categories"
+                sx={{ minWidth: { xs: "100%", md: 180 }, borderRadius: "999px" }}
+              >
+                <Option value="">All categories</Option>
+                {categories.map((category) => (
+                  <Option key={category.id} value={category.slug}>
+                    {category.label}
+                  </Option>
+                ))}
+              </Select>
+              <Button
+                variant="solid"
+                color="neutral"
+                onClick={() => updateFilters({ query: searchText, hashtag: "" })}
+                sx={{ borderRadius: "999px" }}
+              >
+                Search
+              </Button>
+            </Stack>
+
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-              <Button variant="solid" color="primary" onClick={() => navigate(user ? "/create" : "/login?next=/create")} sx={{ borderRadius: "999px" }}>
+              <Button variant="soft" color="neutral" onClick={() => navigate(user ? "/create" : "/login?next=/create")} sx={{ borderRadius: "999px" }}>
                 Create post
               </Button>
               {!user ? (
-                <Button variant="soft" color="neutral" onClick={() => navigate("/signup")} sx={{ borderRadius: "999px" }}>
+                <Button variant="plain" color="neutral" onClick={() => navigate("/signup")} sx={{ borderRadius: "999px" }}>
                   Create account
                 </Button>
               ) : null}
@@ -114,7 +197,7 @@ export default function DiscoverPage() {
         {!isLoadingPosts && !posts.length ? (
           <Card variant="outlined" className="content-card">
             <Typography level="body-md" textColor="neutral.400">
-              No posts yet. The first published image will appear here.
+              No posts matched those filters.
             </Typography>
           </Card>
         ) : null}
@@ -129,6 +212,11 @@ export default function DiscoverPage() {
               onUpvote={() => handleVote(post.id, "up")}
               onDownvote={() => handleVote(post.id, "down")}
               onRepost={() => handleRepost(post.id)}
+              onHashtagClick={(tag) => {
+                setSearchText(`#${tag}`);
+                updateFilters({ hashtag: tag, query: "" });
+              }}
+              onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
               onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
             />
           ))}

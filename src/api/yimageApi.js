@@ -40,10 +40,12 @@ async function request(url, init = {}) {
   }
 }
 
-export async function createPost({ title, description, imageFile }) {
+export async function createPost({ title, description, imageFile, categoryId = "", hashtags = "" }) {
   const formData = new FormData();
   formData.append("title", title);
   formData.append("description", description);
+  formData.append("categoryId", categoryId);
+  formData.append("hashtags", hashtags);
   formData.append("image", imageFile);
 
   const data = await request("/api/posts", {
@@ -54,8 +56,14 @@ export async function createPost({ title, description, imageFile }) {
   return data.post;
 }
 
-export async function getPosts(sort = "hot") {
-  const data = await request(`/api/posts?sort=${encodeURIComponent(sort)}`);
+export async function getPosts(options = {}) {
+  const params = new URLSearchParams();
+  if (options.sort) params.set("sort", options.sort);
+  if (options.query) params.set("query", options.query);
+  if (options.category) params.set("category", options.category);
+  if (options.hashtag) params.set("hashtag", options.hashtag);
+  const query = params.toString();
+  const data = await request(`/api/posts${query ? `?${query}` : ""}`);
   return data.posts;
 }
 
@@ -132,6 +140,11 @@ export async function repostPost(id) {
   return data;
 }
 
+export async function getCategories() {
+  const data = await request("/api/categories");
+  return data.categories;
+}
+
 export async function createComment(id, text) {
   const data = await request(`/api/posts/${id}/comments`, {
     method: "POST",
@@ -142,6 +155,41 @@ export async function createComment(id, text) {
   });
 
   return data.comment;
+}
+
+export async function replyToComment(postId, text, parentId) {
+  const data = await request(`/api/posts/${postId}/comments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ text, parentId })
+  });
+
+  return data.comment;
+}
+
+export async function voteOnComment(id, vote) {
+  const data = await request(`/api/comments/${id}/vote`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ vote })
+  });
+  return data.comment;
+}
+
+export async function getUserProfile(username) {
+  const data = await request(`/api/users/${encodeURIComponent(username)}`);
+  return data;
+}
+
+export async function toggleFollow(username) {
+  const data = await request(`/api/users/${encodeURIComponent(username)}/follow`, {
+    method: "POST"
+  });
+  return data.profile;
 }
 
 export function getDownloadUrl(id) {

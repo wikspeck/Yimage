@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Box, Button, Card, CircularProgress, Input, Sheet, Stack, Textarea, Typography } from "@mui/joy";
+import { Alert, Box, Button, Card, CircularProgress, Input, Option, Select, Sheet, Stack, Textarea, Typography } from "@mui/joy";
 import ImagePreviewCard from "./ImagePreviewCard";
-import { createPost } from "../api/yimageApi";
+import { createPost, getCategories } from "../api/yimageApi";
 import { validateImageFile } from "../utils/validateImageFile";
 
 export default function UploadBox({ onPostCreated }) {
@@ -9,6 +9,9 @@ export default function UploadBox({ onPostCreated }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [categoryId, setCategoryId] = useState("");
+  const [hashtags, setHashtags] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -28,6 +31,29 @@ export default function UploadBox({ onPostCreated }) {
       URL.revokeObjectURL(nextUrl);
     };
   }, [selectedFile]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCategories() {
+      try {
+        const nextCategories = await getCategories();
+        if (isMounted) {
+          setCategories(nextCategories);
+          setCategoryId(nextCategories[0]?.id || "");
+        }
+      } catch {
+        if (isMounted) {
+          setCategories([]);
+        }
+      }
+    }
+
+    loadCategories();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   function resetMessages() {
     setErrorMessage("");
@@ -84,6 +110,7 @@ export default function UploadBox({ onPostCreated }) {
   function resetForm() {
     setTitle("");
     setDescription("");
+    setHashtags("");
     handleRemove();
   }
 
@@ -105,6 +132,8 @@ export default function UploadBox({ onPostCreated }) {
       const post = await createPost({
         title: title.trim(),
         description: description.trim(),
+        categoryId,
+        hashtags,
         imageFile: selectedFile
       });
 
@@ -164,6 +193,24 @@ export default function UploadBox({ onPostCreated }) {
                 }
               }}
               sx={{ borderRadius: "18px" }}
+            />
+            <Select
+              value={categoryId}
+              onChange={(_, nextValue) => setCategoryId(nextValue || "")}
+              placeholder="Category"
+              sx={{ borderRadius: "18px", minHeight: 48 }}
+            >
+              {categories.map((category) => (
+                <Option key={category.id} value={category.id}>
+                  {category.label}
+                </Option>
+              ))}
+            </Select>
+            <Input
+              placeholder="Hashtags (example: art sunset city)"
+              value={hashtags}
+              onChange={(event) => setHashtags(event.target.value)}
+              sx={{ borderRadius: "18px", minHeight: 48 }}
             />
           </Stack>
 

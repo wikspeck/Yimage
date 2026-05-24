@@ -7,8 +7,8 @@ export default function AuthPromptCard({ onLogin, onSignup, message = "Log in to
       sx={{
         p: 3,
         borderRadius: "24px",
-        bgcolor: "rgba(18, 20, 28, 0.92)",
-        borderColor: "rgba(255,255,255,0.08)"
+        bgcolor: "#050505",
+        borderColor: "rgba(255,255,255,0.12)"
       }}
     >
       <Stack spacing={1.5}>

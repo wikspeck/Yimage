@@ -26,6 +26,7 @@ function RequireAuth({ children }) {
 }
 
 function AppLayout() {
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -34,7 +35,7 @@ function AppLayout() {
       onOpenSignup={() => navigate("/signup")}
       onCreate={() => navigate("/create")}
       onDiscover={() => navigate("/")}
-      onProfile={() => navigate("/profile")}
+      onProfile={() => navigate(user ? `/u/${user.username}` : "/login")}
     />
   );
 }
@@ -63,10 +64,11 @@ function AppRoutes() {
                 path="/profile"
                 element={
                   <RequireAuth>
-                    <ProfilePage />
+                    <NavigateToOwnProfile />
                   </RequireAuth>
                 }
               />
+              <Route path="/u/:username" element={<ProfilePage />} />
               <Route path="/:postId" element={<PostPage />} />
             </Routes>
           </main>
@@ -75,6 +77,11 @@ function AppRoutes() {
       </AuthProvider>
     </BrowserRouter>
   );
+}
+
+function NavigateToOwnProfile() {
+  const { user } = useAuth();
+  return <Navigate to={`/u/${user.username}`} replace />;
 }
 
 export default function App() {

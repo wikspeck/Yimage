@@ -12,9 +12,6 @@ const MAX_COMMENT_LENGTH = 400;
 const SESSION_COOKIE = "yimage_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 const POST_ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-// Cloudflare Workers currently reject PBKDF2 iteration counts above 100000.
-// We store the iteration count inside each hash string so future verification
-// stays in sync with whatever limit/version created that password.
 const PBKDF2_ITERATIONS = 100000;
 
 function json(data, init = {}) {
@@ -27,13 +24,7 @@ function json(data, init = {}) {
 }
 
 function success(data, init = {}) {
-  return json(
-    {
-      ok: true,
-      ...data
-    },
-    init
-  );
+  return json({ ok: true, ...data }, init);
 }
 
 function fail(message, status = 400, details) {
@@ -72,6 +63,19 @@ function normalizeEmail(value) {
 
 function normalizeUsername(value) {
   return normalizeText(value);
+}
+
+function normalizeHashtag(value) {
+  return normalizeText(value).replace(/^#+/, "").toLowerCase();
+}
+
+function parseHashtags(value) {
+  const matches = String(value || "")
+    .split(/[,\s]+/)
+    .map((item) => normalizeHashtag(item))
+    .filter(Boolean);
+
+  return [...new Set(matches)].slice(0, 12);
 }
 
 function isValidEmail(email) {
@@ -135,11 +139,49 @@ function toPostResponse(post, viewerVote = null, viewerHasReposted = false, repo
     commentsCount: Number(post.commentsCount || 0),
     views: Number(post.views || 0),
     repostCount: Number(post.repostCount || 0),
+    category: post.categorySlug
+      ? {
+          id: post.categoryId,
+          slug: post.categorySlug,
+          label: post.categoryLabel
+        }
+      : null,
+    hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
     hasLiked: viewerVote === "up",
     viewerVote,
     hasReposted: Boolean(viewerHasReposted),
     repostsRemainingToday: Number(repostsRemainingToday)
   };
+}
+
+function toCommentResponse(comment, viewerVote = null) {
+  return {
+    id: comment.id,
+    postId: comment.postId,
+    parentId: comment.parentId || null,
+    authorId: comment.authorId,
+    authorUsername: comment.authorUsername,
+    text: comment.text,
+    createdAt: comment.createdAt,
+    score: Number(comment.score || 0),
+    viewerVote,
+    replies: []
+  };
+}
+
+function nestComments(flatComments) {
+  const byId = new Map(flatComments.map((comment) => [comment.id, { ...comment, replies: [] }]));
+  const roots = [];
+
+  for (const comment of byId.values()) {
+    if (comment.parentId && byId.has(comment.parentId)) {
+      byId.get(comment.parentId).replies.push(comment);
+    } else {
+      roots.push(comment);
+    }
+  }
+
+  return roots;
 }
 
 async function sha256Hex(input) {
@@ -159,13 +201,7 @@ function bytesToBase64(bytes) {
 async function hashPassword(password) {
   const salt = new Uint8Array(16);
   crypto.getRandomValues(salt);
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
+  const keyMaterial = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
   const derivedBits = await crypto.subtle.deriveBits(
     {
       name: "PBKDF2",
@@ -184,26 +220,13 @@ async function verifyPassword(password, storedHash) {
   const [iterationsText, saltBase64, expectedHash] = String(storedHash || "").split("$");
   const iterations = Number(iterationsText);
 
-  if (!iterations || !saltBase64 || !expectedHash) {
-    return false;
-  }
-
-  if (iterations > PBKDF2_ITERATIONS) {
-    console.error("Stored password hash uses unsupported PBKDF2 iterations in Cloudflare Workers.", {
-      iterations
-    });
+  if (!iterations || !saltBase64 || !expectedHash || iterations > PBKDF2_ITERATIONS) {
     return false;
   }
 
   try {
     const salt = Uint8Array.from(atob(saltBase64), (character) => character.charCodeAt(0));
-    const keyMaterial = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(password),
-      "PBKDF2",
-      false,
-      ["deriveBits"]
-    );
+    const keyMaterial = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
     const derivedBits = await crypto.subtle.deriveBits(
       {
         name: "PBKDF2",
@@ -232,7 +255,6 @@ async function parseJsonBody(request) {
 
 async function getCurrentUser(request, env) {
   const token = getCookie(request, SESSION_COOKIE);
-
   if (!token) {
     return null;
   }
@@ -270,12 +292,40 @@ async function getCurrentUser(request, env) {
 
 async function requireUser(request, env) {
   const user = await getCurrentUser(request, env);
-
   if (!user) {
     throw fail("You must be logged in to do that.", 401);
   }
-
   return user;
+}
+
+async function getPostHashtagsMap(env, postIds) {
+  if (!postIds.length) {
+    return {};
+  }
+
+  const placeholders = postIds.map(() => "?").join(", ");
+  const rows = await env.DB.prepare(
+    `
+      SELECT
+        post_hashtags.post_id AS postId,
+        hashtags.tag
+      FROM post_hashtags
+      INNER JOIN hashtags ON hashtags.id = post_hashtags.hashtag_id
+      WHERE post_hashtags.post_id IN (${placeholders})
+      ORDER BY hashtags.tag ASC
+    `
+  )
+    .bind(...postIds)
+    .all();
+
+  const result = {};
+  for (const row of rows.results || []) {
+    if (!result[row.postId]) {
+      result[row.postId] = [];
+    }
+    result[row.postId].push(row.tag);
+  }
+  return result;
 }
 
 async function getPostRecord(env, postId) {
@@ -294,9 +344,13 @@ async function getPostRecord(env, postId) {
         COALESCE(posts.score, COALESCE(posts.like_count, 0)) AS score,
         COALESCE(posts.comments_count, 0) AS commentsCount,
         COALESCE(posts.views, 0) AS views,
-        COALESCE(posts.repost_count, 0) AS repostCount
+        COALESCE(posts.repost_count, 0) AS repostCount,
+        posts.category_id AS categoryId,
+        categories.slug AS categorySlug,
+        categories.label AS categoryLabel
       FROM posts
       INNER JOIN users ON users.id = posts.author_id
+      LEFT JOIN categories ON categories.id = posts.category_id
       WHERE posts.id = ?
       LIMIT 1
     `
@@ -304,7 +358,13 @@ async function getPostRecord(env, postId) {
     .bind(postId)
     .first();
 
-  return row || null;
+  if (!row) {
+    return null;
+  }
+
+  const hashtagsByPost = await getPostHashtagsMap(env, [postId]);
+  row.hashtags = hashtagsByPost[postId] || [];
+  return row;
 }
 
 async function getViewerVoteMap(env, userId, postIds) {
@@ -313,16 +373,14 @@ async function getViewerVoteMap(env, userId, postIds) {
   }
 
   const placeholders = postIds.map(() => "?").join(", ");
-  const rows = await env.DB.prepare(
-    `SELECT post_id AS postId, value FROM votes WHERE user_id = ? AND post_id IN (${placeholders})`
-  )
+  const rows = await env.DB.prepare(`SELECT post_id AS postId, value FROM votes WHERE user_id = ? AND post_id IN (${placeholders})`)
     .bind(userId, ...postIds)
     .all();
 
   const result = {};
-  (rows.results || []).forEach((row) => {
+  for (const row of rows.results || []) {
     result[row.postId] = Number(row.value) === 1 ? "up" : "down";
-  });
+  }
   return result;
 }
 
@@ -332,16 +390,31 @@ async function getViewerRepostMap(env, userId, postIds) {
   }
 
   const placeholders = postIds.map(() => "?").join(", ");
-  const rows = await env.DB.prepare(
-    `SELECT post_id AS postId FROM reposts WHERE user_id = ? AND post_id IN (${placeholders})`
-  )
+  const rows = await env.DB.prepare(`SELECT post_id AS postId FROM reposts WHERE user_id = ? AND post_id IN (${placeholders})`)
     .bind(userId, ...postIds)
     .all();
 
   const result = {};
-  (rows.results || []).forEach((row) => {
+  for (const row of rows.results || []) {
     result[row.postId] = true;
-  });
+  }
+  return result;
+}
+
+async function getViewerCommentVoteMap(env, userId, commentIds) {
+  if (!userId || !commentIds.length) {
+    return {};
+  }
+
+  const placeholders = commentIds.map(() => "?").join(", ");
+  const rows = await env.DB.prepare(`SELECT comment_id AS commentId, value FROM comment_votes WHERE user_id = ? AND comment_id IN (${placeholders})`)
+    .bind(userId, ...commentIds)
+    .all();
+
+  const result = {};
+  for (const row of rows.results || []) {
+    result[row.commentId] = Number(row.value) === 1 ? "up" : "down";
+  }
   return result;
 }
 
@@ -354,11 +427,97 @@ async function getRepostsRemainingToday(env, userId) {
   const row = await env.DB.prepare("SELECT COUNT(*) AS count FROM reposts WHERE user_id = ? AND created_at >= ?")
     .bind(userId, dayStart)
     .first();
-  const used = Number(row?.count || 0);
-  return Math.max(0, 3 - used);
+
+  return Math.max(0, 3 - Number(row?.count || 0));
 }
 
-async function listPosts(env, userId) {
+async function getCategoryById(env, categoryId) {
+  if (!categoryId) {
+    return null;
+  }
+
+  return env.DB.prepare("SELECT id, slug, label FROM categories WHERE id = ? LIMIT 1").bind(categoryId).first();
+}
+
+async function listCategories(env) {
+  const rows = await env.DB.prepare("SELECT id, slug, label FROM categories ORDER BY label ASC").all();
+  return rows.results || [];
+}
+
+async function syncPostHashtags(env, postId, hashtags) {
+  await env.DB.prepare("DELETE FROM post_hashtags WHERE post_id = ?").bind(postId).run();
+
+  for (const tag of hashtags) {
+    const existing = await env.DB.prepare("SELECT id FROM hashtags WHERE tag = ? LIMIT 1").bind(tag).first();
+    const hashtagId = existing?.id || createId("hashtag_");
+
+    if (!existing) {
+      await env.DB.prepare("INSERT INTO hashtags (id, tag, created_at) VALUES (?, ?, ?)")
+        .bind(hashtagId, tag, toIsoDate())
+        .run();
+    }
+
+    await env.DB.prepare("INSERT OR IGNORE INTO post_hashtags (post_id, hashtag_id, created_at) VALUES (?, ?, ?)")
+      .bind(postId, hashtagId, toIsoDate())
+      .run();
+  }
+}
+
+async function listPosts(env, userId, options = {}) {
+  const searchQuery = normalizeText(options.query).toLowerCase();
+  const creatorQuery = searchQuery.replace(/^@+/, "");
+  const category = normalizeText(options.category).toLowerCase();
+  const hashtag = normalizeHashtag(options.hashtag);
+  const conditions = [];
+  const bindings = [];
+
+  if (searchQuery) {
+    const likeValue = `%${searchQuery}%`;
+    conditions.push(
+      `(
+        LOWER(posts.title) LIKE ?
+        OR LOWER(posts.description) LIKE ?
+        OR LOWER(users.username) LIKE ?
+        OR EXISTS (
+          SELECT 1
+          FROM post_hashtags
+          INNER JOIN hashtags ON hashtags.id = post_hashtags.hashtag_id
+          WHERE post_hashtags.post_id = posts.id
+            AND LOWER(hashtags.tag) LIKE ?
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM categories AS search_categories
+          WHERE search_categories.id = posts.category_id
+            AND (
+              LOWER(search_categories.slug) LIKE ?
+              OR LOWER(search_categories.label) LIKE ?
+            )
+        )
+      )`
+    );
+    bindings.push(likeValue, likeValue, `%${creatorQuery}%`, likeValue, likeValue, likeValue);
+  }
+
+  if (category) {
+    conditions.push("(LOWER(categories.slug) = ? OR LOWER(categories.label) = ?)");
+    bindings.push(category, category);
+  }
+
+  if (hashtag) {
+    conditions.push(
+      `EXISTS (
+        SELECT 1
+        FROM post_hashtags
+        INNER JOIN hashtags ON hashtags.id = post_hashtags.hashtag_id
+        WHERE post_hashtags.post_id = posts.id
+          AND hashtags.tag = ?
+      )`
+    );
+    bindings.push(hashtag);
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
   const rows = await env.DB.prepare(
     `
       SELECT
@@ -373,23 +532,33 @@ async function listPosts(env, userId) {
         COALESCE(posts.like_count, 0) AS likeCount,
         COALESCE(posts.score, COALESCE(posts.like_count, 0)) AS score,
         COALESCE(posts.comments_count, 0) AS commentsCount,
-        COALESCE(posts.views, 0) AS views
-        ,
-        COALESCE(posts.repost_count, 0) AS repostCount
+        COALESCE(posts.views, 0) AS views,
+        COALESCE(posts.repost_count, 0) AS repostCount,
+        posts.category_id AS categoryId,
+        categories.slug AS categorySlug,
+        categories.label AS categoryLabel
       FROM posts
       INNER JOIN users ON users.id = posts.author_id
+      LEFT JOIN categories ON categories.id = posts.category_id
+      ${whereClause}
       ORDER BY COALESCE(posts.repost_count, 0) DESC, COALESCE(posts.score, COALESCE(posts.like_count, 0)) DESC, posts.created_at DESC, posts.id DESC
       LIMIT 50
     `
-  ).all();
+  )
+    .bind(...bindings)
+    .all();
 
   const posts = rows.results || [];
   const postIds = posts.map((post) => post.id);
   const votesByPost = await getViewerVoteMap(env, userId, postIds);
   const repostsByPost = await getViewerRepostMap(env, userId, postIds);
+  const hashtagsByPost = await getPostHashtagsMap(env, postIds);
   const repostsRemainingToday = await getRepostsRemainingToday(env, userId);
 
-  return posts.map((post) => toPostResponse(post, votesByPost[post.id] || null, repostsByPost[post.id], repostsRemainingToday));
+  return posts.map((post) => {
+    post.hashtags = hashtagsByPost[post.id] || [];
+    return toPostResponse(post, votesByPost[post.id] || null, repostsByPost[post.id], repostsRemainingToday);
+  });
 }
 
 async function createSession(env, userId) {
@@ -400,9 +569,7 @@ async function createSession(env, userId) {
   const expiresAt = toIsoDate(Date.now() + SESSION_TTL_SECONDS * 1000);
 
   await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(userId).run();
-  await env.DB.prepare(
-    "INSERT INTO sessions (id, user_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)"
-  )
+  await env.DB.prepare("INSERT INTO sessions (id, user_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)")
     .bind(sessionId, userId, tokenHash, createdAt, expiresAt)
     .run();
 
@@ -418,11 +585,9 @@ async function handleSignup(request, env) {
   if (!isValidUsername(username)) {
     return fail("Username must be 3 to 24 characters and use only letters, numbers, or underscores.");
   }
-
   if (!isValidEmail(email)) {
     return fail("Please enter a valid email address.");
   }
-
   if (password.length < 8) {
     return fail("Password must be at least 8 characters.");
   }
@@ -439,9 +604,7 @@ async function handleSignup(request, env) {
   const createdAt = toIsoDate();
   const passwordHash = await hashPassword(password);
 
-  await env.DB.prepare(
-    "INSERT INTO users (id, username, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)"
-  )
+  await env.DB.prepare("INSERT INTO users (id, username, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)")
     .bind(userId, username, email, passwordHash, createdAt)
     .run();
 
@@ -449,12 +612,7 @@ async function handleSignup(request, env) {
 
   return success(
     {
-      user: toPublicUser({
-        id: userId,
-        username,
-        email,
-        createdAt
-      })
+      user: toPublicUser({ id: userId, username, email, createdAt })
     },
     {
       status: 201,
@@ -490,22 +648,13 @@ async function handleLogin(request, env) {
     .bind(email)
     .first();
 
-  if (!user) {
-    return fail("Invalid email or password.", 401);
-  }
-
-  const validPassword = await verifyPassword(password, user.passwordHash);
-
-  if (!validPassword) {
+  if (!user || !(await verifyPassword(password, user.passwordHash))) {
     return fail("Invalid email or password.", 401);
   }
 
   const token = await createSession(env, user.id);
-
   return success(
-    {
-      user: toPublicUser(user)
-    },
+    { user: toPublicUser(user) },
     {
       headers: {
         "Set-Cookie": buildSessionCookie(token)
@@ -516,7 +665,6 @@ async function handleLogin(request, env) {
 
 async function handleLogout(request, env) {
   const token = getCookie(request, SESSION_COOKIE);
-
   if (token) {
     const tokenHash = await sha256Hex(token);
     await env.DB.prepare("DELETE FROM sessions WHERE token_hash = ?").bind(tokenHash).run();
@@ -534,9 +682,7 @@ async function handleLogout(request, env) {
 
 async function handleMe(request, env) {
   const user = await getCurrentUser(request, env);
-  return success({
-    user: user ? toPublicUser(user) : null
-  });
+  return success({ user: user ? toPublicUser(user) : null });
 }
 
 async function handleCreatePost(request, env) {
@@ -544,50 +690,53 @@ async function handleCreatePost(request, env) {
   const formData = await request.formData();
   const title = normalizeText(formData.get("title"));
   const description = normalizeText(formData.get("description"));
+  const categoryId = normalizeText(formData.get("categoryId"));
+  const hashtags = parseHashtags(formData.get("hashtags"));
   const image = formData.get("image");
 
   if (!title) {
     return fail("Title is required.");
   }
-
   if (title.length > MAX_TITLE_LENGTH) {
     return fail(`Title must be ${MAX_TITLE_LENGTH} characters or fewer.`);
   }
-
   if (description.length > MAX_DESCRIPTION_LENGTH) {
     return fail(`Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`);
   }
-
   if (!(image instanceof File)) {
     return fail("Image file is required.");
   }
-
   if (!ALLOWED_IMAGE_TYPES[image.type]) {
     return fail("Only JPG, PNG, WEBP, and GIF images are allowed.");
   }
-
   if (image.size > MAX_FILE_SIZE) {
     return fail("Image must be 10 MB or smaller.");
   }
 
+  let resolvedCategoryId = null;
+  if (categoryId) {
+    const category = await getCategoryById(env, categoryId);
+    if (!category) {
+      return fail("Selected category is invalid.");
+    }
+    resolvedCategoryId = category.id;
+  }
+
   let postId = "";
   let foundAvailableId = false;
-
   for (let attempt = 0; attempt < 6; attempt += 1) {
     postId = createPostId();
-    const existingPost = await env.DB.prepare("SELECT id FROM posts WHERE id = ? LIMIT 1").bind(postId).first();
-    if (!existingPost) {
+    const existing = await env.DB.prepare("SELECT id FROM posts WHERE id = ? LIMIT 1").bind(postId).first();
+    if (!existing) {
       foundAvailableId = true;
       break;
     }
   }
-
   if (!foundAvailableId) {
     return fail("Could not create post id.", 500);
   }
 
-  const extension = ALLOWED_IMAGE_TYPES[image.type];
-  const imageKey = getImageKey(postId, extension);
+  const imageKey = getImageKey(postId, ALLOWED_IMAGE_TYPES[image.type]);
   const createdAt = toIsoDate();
 
   await env.YIMAGE_BUCKET.put(imageKey, image.stream(), {
@@ -608,36 +757,38 @@ async function handleCreatePost(request, env) {
         created_at,
         like_count,
         comments_count,
-        views
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0)
+        views,
+        category_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?)
     `
   )
-    .bind(postId, user.id, title, description, imageKey, image.type, createdAt)
+    .bind(postId, user.id, title, description, imageKey, image.type, createdAt, resolvedCategoryId)
     .run();
 
+  await syncPostHashtags(env, postId, hashtags);
   const post = await getPostRecord(env, postId);
-  return success(
-    {
-      post: toPostResponse(post, null, false, 3)
-    },
-    { status: 201 }
-  );
+
+  return success({ post: toPostResponse(post) }, { status: 201 });
 }
 
 async function handleListPosts(request, env) {
   const user = await getCurrentUser(request, env);
-  const posts = await listPosts(env, user?.id);
+  const url = new URL(request.url);
+  const posts = await listPosts(env, user?.id, {
+    query: url.searchParams.get("query") || "",
+    category: url.searchParams.get("category") || "",
+    hashtag: url.searchParams.get("hashtag") || ""
+  });
   return success({ posts });
 }
 
 async function handleGetPost(request, env, postId) {
   const post = await getPostRecord(env, postId);
-
   if (!post) {
     return fail("Post not found.", 404);
   }
 
-  await env.DB.prepare("UPDATE posts SET views = views + 1 WHERE id = ?").bind(postId).run();
+  await env.DB.prepare("UPDATE posts SET views = COALESCE(views, 0) + 1 WHERE id = ?").bind(postId).run();
   post.views = Number(post.views || 0) + 1;
 
   const user = await getCurrentUser(request, env);
@@ -650,72 +801,26 @@ async function handleGetPost(request, env, postId) {
   });
 }
 
-async function handleLike(request, env, postId) {
-  const user = await requireUser(request, env);
-  const post = await getPostRecord(env, postId);
-
-  if (!post) {
-    return fail("Post not found.", 404);
-  }
-
-  const existingVote = await env.DB.prepare("SELECT id, value FROM votes WHERE user_id = ? AND post_id = ? LIMIT 1")
-    .bind(user.id, postId)
-    .first();
-
-  let finalVote = "up";
-  let scoreDelta = 0;
-
-  if (!existingVote) {
-    await env.DB.prepare("INSERT INTO votes (id, post_id, user_id, value, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
-      .bind(createId("vote_"), postId, user.id, 1, toIsoDate(), toIsoDate())
-      .run();
-    scoreDelta = 1;
-  } else if (Number(existingVote.value) === 1) {
-    await env.DB.prepare("DELETE FROM votes WHERE id = ?").bind(existingVote.id).run();
-    scoreDelta = -1;
-    finalVote = null;
-  } else {
-    await env.DB.prepare("UPDATE votes SET value = ?, updated_at = ? WHERE id = ?")
-      .bind(1, toIsoDate(), existingVote.id)
-      .run();
-    scoreDelta = 2;
-  }
-
-  await env.DB.prepare("UPDATE posts SET score = COALESCE(score, COALESCE(like_count, 0)) + ?, like_count = COALESCE(score, COALESCE(like_count, 0)) + ? WHERE id = ?")
-    .bind(scoreDelta, scoreDelta, postId)
-    .run();
-
-  const updatedPost = await getPostRecord(env, postId);
-  const repostsRemainingToday = await getRepostsRemainingToday(env, user.id);
-  const viewerReposts = await getViewerRepostMap(env, user.id, [postId]);
-
-  return success({
-    post: toPostResponse(updatedPost, finalVote, viewerReposts[postId], repostsRemainingToday)
-  });
-}
-
 async function handleVote(request, env, postId) {
   const user = await requireUser(request, env);
   const post = await getPostRecord(env, postId);
-
   if (!post) {
     return fail("Post not found.", 404);
   }
 
   const body = await parseJsonBody(request);
   const nextVote = body.vote === "up" || body.vote === "down" ? body.vote : null;
-
   if (!nextVote) {
-    return fail("Vote must be up or down.", 400);
+    return fail("Vote must be up or down.");
   }
 
   const existingVote = await env.DB.prepare("SELECT id, value FROM votes WHERE user_id = ? AND post_id = ? LIMIT 1")
     .bind(user.id, postId)
     .first();
 
+  const nextVoteValue = nextVote === "up" ? 1 : -1;
   let finalVote = nextVote;
   let scoreDelta = 0;
-  const nextVoteValue = nextVote === "up" ? 1 : -1;
 
   if (!existingVote) {
     await env.DB.prepare("INSERT INTO votes (id, post_id, user_id, value, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
@@ -733,57 +838,64 @@ async function handleVote(request, env, postId) {
     scoreDelta = nextVote === "up" ? 2 : -2;
   }
 
-  await env.DB.prepare("UPDATE posts SET score = COALESCE(score, COALESCE(like_count, 0)) + ?, like_count = COALESCE(score, COALESCE(like_count, 0)) + ? WHERE id = ?")
+  await env.DB.prepare(
+    "UPDATE posts SET score = COALESCE(score, COALESCE(like_count, 0)) + ?, like_count = COALESCE(score, COALESCE(like_count, 0)) + ? WHERE id = ?"
+  )
     .bind(scoreDelta, scoreDelta, postId)
     .run();
 
   const updatedPost = await getPostRecord(env, postId);
-  const repostsRemainingToday = await getRepostsRemainingToday(env, user.id);
   const viewerReposts = await getViewerRepostMap(env, user.id, [postId]);
-
+  const repostsRemainingToday = await getRepostsRemainingToday(env, user.id);
   return success({
     post: toPostResponse(updatedPost, finalVote, viewerReposts[postId], repostsRemainingToday)
   });
 }
 
+async function handleLike(request, env, postId) {
+  const cloned = new Request(request.url, {
+    method: "POST",
+    headers: request.headers,
+    body: JSON.stringify({ vote: "up" })
+  });
+  return handleVote(cloned, env, postId);
+}
+
 async function handleRepost(request, env, postId) {
   const user = await requireUser(request, env);
   const post = await getPostRecord(env, postId);
-
   if (!post) {
     return fail("Post not found.", 404);
-  }
-
-  const remainingBefore = await getRepostsRemainingToday(env, user.id);
-  if (remainingBefore <= 0) {
-    return fail("You have no reposts left today.", 429);
   }
 
   const existing = await env.DB.prepare("SELECT id FROM reposts WHERE user_id = ? AND post_id = ? LIMIT 1")
     .bind(user.id, postId)
     .first();
 
-  let active = false;
+  if (!existing) {
+    const remaining = await getRepostsRemainingToday(env, user.id);
+    if (remaining <= 0) {
+      return fail("You have no reposts left today.", 429);
+    }
+  }
 
+  let active = false;
   if (existing) {
     await env.DB.prepare("DELETE FROM reposts WHERE id = ?").bind(existing.id).run();
-    await env.DB.prepare("UPDATE posts SET repost_count = CASE WHEN repost_count > 0 THEN repost_count - 1 ELSE 0 END WHERE id = ?")
+    await env.DB.prepare("UPDATE posts SET repost_count = CASE WHEN COALESCE(repost_count, 0) > 0 THEN repost_count - 1 ELSE 0 END WHERE id = ?")
       .bind(postId)
       .run();
   } else {
     await env.DB.prepare("INSERT INTO reposts (id, post_id, user_id, created_at) VALUES (?, ?, ?, ?)")
       .bind(createId("repost_"), postId, user.id, toIsoDate())
       .run();
-    await env.DB.prepare("UPDATE posts SET repost_count = COALESCE(repost_count, 0) + 1 WHERE id = ?")
-      .bind(postId)
-      .run();
+    await env.DB.prepare("UPDATE posts SET repost_count = COALESCE(repost_count, 0) + 1 WHERE id = ?").bind(postId).run();
     active = true;
   }
 
   const updatedPost = await getPostRecord(env, postId);
   const votes = await getViewerVoteMap(env, user.id, [postId]);
   const repostsRemainingToday = await getRepostsRemainingToday(env, user.id);
-
   return success({
     message: active
       ? `You reposted. ${repostsRemainingToday} reposts left today.`
@@ -792,9 +904,8 @@ async function handleRepost(request, env, postId) {
   });
 }
 
-async function handleCommentsList(env, postId) {
+async function handleCommentsList(request, env, postId) {
   const post = await getPostRecord(env, postId);
-
   if (!post) {
     return fail("Post not found.", 404);
   }
@@ -804,10 +915,12 @@ async function handleCommentsList(env, postId) {
       SELECT
         comments.id,
         comments.post_id AS postId,
+        comments.parent_id AS parentId,
         comments.author_id AS authorId,
         users.username AS authorUsername,
         comments.text,
-        comments.created_at AS createdAt
+        comments.created_at AS createdAt,
+        COALESCE(comments.score, 0) AS score
       FROM comments
       INNER JOIN users ON users.id = comments.author_id
       WHERE comments.post_id = ?
@@ -817,62 +930,266 @@ async function handleCommentsList(env, postId) {
     .bind(postId)
     .all();
 
-  return success({
-    comments: rows.results || []
-  });
+  const user = await getCurrentUser(request, env);
+  const commentIds = (rows.results || []).map((row) => row.id);
+  const viewerVotes = await getViewerCommentVoteMap(env, user?.id, commentIds);
+  const comments = (rows.results || []).map((row) => toCommentResponse(row, viewerVotes[row.id] || null));
+
+  return success({ comments: nestComments(comments) });
 }
 
 async function handleCommentCreate(request, env, postId) {
   const user = await requireUser(request, env);
   const post = await getPostRecord(env, postId);
-
   if (!post) {
     return fail("Post not found.", 404);
   }
 
   const body = await parseJsonBody(request);
   const text = normalizeText(body.text);
+  const parentId = normalizeText(body.parentId);
 
   if (!text) {
     return fail("Comment cannot be empty.");
   }
-
   if (text.length > MAX_COMMENT_LENGTH) {
     return fail(`Comment must be ${MAX_COMMENT_LENGTH} characters or fewer.`);
+  }
+
+  let resolvedParentId = null;
+  if (parentId) {
+    const parentComment = await env.DB.prepare("SELECT id FROM comments WHERE id = ? AND post_id = ? LIMIT 1").bind(parentId, postId).first();
+    if (!parentComment) {
+      return fail("Reply target was not found.", 404);
+    }
+    resolvedParentId = parentId;
   }
 
   const comment = {
     id: createId("comment_"),
     postId,
+    parentId: resolvedParentId,
     authorId: user.id,
     authorUsername: user.username,
     text,
-    createdAt: toIsoDate()
+    createdAt: toIsoDate(),
+    score: 0
   };
 
-  await env.DB.prepare("INSERT INTO comments (id, post_id, author_id, text, created_at) VALUES (?, ?, ?, ?, ?)")
-    .bind(comment.id, comment.postId, comment.authorId, comment.text, comment.createdAt)
+  await env.DB.prepare("INSERT INTO comments (id, post_id, parent_id, author_id, text, created_at, score) VALUES (?, ?, ?, ?, ?, ?, 0)")
+    .bind(comment.id, comment.postId, comment.parentId, comment.authorId, comment.text, comment.createdAt)
     .run();
 
-  await env.DB.prepare("UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?").bind(postId).run();
+  await env.DB.prepare("UPDATE posts SET comments_count = COALESCE(comments_count, 0) + 1 WHERE id = ?").bind(postId).run();
+  return success({ comment: toCommentResponse(comment) }, { status: 201 });
+}
 
-  return success(
-    {
-      comment
+async function handleCommentVote(request, env, commentId) {
+  const user = await requireUser(request, env);
+  const body = await parseJsonBody(request);
+  const nextVote = body.vote === "up" || body.vote === "down" ? body.vote : null;
+  if (!nextVote) {
+    return fail("Vote must be up or down.");
+  }
+
+  const comment = await env.DB.prepare("SELECT id, post_id AS postId, author_id AS authorId, parent_id AS parentId, text, created_at AS createdAt, COALESCE(score, 0) AS score FROM comments WHERE id = ? LIMIT 1")
+    .bind(commentId)
+    .first();
+  if (!comment) {
+    return fail("Comment not found.", 404);
+  }
+
+  const author = await env.DB.prepare("SELECT username AS authorUsername FROM users WHERE id = ? LIMIT 1").bind(comment.authorId).first();
+  const existingVote = await env.DB.prepare("SELECT id, value FROM comment_votes WHERE user_id = ? AND comment_id = ? LIMIT 1")
+    .bind(user.id, commentId)
+    .first();
+
+  const nextVoteValue = nextVote === "up" ? 1 : -1;
+  let finalVote = nextVote;
+  let scoreDelta = 0;
+
+  if (!existingVote) {
+    await env.DB.prepare("INSERT INTO comment_votes (id, comment_id, user_id, value, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(createId("comment_vote_"), commentId, user.id, nextVoteValue, toIsoDate(), toIsoDate())
+      .run();
+    scoreDelta = nextVoteValue;
+  } else if (Number(existingVote.value) === nextVoteValue) {
+    await env.DB.prepare("DELETE FROM comment_votes WHERE id = ?").bind(existingVote.id).run();
+    scoreDelta = nextVote === "up" ? -1 : 1;
+    finalVote = null;
+  } else {
+    await env.DB.prepare("UPDATE comment_votes SET value = ?, updated_at = ? WHERE id = ?")
+      .bind(nextVoteValue, toIsoDate(), existingVote.id)
+      .run();
+    scoreDelta = nextVote === "up" ? 2 : -2;
+  }
+
+  await env.DB.prepare("UPDATE comments SET score = COALESCE(score, 0) + ? WHERE id = ?").bind(scoreDelta, commentId).run();
+  comment.score = Number(comment.score || 0) + scoreDelta;
+  comment.authorUsername = author?.authorUsername || "unknown";
+
+  return success({ comment: toCommentResponse(comment, finalVote) });
+}
+
+async function handleCategoriesList(env) {
+  const categories = await listCategories(env);
+  return success({ categories });
+}
+
+async function handleGetProfile(request, env, username) {
+  const normalizedUsername = normalizeUsername(username);
+  const viewer = await getCurrentUser(request, env);
+  const profileUser = await env.DB.prepare(
+    `
+      SELECT
+        id,
+        username,
+        email,
+        created_at AS createdAt
+      FROM users
+      WHERE username = ?
+      LIMIT 1
+    `
+  )
+    .bind(normalizedUsername)
+    .first();
+
+  if (!profileUser) {
+    return fail("User not found.", 404);
+  }
+
+  const counts = await env.DB.prepare(
+    `
+      SELECT
+        (SELECT COUNT(*) FROM posts WHERE author_id = ?) AS postsCount,
+        (SELECT COUNT(*) FROM follows WHERE following_id = ?) AS followersCount,
+        (SELECT COUNT(*) FROM follows WHERE follower_id = ?) AS followingCount
+    `
+  )
+    .bind(profileUser.id, profileUser.id, profileUser.id)
+    .first();
+
+  let isFollowing = false;
+  if (viewer?.id && viewer.id !== profileUser.id) {
+    const followRow = await env.DB.prepare("SELECT id FROM follows WHERE follower_id = ? AND following_id = ? LIMIT 1")
+      .bind(viewer.id, profileUser.id)
+      .first();
+    isFollowing = Boolean(followRow);
+  }
+
+  const postRows = await env.DB.prepare(
+    `
+      SELECT
+        posts.id,
+        posts.author_id AS userId,
+        users.username AS authorUsername,
+        posts.title,
+        COALESCE(posts.description, '') AS description,
+        posts.image_key AS imageKey,
+        COALESCE(posts.image_mime_type, 'application/octet-stream') AS imageMimeType,
+        posts.created_at AS createdAt,
+        COALESCE(posts.like_count, 0) AS likeCount,
+        COALESCE(posts.score, COALESCE(posts.like_count, 0)) AS score,
+        COALESCE(posts.comments_count, 0) AS commentsCount,
+        COALESCE(posts.views, 0) AS views,
+        COALESCE(posts.repost_count, 0) AS repostCount,
+        posts.category_id AS categoryId,
+        categories.slug AS categorySlug,
+        categories.label AS categoryLabel
+      FROM posts
+      INNER JOIN users ON users.id = posts.author_id
+      LEFT JOIN categories ON categories.id = posts.category_id
+      WHERE posts.author_id = ?
+      ORDER BY posts.created_at DESC, posts.id DESC
+      LIMIT 50
+    `
+  )
+    .bind(profileUser.id)
+    .all();
+
+  const postIds = (postRows.results || []).map((post) => post.id);
+  const votesByPost = await getViewerVoteMap(env, viewer?.id, postIds);
+  const repostsByPost = await getViewerRepostMap(env, viewer?.id, postIds);
+  const hashtagsByPost = await getPostHashtagsMap(env, postIds);
+  const repostsRemainingToday = await getRepostsRemainingToday(env, viewer?.id);
+  const profilePosts = (postRows.results || []).map((post) => {
+    post.hashtags = hashtagsByPost[post.id] || [];
+    return toPostResponse(post, votesByPost[post.id] || null, repostsByPost[post.id], repostsRemainingToday);
+  });
+
+  return success({
+    profile: {
+      id: profileUser.id,
+      username: profileUser.username,
+      createdAt: profileUser.createdAt,
+      postsCount: Number(counts?.postsCount || 0),
+      followersCount: Number(counts?.followersCount || 0),
+      followingCount: Number(counts?.followingCount || 0),
+      isFollowing
     },
-    { status: 201 }
-  );
+    posts: profilePosts
+  });
+}
+
+async function handleToggleFollow(request, env, username) {
+  const viewer = await requireUser(request, env);
+  const normalizedUsername = normalizeUsername(username);
+  const targetUser = await env.DB.prepare("SELECT id, username, created_at AS createdAt FROM users WHERE username = ? LIMIT 1")
+    .bind(normalizedUsername)
+    .first();
+
+  if (!targetUser) {
+    return fail("User not found.", 404);
+  }
+  if (targetUser.id === viewer.id) {
+    return fail("You cannot follow yourself.");
+  }
+
+  const existingFollow = await env.DB.prepare("SELECT id FROM follows WHERE follower_id = ? AND following_id = ? LIMIT 1")
+    .bind(viewer.id, targetUser.id)
+    .first();
+
+  let isFollowing = false;
+  if (existingFollow) {
+    await env.DB.prepare("DELETE FROM follows WHERE id = ?").bind(existingFollow.id).run();
+  } else {
+    await env.DB.prepare("INSERT INTO follows (id, follower_id, following_id, created_at) VALUES (?, ?, ?, ?)")
+      .bind(createId("follow_"), viewer.id, targetUser.id, toIsoDate())
+      .run();
+    isFollowing = true;
+  }
+
+  const counts = await env.DB.prepare(
+    `
+      SELECT
+        (SELECT COUNT(*) FROM posts WHERE author_id = ?) AS postsCount,
+        (SELECT COUNT(*) FROM follows WHERE following_id = ?) AS followersCount,
+        (SELECT COUNT(*) FROM follows WHERE follower_id = ?) AS followingCount
+    `
+  )
+    .bind(targetUser.id, targetUser.id, targetUser.id)
+    .first();
+
+  return success({
+    profile: {
+      id: targetUser.id,
+      username: targetUser.username,
+      createdAt: targetUser.createdAt,
+      postsCount: Number(counts?.postsCount || 0),
+      followersCount: Number(counts?.followersCount || 0),
+      followingCount: Number(counts?.followingCount || 0),
+      isFollowing
+    }
+  });
 }
 
 async function handleImage(env, postId) {
   const post = await getPostRecord(env, postId);
-
   if (!post) {
     return fail("Image not found.", 404);
   }
 
   const object = await env.YIMAGE_BUCKET.get(post.imageKey);
-
   if (!object) {
     return fail("Image not found.", 404);
   }
@@ -887,13 +1204,11 @@ async function handleImage(env, postId) {
 
 async function handleDownload(env, postId) {
   const post = await getPostRecord(env, postId);
-
   if (!post) {
     return fail("Post not found.", 404);
   }
 
   const object = await env.YIMAGE_BUCKET.get(post.imageKey);
-
   if (!object) {
     return fail("Image not found.", 404);
   }
@@ -913,71 +1228,65 @@ export default {
 
     try {
       if (url.pathname === "/api/health" && request.method === "GET") {
-        return success({
-          message: "Yimage Worker API is working"
-        });
+        return success({ message: "Yimage Worker API is working" });
       }
-
       if (url.pathname === "/api/auth/signup" && request.method === "POST") {
         return await handleSignup(request, env);
       }
-
       if (url.pathname === "/api/auth/login" && request.method === "POST") {
         return await handleLogin(request, env);
       }
-
       if (url.pathname === "/api/auth/logout" && request.method === "POST") {
         return await handleLogout(request, env);
       }
-
       if (url.pathname === "/api/auth/me" && request.method === "GET") {
         return await handleMe(request, env);
       }
-
+      if (url.pathname === "/api/categories" && request.method === "GET") {
+        return await handleCategoriesList(env);
+      }
       if ((url.pathname === "/api/upload" || url.pathname === "/api/posts") && request.method === "POST") {
         return await handleCreatePost(request, env);
       }
-
       if (url.pathname === "/api/posts" && request.method === "GET") {
         return await handleListPosts(request, env);
       }
-
       if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/vote") && request.method === "POST") {
         return await handleVote(request, env, url.pathname.split("/")[3]);
       }
-
       if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/repost") && request.method === "POST") {
         return await handleRepost(request, env, url.pathname.split("/")[3]);
       }
-
       if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/like") && request.method === "POST") {
         return await handleLike(request, env, url.pathname.split("/")[3]);
       }
-
       if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/comments") && request.method === "GET") {
-        return await handleCommentsList(env, url.pathname.split("/")[3]);
+        return await handleCommentsList(request, env, url.pathname.split("/")[3]);
       }
-
       if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/comments") && request.method === "POST") {
         return await handleCommentCreate(request, env, url.pathname.split("/")[3]);
       }
-
       if (url.pathname.startsWith("/api/posts/") && url.pathname.endsWith("/download") && request.method === "GET") {
         return await handleDownload(env, url.pathname.split("/")[3]);
       }
-
       if (url.pathname.startsWith("/api/posts/") && request.method === "GET") {
         return await handleGetPost(request, env, url.pathname.replace("/api/posts/", "").trim());
       }
-
+      if (url.pathname.startsWith("/api/comments/") && url.pathname.endsWith("/vote") && request.method === "POST") {
+        return await handleCommentVote(request, env, url.pathname.split("/")[3]);
+      }
+      if (url.pathname.startsWith("/api/users/") && url.pathname.endsWith("/follow") && request.method === "POST") {
+        return await handleToggleFollow(request, env, decodeURIComponent(url.pathname.split("/")[3]));
+      }
+      if (url.pathname.startsWith("/api/users/") && request.method === "GET") {
+        return await handleGetProfile(request, env, decodeURIComponent(url.pathname.split("/")[3]));
+      }
       if (url.pathname.startsWith("/api/image/") && request.method === "GET") {
         return await handleImage(env, url.pathname.replace("/api/image/", "").trim());
       }
-
       if (url.pathname.startsWith("/api/")) {
         return fail("API route not found.", 404);
       }
-
       return fail("Not found.", 404);
     } catch (thrown) {
       if (thrown instanceof Response) {

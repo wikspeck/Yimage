@@ -3,7 +3,17 @@ import { Link as RouterLink } from "react-router-dom";
 import PostActionBar from "./PostActionBar";
 import { formatRelativeTime } from "../utils/formatters";
 
-export default function PostCard({ post, isLoggedIn, isBusy, onUpvote, onDownvote, onRepost, onRequireLogin }) {
+export default function PostCard({
+  post,
+  isLoggedIn,
+  isBusy,
+  onUpvote,
+  onDownvote,
+  onRepost,
+  onHashtagClick,
+  onAuthorClick,
+  onRequireLogin
+}) {
   return (
     <Card
       variant="outlined"
@@ -42,9 +52,31 @@ export default function PostCard({ post, isLoggedIn, isBusy, onUpvote, onDownvot
               {formatRelativeTime(post.createdAt)}
             </Typography>
           </Stack>
-          <Typography level="body-sm" textColor="neutral.400">
+          <Typography
+            level="body-sm"
+            textColor="neutral.400"
+            sx={{ cursor: onAuthorClick ? "pointer" : "default" }}
+            onClick={onAuthorClick}
+          >
             by @{post.authorUsername}
           </Typography>
+          <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
+            {post.category ? (
+              <Typography level="body-sm" className="post-tag-chip">
+                {post.category.label}
+              </Typography>
+            ) : null}
+            {(post.hashtags || []).map((tag) => (
+              <Typography
+                key={tag}
+                level="body-sm"
+                className="post-tag-chip post-tag-chip-clickable"
+                onClick={() => onHashtagClick?.(tag)}
+              >
+                #{tag}
+              </Typography>
+            ))}
+          </Stack>
           {post.description ? (
             <Typography level="body-md" textColor="neutral.300">
               {post.description.length > 140 ? `${post.description.slice(0, 140)}...` : post.description}

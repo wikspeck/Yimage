@@ -1,0 +1,135 @@
+import { useState } from "react";
+import { Button, Card, Stack, Textarea, Typography } from "@mui/joy";
+import { formatRelativeTime } from "../utils/formatters";
+
+function VotePill({ active = false, children, onClick, label }) {
+  return (
+    <Button
+      size="sm"
+      variant="plain"
+      color="neutral"
+      onClick={onClick}
+      aria-label={label}
+      className={`comment-vote-pill${active ? " comment-vote-pill-active" : ""}`}
+    >
+      {children}
+    </Button>
+  );
+}
+
+function CommentNode({
+  comment,
+  isLoggedIn,
+  onRequireLogin,
+  onReply,
+  onVote,
+  depth = 0
+}) {
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleReplySubmit(event) {
+    event.preventDefault();
+    if (!replyText.trim()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onReply(comment.id, replyText.trim());
+      setReplyText("");
+      setReplyOpen(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <Stack spacing={1.2} sx={{ ml: depth ? { xs: 1.5, sm: 2.5 } : 0 }}>
+      <Card variant="outlined" className="comment-card">
+        <Stack spacing={1}>
+          <Stack direction="row" justifyContent="space-between" spacing={1}>
+            <Typography level="title-sm">@{comment.authorUsername}</Typography>
+            <Typography level="body-sm" textColor="neutral.500">
+              {formatRelativeTime(comment.createdAt)}
+            </Typography>
+          </Stack>
+
+          <Typography level="body-md" textColor="neutral.200">
+            {comment.text}
+          </Typography>
+
+          <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap">
+            <VotePill
+              active={comment.viewerVote === "up"}
+              onClick={() => (isLoggedIn ? onVote(comment.id, "up") : onRequireLogin?.())}
+              label="Upvote comment"
+            >
+              ↑
+            </VotePill>
+            <Typography level="body-sm" sx={{ minWidth: 18, textAlign: "center" }}>
+              {comment.score}
+            </Typography>
+            <VotePill
+              active={comment.viewerVote === "down"}
+              onClick={() => (isLoggedIn ? onVote(comment.id, "down") : onRequireLogin?.())}
+              label="Downvote comment"
+            >
+              ↓
+            </VotePill>
+            <Button
+              size="sm"
+              variant="plain"
+              color="neutral"
+              onClick={() => (isLoggedIn ? setReplyOpen((current) => !current) : onRequireLogin?.())}
+              sx={{ borderRadius: "999px" }}
+            >
+              Reply
+            </Button>
+          </Stack>
+
+          {replyOpen ? (
+            <Stack component="form" spacing={1} onSubmit={handleReplySubmit}>
+              <Textarea
+                minRows={2}
+                maxRows={5}
+                maxLength={400}
+                placeholder="Write a reply"
+                value={replyText}
+                onChange={(event) => setReplyText(event.target.value)}
+                sx={{ borderRadius: "14px" }}
+              />
+              <Stack direction="row" spacing={1} justifyContent="flex-end">
+                <Button size="sm" variant="plain" color="neutral" onClick={() => setReplyOpen(false)} sx={{ borderRadius: "999px" }}>
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" loading={isSubmitting} disabled={!replyText.trim()} sx={{ borderRadius: "999px" }}>
+                  Reply
+                </Button>
+              </Stack>
+            </Stack>
+          ) : null}
+        </Stack>
+      </Card>
+
+      {comment.replies?.length
+        ? comment.replies.map((reply) => (
+            <CommentNode
+              key={reply.id}
+              comment={reply}
+              depth={depth + 1}
+              isLoggedIn={isLoggedIn}
+              onRequireLogin={onRequireLogin}
+              onReply={onReply}
+              onVote={onVote}
+            />
+          ))
+        : null}
+    </Stack>
+  );
+}
+
+export default function CommentThread(props) {
+  return <CommentNode {...props} />;
+}
