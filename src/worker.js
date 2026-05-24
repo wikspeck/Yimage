@@ -42,18 +42,6 @@ const HARASSMENT_TERMS = ["kill yourself", "die", "stupid bitch"];
 const SEXUAL_TERMS = ["porn", "nude", "nsfw", "explicit"];
 const VIOLENCE_TERMS = ["gore", "beheading", "murder"];
 const SPAM_TERMS = ["free money", "buy now", "click here"];
-const RATE_LIMIT_RULES = {
-  login: { limit: 8, windowSeconds: 15 * 60 },
-  signup: { limit: 5, windowSeconds: 60 * 60 },
-  upload: { limit: 10, windowSeconds: 60 * 60 },
-  comment: { limit: 20, windowSeconds: 15 * 60 },
-  report: { limit: 8, windowSeconds: 60 * 60 },
-  vote: { limit: 120, windowSeconds: 10 * 60 },
-  repost: { limit: 12, windowSeconds: 60 * 60 },
-  follow: { limit: 40, windowSeconds: 15 * 60 },
-  profile_edit: { limit: 10, windowSeconds: 60 * 60 },
-  comment_vote: { limit: 120, windowSeconds: 10 * 60 }
-};
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -67,6 +55,10 @@ const CONTENT_SECURITY_POLICY = [
   "connect-src 'self' https://challenges.cloudflare.com",
   "frame-src https://challenges.cloudflare.com"
 ].join("; ");
+const ALLOWED_CORS_ORIGINS = new Set([
+  "https://yimage.org",
+  "http://localhost:5173"
+]);
 
 function applySecurityHeaders(response) {
   const headers = new Headers(response.headers);
@@ -89,52 +81,50 @@ function applySecurityHeaders(response) {
   });
 }
 
-function getRateLimitKey(request, userId = "") {
-  if (userId) {
-    return `user:${userId}`;
-  }
-
-  const ip = request.headers.get("CF-Connecting-IP") || request.headers.get("x-forwarded-for") || "";
-  return ip ? `ip:${ip.split(",")[0].trim()}` : "ip:unknown";
+function getAllowedCorsOrigin(request) {
+  const origin = request.headers.get("Origin") || "";
+  return ALLOWED_CORS_ORIGINS.has(origin) ? origin : "";
 }
 
-function getRateLimitWindowStart(windowSeconds, now = Date.now()) {
-  const windowMs = windowSeconds * 1000;
-  return new Date(Math.floor(now / windowMs) * windowMs).toISOString();
+function applyCorsHeaders(request, response) {
+  const allowedOrigin = getAllowedCorsOrigin(request);
+  const headers = new Headers(response.headers);
+  headers.append("Vary", "Origin");
+
+  if (allowedOrigin) {
+    headers.set("Access-Control-Allow-Origin", allowedOrigin);
+    headers.set("Access-Control-Allow-Credentials", "true");
+    headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
+    headers.set(
+      "Access-Control-Allow-Headers",
+      request.headers.get("Access-Control-Request-Headers") || "Content-Type"
+    );
+  }
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
 }
 
-async function enforceRateLimit(env, { action, request, userId = "" }) {
-  const rule = RATE_LIMIT_RULES[action];
-  if (!rule) {
-    return null;
+function buildPreflightResponse(request) {
+  const allowedOrigin = getAllowedCorsOrigin(request);
+  if (!allowedOrigin) {
+    return fail("Origin not allowed.", 403);
   }
 
-  const key = getRateLimitKey(request, userId);
-  const now = Date.now();
-  const windowStart = getRateLimitWindowStart(rule.windowSeconds, now);
-  const updatedAt = new Date(now).toISOString();
-
-  const existing = await env.DB.prepare(
-    "SELECT count FROM rate_limits WHERE key = ? AND action = ? AND window_start = ? LIMIT 1"
-  )
-    .bind(key, action, windowStart)
-    .first();
-
-  const nextCount = Number(existing?.count || 0) + 1;
-  if (nextCount > rule.limit) {
-    return fail("Too many requests. Please try again later.", 429);
-  }
-
-  await env.DB.prepare(
-    `INSERT INTO rate_limits (key, action, window_start, count, updated_at)
-     VALUES (?, ?, ?, 1, ?)
-     ON CONFLICT(key, action, window_start)
-     DO UPDATE SET count = count + 1, updated_at = excluded.updated_at`
-  )
-    .bind(key, action, windowStart, updatedAt)
-    .run();
-
-  return null;
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": allowedOrigin,
+      "Access-Control-Allow-Credentials": "true",
+      "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
+      "Access-Control-Allow-Headers": request.headers.get("Access-Control-Request-Headers") || "Content-Type",
+      "Access-Control-Max-Age": "86400",
+      "Vary": "Origin"
+    }
+  });
 }
 
 function json(data, init = {}) {
@@ -986,10 +976,6 @@ async function createSession(env, userId) {
 }
 
 async function handleSignup(request, env) {
-  const rateLimitFailure = await enforceRateLimit(env, { action: "signup", request });
-  if (rateLimitFailure) {
-    return rateLimitFailure;
-  }
   const body = await parseJsonBody(request);
   const turnstileFailure = await verifyTurnstileToken(env, request, body.turnstileToken);
   if (turnstileFailure) {
@@ -1045,10 +1031,6 @@ async function handleSignup(request, env) {
 }
 
 async function handleLogin(request, env) {
-  const rateLimitFailure = await enforceRateLimit(env, { action: "login", request });
-  if (rateLimitFailure) {
-    return rateLimitFailure;
-  }
   const body = await parseJsonBody(request);
   const turnstileFailure = await verifyTurnstileToken(env, request, body.turnstileToken);
   if (turnstileFailure) {
@@ -1121,10 +1103,6 @@ async function handleMe(request, env) {
 
 async function handleUpdateProfile(request, env) {
   const user = await requireUser(request, env);
-  const rateLimitFailure = await enforceRateLimit(env, { action: "profile_edit", request, userId: user.id });
-  if (rateLimitFailure) {
-    return rateLimitFailure;
-  }
   const body = await parseJsonBody(request);
   const displayName = normalizeText(body.displayName).slice(0, 60);
   const bio = normalizeText(body.bio).slice(0, MAX_BIO_LENGTH);
@@ -1172,10 +1150,6 @@ async function handleUpdateProfile(request, env) {
 
 async function handleAvatarUpload(request, env) {
   const user = await requireUser(request, env);
-  const rateLimitFailure = await enforceRateLimit(env, { action: "profile_edit", request, userId: user.id });
-  if (rateLimitFailure) {
-    return rateLimitFailure;
-  }
   const formData = await request.formData();
   const avatar = formData.get("avatar");
 
@@ -1216,10 +1190,6 @@ async function handleAvatarUpload(request, env) {
 
 async function handleCreatePost(request, env) {
   const user = await requireUser(request, env);
-  const rateLimitFailure = await enforceRateLimit(env, { action: "upload", request, userId: user.id });
-  if (rateLimitFailure) {
-    return rateLimitFailure;
-  }
   const formData = await request.formData();
   const turnstileFailure = await verifyTurnstileToken(env, request, formData.get("turnstileToken"));
   if (turnstileFailure) {
@@ -1342,10 +1312,6 @@ async function handleGetPost(request, env, postId) {
 
 async function handleVote(request, env, postId) {
   const user = await requireUser(request, env);
-  const rateLimitFailure = await enforceRateLimit(env, { action: "vote", request, userId: user.id });
-  if (rateLimitFailure) {
-    return rateLimitFailure;
-  }
   const post = await getPostRecord(env, postId);
   if (!post) {
     return fail("Post not found.", 404);
@@ -1406,10 +1372,6 @@ async function handleLike(request, env, postId) {
 
 async function handleRepost(request, env, postId) {
   const user = await requireUser(request, env);
-  const rateLimitFailure = await enforceRateLimit(env, { action: "repost", request, userId: user.id });
-  if (rateLimitFailure) {
-    return rateLimitFailure;
-  }
   const post = await getPostRecord(env, postId);
   if (!post) {
     return fail("Post not found.", 404);
@@ -1488,10 +1450,6 @@ async function handleCommentsList(request, env, postId) {
 
 async function handleCommentCreate(request, env, postId) {
   const user = await requireUser(request, env);
-  const rateLimitFailure = await enforceRateLimit(env, { action: "comment", request, userId: user.id });
-  if (rateLimitFailure) {
-    return rateLimitFailure;
-  }
   const post = await getPostRecord(env, postId);
   if (!post) {
     return fail("Post not found.", 404);
@@ -1548,10 +1506,6 @@ async function handleCommentCreate(request, env, postId) {
 
 async function handleCommentVote(request, env, commentId) {
   const user = await requireUser(request, env);
-  const rateLimitFailure = await enforceRateLimit(env, { action: "comment_vote", request, userId: user.id });
-  if (rateLimitFailure) {
-    return rateLimitFailure;
-  }
   const body = await parseJsonBody(request);
   const nextVote = body.vote === "up" || body.vote === "down" ? body.vote : null;
   if (!nextVote) {
@@ -1604,10 +1558,6 @@ async function handleCategoriesList(env) {
 
 async function handleCreateReport(request, env) {
   const reporter = await getCurrentUser(request, env);
-  const rateLimitFailure = await enforceRateLimit(env, { action: "report", request, userId: reporter?.id || "" });
-  if (rateLimitFailure) {
-    return rateLimitFailure;
-  }
   const body = await parseJsonBody(request);
   const turnstileFailure = await verifyTurnstileToken(env, request, body.turnstileToken);
   if (turnstileFailure) {
@@ -1882,10 +1832,6 @@ async function handleGetProfile(request, env, username) {
 
 async function handleToggleFollow(request, env, username) {
   const viewer = await requireUser(request, env);
-  const rateLimitFailure = await enforceRateLimit(env, { action: "follow", request, userId: viewer.id });
-  if (rateLimitFailure) {
-    return rateLimitFailure;
-  }
   const normalizedUsername = normalizeUsername(username);
   const targetUser = await env.DB.prepare("SELECT id, username, created_at AS createdAt FROM users WHERE username = ? LIMIT 1")
     .bind(normalizedUsername)
@@ -2029,6 +1975,12 @@ async function handleAvatar(env, username) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const isApiRequest = url.pathname.startsWith("/api/");
+
+    if (isApiRequest && request.method === "OPTIONS") {
+      return applySecurityHeaders(buildPreflightResponse(request));
+    }
+
     const response = await (async () => {
       try {
         if (url.pathname === "/api/health" && request.method === "GET") {
@@ -2124,6 +2076,7 @@ export default {
       }
     })();
 
-    return applySecurityHeaders(response);
+    const withCors = isApiRequest ? applyCorsHeaders(request, response) : response;
+    return applySecurityHeaders(withCors);
   }
 };
