@@ -658,28 +658,39 @@ async function handleLike(request, env, postId) {
     return fail("Post not found.", 404);
   }
 
-  const existingLike = await env.DB.prepare("SELECT user_id FROM likes WHERE user_id = ? AND post_id = ? LIMIT 1")
+  const existingVote = await env.DB.prepare("SELECT vote FROM votes WHERE user_id = ? AND post_id = ? LIMIT 1")
     .bind(user.id, postId)
     .first();
 
-  let hasLiked = false;
+  let finalVote = "up";
+  let scoreDelta = 0;
 
-  if (existingLike) {
-    await env.DB.prepare("DELETE FROM likes WHERE user_id = ? AND post_id = ?").bind(user.id, postId).run();
-    await env.DB.prepare("UPDATE posts SET like_count = CASE WHEN like_count > 0 THEN like_count - 1 ELSE 0 END WHERE id = ?")
-      .bind(postId)
+  if (!existingVote) {
+    await env.DB.prepare("INSERT INTO votes (post_id, user_id, vote, created_at) VALUES (?, ?, ?, ?)")
+      .bind(postId, user.id, "up", toIsoDate())
       .run();
+    scoreDelta = 1;
+  } else if (existingVote.vote === "up") {
+    await env.DB.prepare("DELETE FROM votes WHERE user_id = ? AND post_id = ?").bind(user.id, postId).run();
+    scoreDelta = -1;
+    finalVote = null;
   } else {
-    await env.DB.prepare("INSERT INTO likes (user_id, post_id, created_at) VALUES (?, ?, ?)")
-      .bind(user.id, postId, toIsoDate())
+    await env.DB.prepare("UPDATE votes SET vote = ?, created_at = ? WHERE user_id = ? AND post_id = ?")
+      .bind("up", toIsoDate(), user.id, postId)
       .run();
-    await env.DB.prepare("UPDATE posts SET like_count = like_count + 1 WHERE id = ?").bind(postId).run();
-    hasLiked = true;
+    scoreDelta = 2;
   }
 
+  await env.DB.prepare("UPDATE posts SET score = COALESCE(score, COALESCE(like_count, 0)) + ?, like_count = COALESCE(score, COALESCE(like_count, 0)) + ? WHERE id = ?")
+    .bind(scoreDelta, scoreDelta, postId)
+    .run();
+
   const updatedPost = await getPostRecord(env, postId);
+  const repostsRemainingToday = await getRepostsRemainingToday(env, user.id);
+  const viewerReposts = await getViewerRepostMap(env, user.id, [postId]);
+
   return success({
-    post: toPostResponse(updatedPost, hasLiked ? "up" : null, false, 3)
+    post: toPostResponse(updatedPost, finalVote, viewerReposts[postId], repostsRemainingToday)
   });
 }
 
