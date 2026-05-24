@@ -57,15 +57,25 @@ export default function DiscoverPage() {
   }
 
   function handleDownvotePlaceholder() {
-    setPostsError("Downvotes are coming soon.");
+    setPostsError("Downvote support is coming soon.");
   }
 
-  function handleRepostPlaceholder() {
-    setPostsError("Repost is coming soon.");
+  async function handleRepost(postId) {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/${postId}`);
+      setPostsError("Post link copied.");
+    } catch {
+      setPostsError("Could not copy the post link.");
+    }
   }
 
-  function handleUsePlaceholder() {
-    setPostsError("Use is coming soon.");
+  async function handleUse(post) {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${post.imageUrl}`);
+      setPostsError("Image URL copied.");
+    } catch {
+      setPostsError("Could not copy the image URL.");
+    }
   }
 
   return (
@@ -120,8 +130,8 @@ export default function DiscoverPage() {
               isBusy={busyPostId === post.id}
               onUpvote={() => handleLike(post.id)}
               onDownvote={handleDownvotePlaceholder}
-              onRepost={handleRepostPlaceholder}
-              onUse={handleUsePlaceholder}
+              onRepost={() => handleRepost(post.id)}
+              onUse={() => handleUse(post)}
               onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
             />
           ))}

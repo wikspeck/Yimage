@@ -20,6 +20,7 @@ export default function PostPage() {
   const [isBusy, setIsBusy] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [actionNotice, setActionNotice] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -66,15 +67,25 @@ export default function PostPage() {
   }
 
   function handleDownvotePlaceholder() {
-    setError("Downvotes are coming soon.");
+    setActionNotice("Downvote support is coming soon.");
   }
 
-  function handleRepostPlaceholder() {
-    setError("Repost is coming soon.");
+  async function handleRepost() {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setActionNotice("Post link copied.");
+    } catch {
+      setActionNotice("Could not copy the post link.");
+    }
   }
 
-  function handleUsePlaceholder() {
-    setError("Use is coming soon.");
+  async function handleUse() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${post.imageUrl}`);
+      setActionNotice("Image URL copied.");
+    } catch {
+      setActionNotice("Could not copy the image URL.");
+    }
   }
 
   async function handleCreateComment(event) {
@@ -130,6 +141,7 @@ export default function PostPage() {
       <Stack spacing={3}>
         <BackButton fallbackTo="/" label="Back" />
         {error ? <Alert color="danger" variant="soft">{error}</Alert> : null}
+        {actionNotice ? <Alert color="neutral" variant="soft">{actionNotice}</Alert> : null}
 
         <Card variant="outlined" className="content-card">
           <Stack spacing={2.5}>
@@ -157,8 +169,9 @@ export default function PostPage() {
               isBusy={isBusy}
               onUpvote={handleLike}
               onDownvote={handleDownvotePlaceholder}
-              onRepost={handleRepostPlaceholder}
-              onUse={handleUsePlaceholder}
+              onRepost={handleRepost}
+              onUse={handleUse}
+              onComment={() => document.getElementById("comments")?.scrollIntoView({ behavior: "smooth", block: "start" })}
               onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
             />
 
@@ -173,7 +186,7 @@ export default function PostPage() {
           </Stack>
         </Card>
 
-        <Stack spacing={2}>
+        <Stack spacing={2} id="comments">
           <Typography level="title-lg">Comments</Typography>
 
           {user ? (

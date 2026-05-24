@@ -76,15 +76,19 @@ a {
   justify-content: center;
   background: #000000;
   padding: 12px;
+  text-align: center;
 }
 
 .post-preview-image {
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   max-height: 496px;
   object-fit: contain;
   object-position: center;
   border-radius: 16px;
   background: #000000;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .icon-button,
@@ -105,9 +109,8 @@ a {
 }
 
 .use-button {
-  border: none !important;
-  background: transparent !important;
-  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  background: #000000 !important;
 }
 
 .action-icon-wrap {
@@ -115,14 +118,17 @@ a {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  color: #ffffff;
 }
 
-.action-icon {
-  display: block;
-}
-
-.use-icon-wrap {
-  background: transparent;
+.action-icon-boxed {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #ffffff;
+  border-radius: 11px;
+  background: #000000;
 }
 
 .post-actions-shell {

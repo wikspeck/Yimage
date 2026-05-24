@@ -58,6 +58,7 @@ export default function PostCard({ post, isLoggedIn, isBusy, onUpvote, onDownvot
           onDownvote={onDownvote}
           onRepost={onRepost}
           onUse={onUse}
+          onComment={() => window.location.assign(`/${post.id}#comments`)}
           onRequireLogin={onRequireLogin}
         />
       </Stack>

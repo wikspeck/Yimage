@@ -21,8 +21,8 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onDiscover
         px: { xs: 2, md: 3 },
         py: 1.5,
         borderRadius: "18px",
-        bgcolor: "rgba(14, 16, 24, 0.92)",
-        borderColor: "rgba(255,255,255,0.08)",
+        bgcolor: "#000000",
+        borderColor: "rgba(255,255,255,0.12)",
         backdropFilter: "blur(14px)"
       }}
     >
