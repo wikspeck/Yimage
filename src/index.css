@@ -113,13 +113,17 @@ a {
 
 .icon-button,
 .download-button {
-  min-width: auto !important;
-  min-height: 40px !important;
-  padding: 6px 8px !important;
+  min-width: 42px !important;
+  min-height: 42px !important;
+  padding: 0 !important;
   border-radius: 999px !important;
   background: #000000 !important;
   border: 1px solid rgba(255, 255, 255, 0.16) !important;
   color: #ffffff !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
 }
 
 .icon-button-active {
@@ -137,12 +141,13 @@ a {
 
 .download-button {
   gap: 6px;
-  padding: 6px 10px !important;
+  padding: 0 12px !important;
+  min-width: auto !important;
 }
 
 .share-button {
-  min-width: 44px !important;
-  min-height: 44px !important;
+  min-width: 42px !important;
+  min-height: 42px !important;
 }
 
 .action-icon-wrap {
@@ -151,6 +156,8 @@ a {
   justify-content: center;
   flex-shrink: 0;
   color: inherit;
+  width: 18px;
+  height: 18px;
 }
 
 .action-icon-boxed {
@@ -161,6 +168,14 @@ a {
   color: inherit;
   border-radius: 11px;
   background: transparent;
+  width: 18px;
+  height: 18px;
+}
+
+.icon-button svg,
+.download-button svg,
+.comment-vote-pill svg {
+  display: block;
 }
 
 .post-actions-shell {
@@ -187,20 +202,23 @@ a {
 
 .post-detail-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: minmax(0, 540px) minmax(0, 540px);
+  gap: 28px;
   align-items: start;
+  justify-content: center;
 }
 
 .post-detail-media-card {
-  position: sticky;
-  top: 110px;
+  position: relative;
+  top: 0;
+  margin: 0;
 }
 
 .post-detail-comments {
   min-width: 0;
-  align-self: stretch;
-  height: 100%;
+  align-self: start;
+  height: auto;
+  margin: 0;
 }
 
 .comment-panel-shell {
@@ -222,11 +240,17 @@ a {
 }
 
 .comment-vote-pill {
-  min-width: auto !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  padding: 0 !important;
   border-radius: 999px !important;
   background: #000000 !important;
   border: 1px solid rgba(255, 255, 255, 0.16) !important;
   color: #ffffff !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
 }
 
 .comment-vote-pill-active {
@@ -288,12 +312,14 @@ a {
   .vote-cluster,
   .action-cluster {
     width: 100%;
-    justify-content: space-between;
+    justify-content: center;
     gap: 8px;
+    flex-wrap: wrap;
   }
 
   .post-stats-row {
     width: 100%;
+    justify-content: center;
   }
 
   .viewer-frame {
@@ -318,9 +344,14 @@ a {
 @media (max-width: 980px) {
   .post-detail-layout {
     grid-template-columns: 1fr;
+    gap: 20px;
   }
 
   .post-detail-media-card {
     position: static;
+  }
+
+  .post-detail-comments {
+    align-self: stretch;
   }
 }
