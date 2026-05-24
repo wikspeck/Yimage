@@ -7,6 +7,8 @@ import BackButton from "../components/BackButton";
 import CommentThread from "../components/CommentThread";
 import PostActionBar from "../components/PostActionBar";
 import ReportDialog from "../components/ReportDialog";
+import ShareDialog from "../components/ShareDialog";
+import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
 import { formatFullDate, formatRelativeTime } from "../utils/formatters";
 
@@ -48,6 +50,8 @@ export default function PostPage() {
   const [copied, setCopied] = useState(false);
   const [actionNotice, setActionNotice] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -145,6 +149,7 @@ export default function PostPage() {
   async function handleCopyLink() {
     await navigator.clipboard.writeText(window.location.href);
     setCopied(true);
+    setToastMessage("Copied link to clipboard.");
     window.setTimeout(() => setCopied(false), 1600);
   }
 
@@ -157,8 +162,7 @@ export default function PostPage() {
         return;
       }
 
-      await navigator.clipboard.writeText(link);
-      setActionNotice("Copied link to clipboard.");
+      setShareOpen(true);
     } catch (shareError) {
       if (shareError?.name !== "AbortError") {
         setError("Could not share this post.");
@@ -251,6 +255,7 @@ export default function PostPage() {
                 onDownvote={() => handleVote("down")}
                 onRepost={handleRepost}
                 onShare={handleShare}
+                onReport={() => setReportOpen(true)}
                 onComment={() => document.getElementById("comments")?.scrollIntoView({ behavior: "smooth", block: "start" })}
                 onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
               />
@@ -327,6 +332,8 @@ export default function PostPage() {
         </div>
 
         <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} targetType="post" targetId={post.id} title="Report post" />
+        <ShareDialog open={shareOpen} onClose={() => setShareOpen(false)} url={window.location.href} title="Share post" onCopied={setToastMessage} />
+        <ToastNotice open={Boolean(toastMessage)} message={toastMessage} onClose={() => setToastMessage("")} />
       </Stack>
     </div>
   );

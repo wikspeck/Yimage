@@ -140,6 +140,11 @@ a {
   padding: 6px 10px !important;
 }
 
+.share-button {
+  min-width: 44px !important;
+  min-height: 44px !important;
+}
+
 .action-icon-wrap {
   display: inline-flex;
   align-items: center;
@@ -182,8 +187,8 @@ a {
 
 .post-detail-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
   align-items: start;
 }
 
@@ -194,6 +199,7 @@ a {
 
 .post-detail-comments {
   min-width: 0;
+  align-self: stretch;
 }
 
 .comment-vote-pill {

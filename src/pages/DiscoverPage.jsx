@@ -3,6 +3,8 @@ import { Alert, Box, Button, Card, CircularProgress, Input, Option, Select, Stac
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getCategories, getPosts, repostPost, voteOnPost } from "../api/yimageApi";
 import PostCard from "../components/PostCard";
+import ShareDialog from "../components/ShareDialog";
+import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
 
 export default function DiscoverPage() {
@@ -14,7 +16,9 @@ export default function DiscoverPage() {
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [postsError, setPostsError] = useState("");
   const [notice, setNotice] = useState("");
+  const [toastMessage, setToastMessage] = useState("");
   const [busyPostId, setBusyPostId] = useState("");
+  const [sharePostId, setSharePostId] = useState("");
   const [searchText, setSearchText] = useState(searchParams.get("query") || searchParams.get("hashtag") || "");
   const selectedCategory = searchParams.get("category") || "";
 
@@ -139,8 +143,7 @@ export default function DiscoverPage() {
         return;
       }
 
-      await navigator.clipboard.writeText(link);
-      setNotice("Copied link to clipboard.");
+      setSharePostId(postId);
     } catch (error) {
       if (error?.name !== "AbortError") {
         setPostsError("Could not share this post.");
@@ -244,6 +247,14 @@ export default function DiscoverPage() {
           ))}
         </Stack>
       </Stack>
+      <ShareDialog
+        open={Boolean(sharePostId)}
+        onClose={() => setSharePostId("")}
+        url={sharePostId ? `${window.location.origin}/${sharePostId}` : window.location.origin}
+        title="Share post"
+        onCopied={setToastMessage}
+      />
+      <ToastNotice open={Boolean(toastMessage)} message={toastMessage} onClose={() => setToastMessage("")} />
     </Box>
   );
 }

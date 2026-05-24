@@ -1,7 +1,9 @@
 import { Card, Link, Sheet, Stack, Typography } from "@mui/joy";
 import { Link as RouterLink } from "react-router-dom";
 import PostActionBar from "./PostActionBar";
+import ReportDialog from "./ReportDialog";
 import { formatRelativeTime } from "../utils/formatters";
+import { useState } from "react";
 
 export default function PostCard({
   post,
@@ -15,18 +17,21 @@ export default function PostCard({
   onAuthorClick,
   onRequireLogin
 }) {
+  const [reportOpen, setReportOpen] = useState(false);
+
   return (
-    <Card
-      variant="outlined"
-      className="post-card"
-      sx={{
-        p: { xs: 2, md: 2.5 },
-        borderRadius: "22px",
-        bgcolor: "#000000",
-        borderColor: "rgba(255,255,255,0.12)"
-      }}
-    >
-      <Stack spacing={2}>
+    <>
+      <Card
+        variant="outlined"
+        className="post-card"
+        sx={{
+          p: { xs: 2, md: 2.5 },
+          borderRadius: "22px",
+          bgcolor: "#000000",
+          borderColor: "rgba(255,255,255,0.12)"
+        }}
+      >
+        <Stack spacing={2}>
         <Sheet
           sx={{
             borderRadius: "20px",
@@ -85,18 +90,21 @@ export default function PostCard({
           ) : null}
         </Stack>
 
-        <PostActionBar
-          post={post}
-          isLoggedIn={isLoggedIn}
-          isBusy={isBusy}
-          onUpvote={onUpvote}
-          onDownvote={onDownvote}
-          onRepost={onRepost}
-          onShare={onShare}
-          onComment={() => window.location.assign(`/${post.id}#comments`)}
-          onRequireLogin={onRequireLogin}
-        />
-      </Stack>
-    </Card>
+          <PostActionBar
+            post={post}
+            isLoggedIn={isLoggedIn}
+            isBusy={isBusy}
+            onUpvote={onUpvote}
+            onDownvote={onDownvote}
+            onRepost={onRepost}
+            onShare={onShare}
+            onReport={() => setReportOpen(true)}
+            onComment={() => window.location.assign(`/${post.id}#comments`)}
+            onRequireLogin={onRequireLogin}
+          />
+        </Stack>
+      </Card>
+      <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} targetType="post" targetId={post.id} title="Report post" />
+    </>
   );
 }

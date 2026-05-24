@@ -1,17 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, Avatar, Button, Card, CircularProgress, Input, Stack, Textarea, Typography } from "@mui/joy";
 import { useNavigate, useParams } from "react-router-dom";
 import { getUserProfile, toggleFollow } from "../api/yimageApi";
 import BackButton from "../components/BackButton";
 import PostCard from "../components/PostCard";
 import ReportDialog from "../components/ReportDialog";
+import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
 import { formatFullDate } from "../utils/formatters";
 
 export default function ProfilePage() {
   const { username: routeUsername } = useParams();
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, uploadProfileAvatar } = useAuth();
   const navigate = useNavigate();
+  const avatarInputRef = useRef(null);
   const username = routeUsername || user?.username;
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -22,6 +24,8 @@ export default function ProfilePage() {
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const isOwnProfile = Boolean(user && profile && user.username === profile.username);
 
   useEffect(() => {
@@ -105,7 +109,7 @@ export default function ProfilePage() {
       }
 
       await navigator.clipboard.writeText(link);
-      setNotice("Copied link to clipboard.");
+      setToastMessage("Copied link to clipboard.");
     } catch (shareError) {
       if (shareError?.name !== "AbortError") {
         setError("Could not share this profile.");
@@ -126,11 +130,37 @@ export default function ProfilePage() {
       }
 
       await navigator.clipboard.writeText(link);
-      setNotice("Copied link to clipboard.");
+      setToastMessage("Copied link to clipboard.");
     } catch (shareError) {
       if (shareError?.name !== "AbortError") {
         setError("Could not share this post.");
       }
+    }
+  }
+
+  async function handleAvatarChange(event) {
+    const [file] = event.target.files || [];
+    if (!file) {
+      return;
+    }
+
+    setError("");
+    setNotice("");
+    setIsUploadingAvatar(true);
+
+    try {
+      const nextUser = await uploadProfileAvatar(file);
+      setProfile((current) => ({
+        ...current,
+        avatarUrl: nextUser.avatarUrl
+      }));
+      setAvatarUrl(nextUser.avatarUrl);
+      setToastMessage("Profile picture updated.");
+    } catch (uploadError) {
+      setError(uploadError.message || "Could not update profile picture.");
+    } finally {
+      setIsUploadingAvatar(false);
+      event.target.value = "";
     }
   }
 
@@ -192,6 +222,26 @@ export default function ProfilePage() {
                 <Typography level="body-sm" textColor="neutral.500">
                   Joined {formatFullDate(profile.createdAt)}
                 </Typography>
+                {isOwnProfile ? (
+                  <>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      onChange={handleAvatarChange}
+                      style={{ display: "none" }}
+                    />
+                    <Button
+                      variant="plain"
+                      color="neutral"
+                      loading={isUploadingAvatar}
+                      onClick={() => avatarInputRef.current?.click()}
+                      sx={{ borderRadius: "14px", alignSelf: "flex-start" }}
+                    >
+                      Change profile picture
+                    </Button>
+                  </>
+                ) : null}
               </Stack>
             </Stack>
 
@@ -269,6 +319,7 @@ export default function ProfilePage() {
           ))}
         </Stack>
         <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} targetType="user" targetId={profile.id} title="Report profile" />
+        <ToastNotice open={Boolean(toastMessage)} message={toastMessage} onClose={() => setToastMessage("")} />
       </Stack>
     </div>
   );

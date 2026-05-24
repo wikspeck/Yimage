@@ -124,6 +124,18 @@ export async function updateProfile({ displayName, bio, avatarUrl }) {
   return data.user;
 }
 
+export async function uploadProfileAvatar(file) {
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  const data = await request("/api/me/avatar", {
+    method: "POST",
+    body: formData
+  });
+
+  return data.user;
+}
+
 export async function likePost(id) {
   const data = await request(`/api/posts/${id}/like`, {
     method: "POST"

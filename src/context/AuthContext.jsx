@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { getCurrentUser, loginUser, logoutUser, signupUser, updateProfile as updateProfileRequest } from "../api/yimageApi";
+import { getCurrentUser, loginUser, logoutUser, signupUser, updateProfile as updateProfileRequest, uploadProfileAvatar as uploadProfileAvatarRequest } from "../api/yimageApi";
 
 const AuthContext = createContext(null);
 
@@ -54,6 +54,11 @@ export function AuthProvider({ children }) {
       },
       async updateProfile(payload) {
         const nextUser = await updateProfileRequest(payload);
+        setUser(nextUser);
+        return nextUser;
+      },
+      async uploadProfileAvatar(file) {
+        const nextUser = await uploadProfileAvatarRequest(file);
         setUser(nextUser);
         return nextUser;
       },

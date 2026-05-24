@@ -77,9 +77,20 @@ function SaveIcon() {
 function ShareIcon() {
   return (
     <Icon>
-      <path d="M8 12h8" />
-      <path d="M12 8l4 4-4 4" />
-      <path d="M7 18H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h1" />
+      <circle cx="18" cy="5" r="2.25" />
+      <circle cx="6" cy="12" r="2.25" />
+      <circle cx="18" cy="19" r="2.25" />
+      <path d="M8 11l7.5-4.2" />
+      <path d="M8 13l7.5 4.2" />
+    </Icon>
+  );
+}
+
+function ReportIcon() {
+  return (
+    <Icon size={16}>
+      <path d="M6 4v16" />
+      <path d="M7.5 5h8l-1.8 3 1.8 3h-8z" />
     </Icon>
   );
 }
@@ -92,6 +103,7 @@ export default function PostActionBar({
   onDownvote,
   onRepost,
   onShare,
+  onReport,
   onComment,
   onRequireLogin
 }) {
@@ -150,7 +162,7 @@ export default function PostActionBar({
             variant="plain"
             color="neutral"
             onClick={() => onShare?.()}
-            className="icon-button"
+            className="icon-button share-button"
             aria-label="Share"
           >
             <ShareIcon />
@@ -176,6 +188,16 @@ export default function PostActionBar({
           >
             <SaveIcon />
             <span>Save</span>
+          </Button>
+          <Button
+            size="sm"
+            variant="plain"
+            color="neutral"
+            onClick={() => onReport?.()}
+            className="icon-button"
+            aria-label="Report"
+          >
+            <ReportIcon />
           </Button>
         </Stack>
       </Stack>

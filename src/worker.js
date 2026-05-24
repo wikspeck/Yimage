@@ -177,6 +177,10 @@ function getImageKey(id, extension) {
   return `uploads/${id}.${extension}`;
 }
 
+function getAvatarKey(userId, extension) {
+  return `avatars/${userId}.${extension}`;
+}
+
 function getImageFilename(post) {
   const extension = ALLOWED_IMAGE_TYPES[post.imageMimeType] || "jpg";
   const safeTitle = normalizeText(post.title)
@@ -189,6 +193,10 @@ function getImageFilename(post) {
 }
 
 function toPublicUser(user) {
+  const avatarUrl = user.avatarUrl && user.avatarUrl.startsWith("avatars/")
+    ? `/api/users/${user.username}/avatar`
+    : user.avatarUrl || "";
+
   return {
     id: user.id,
     username: user.username,
@@ -196,7 +204,7 @@ function toPublicUser(user) {
     createdAt: user.createdAt,
     displayName: user.displayName || "",
     bio: user.bio || "",
-    avatarUrl: user.avatarUrl || "",
+    avatarUrl,
     isAdmin: Boolean(user.isAdmin),
     moderationStatus: user.moderationStatus || MODERATION_STATES.ACTIVE
   };
@@ -907,6 +915,51 @@ async function handleUpdateProfile(request, env) {
         COALESCE(display_name, '') AS displayName,
         COALESCE(bio, '') AS bio,
         COALESCE(avatar_url, '') AS avatarUrl
+      FROM users
+      WHERE id = ?
+      LIMIT 1
+    `
+  )
+    .bind(user.id)
+    .first();
+
+  return success({ user: toPublicUser(updatedUser) });
+}
+
+async function handleAvatarUpload(request, env) {
+  const user = await requireUser(request, env);
+  const formData = await request.formData();
+  const avatar = formData.get("avatar");
+
+  if (!(avatar instanceof File)) {
+    return fail("Avatar image is required.");
+  }
+  if (!ALLOWED_IMAGE_TYPES[avatar.type]) {
+    return fail("Only JPG, PNG, WEBP, and GIF images are allowed.");
+  }
+  if (avatar.size > MAX_FILE_SIZE) {
+    return fail("Avatar image must be 10 MB or smaller.");
+  }
+
+  const avatarKey = getAvatarKey(user.id, ALLOWED_IMAGE_TYPES[avatar.type]);
+  await env.YIMAGE_BUCKET.put(avatarKey, avatar.stream(), {
+    httpMetadata: { contentType: avatar.type }
+  });
+
+  await env.DB.prepare("UPDATE users SET avatar_url = ? WHERE id = ?").bind(avatarKey, user.id).run();
+
+  const updatedUser = await env.DB.prepare(
+    `
+      SELECT
+        id,
+        username,
+        email,
+        created_at AS createdAt,
+        COALESCE(display_name, '') AS displayName,
+        COALESCE(bio, '') AS bio,
+        COALESCE(avatar_url, '') AS avatarUrl,
+        COALESCE(is_admin, 0) AS isAdmin,
+        COALESCE(moderation_status, 'active') AS moderationStatus
       FROM users
       WHERE id = ?
       LIMIT 1
@@ -1664,6 +1717,37 @@ async function handleDownload(env, postId) {
   });
 }
 
+async function handleAvatar(env, username) {
+  const user = await env.DB.prepare(
+    `
+      SELECT
+        username,
+        COALESCE(avatar_url, '') AS avatarUrl
+      FROM users
+      WHERE username = ?
+      LIMIT 1
+    `
+  )
+    .bind(username)
+    .first();
+
+  if (!user?.avatarUrl || !user.avatarUrl.startsWith("avatars/")) {
+    return fail("Avatar not found.", 404);
+  }
+
+  const object = await env.YIMAGE_BUCKET.get(user.avatarUrl);
+  if (!object) {
+    return fail("Avatar not found.", 404);
+  }
+
+  return new Response(object.body, {
+    headers: {
+      "Content-Type": object.httpMetadata?.contentType || "application/octet-stream",
+      "Cache-Control": "public, max-age=3600"
+    }
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -1686,6 +1770,9 @@ export default {
       }
       if (url.pathname === "/api/me/profile" && request.method === "PATCH") {
         return await handleUpdateProfile(request, env);
+      }
+      if (url.pathname === "/api/me/avatar" && request.method === "POST") {
+        return await handleAvatarUpload(request, env);
       }
       if (url.pathname === "/api/categories" && request.method === "GET") {
         return await handleCategoriesList(env);
@@ -1731,6 +1818,9 @@ export default {
       }
       if (url.pathname.startsWith("/api/users/") && url.pathname.endsWith("/follow") && request.method === "POST") {
         return await handleToggleFollow(request, env, decodeURIComponent(url.pathname.split("/")[3]));
+      }
+      if (url.pathname.startsWith("/api/users/") && url.pathname.endsWith("/avatar") && request.method === "GET") {
+        return await handleAvatar(env, decodeURIComponent(url.pathname.split("/")[3]));
       }
       if (url.pathname.startsWith("/api/users/") && request.method === "GET") {
         return await handleGetProfile(request, env, decodeURIComponent(url.pathname.split("/")[3]));
