@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, Link, Sheet, Stack, Typography } from "@mui/joy";
+import { Avatar, Card, Link, Sheet, Stack, Typography } from "@mui/joy";
 import { Link as RouterLink } from "react-router-dom";
 import PostActionBar from "./PostActionBar";
 import ReportDialog from "./ReportDialog";
@@ -28,19 +28,57 @@ export default function PostCard({
         variant="outlined"
         className="post-card"
         sx={{
-          p: { xs: 2, md: 2.5 },
-          borderRadius: "22px",
-          bgcolor: "#000000",
-          borderColor: "rgba(255,255,255,0.12)"
+          p: { xs: 2, md: 2.5 }
         }}
       >
         <Stack spacing={2}>
+          <Stack direction="row" justifyContent="space-between" spacing={1.5} alignItems="flex-start">
+            <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
+              <Avatar
+                src={post.authorProfile?.avatarUrl || ""}
+                alt={post.authorUsername}
+                sx={{
+                  width: 44,
+                  height: 44,
+                  bgcolor: "rgba(111, 92, 255, 0.22)",
+                  color: "#f4f7ff",
+                  fontWeight: 700
+                }}
+              >
+                {(post.authorUsername || "Y").slice(0, 1).toUpperCase()}
+              </Avatar>
+              <Stack spacing={0.15} sx={{ minWidth: 0 }}>
+                <Stack direction="row" spacing={0.9} alignItems="center" flexWrap="wrap">
+                  <Typography level="title-md" sx={{ cursor: onAuthorClick ? "pointer" : "default" }} onClick={onAuthorClick}>
+                    {post.authorProfile?.displayName || post.authorUsername}
+                  </Typography>
+                  <Typography level="body-sm" textColor="neutral.500">
+                    @{post.authorUsername}
+                  </Typography>
+                  <Typography level="body-sm" textColor="neutral.500">
+                    {formatRelativeTime(post.createdAt)}
+                  </Typography>
+                </Stack>
+                {onToggleFollow && isLoggedIn ? (
+                  <button
+                    type="button"
+                    className="inline-follow-button inline-follow-button-compact"
+                    onClick={onToggleFollow}
+                  >
+                    {post.authorProfile?.isFollowing ? "Following" : "Follow"}
+                  </button>
+                ) : null}
+              </Stack>
+            </Stack>
+            <Typography level="body-sm" textColor="neutral.500">
+              ...
+            </Typography>
+          </Stack>
+
           <Sheet
+            className="post-media-frame"
             sx={{
-              borderRadius: "20px",
-              overflow: "hidden",
-              bgcolor: "#050505",
-              border: "1px solid rgba(255,255,255,0.12)"
+              overflow: "hidden"
             }}
           >
             <Link component={RouterLink} to={`/${post.id}`} underline="none" color="neutral">
@@ -55,30 +93,8 @@ export default function PostCard({
           <Stack spacing={1}>
             <Stack direction="row" justifyContent="space-between" spacing={1.5}>
               <Link component={RouterLink} to={`/${post.id}`} underline="none" color="neutral">
-                <Typography level="title-lg">{post.title}</Typography>
+                <Typography level="title-lg" sx={{ letterSpacing: "-0.03em" }}>{post.title}</Typography>
               </Link>
-              <Typography level="body-sm" textColor="neutral.500">
-                {formatRelativeTime(post.createdAt)}
-              </Typography>
-            </Stack>
-            <Stack direction="row" spacing={0.9} alignItems="center" useFlexGap flexWrap="wrap" className="post-author-row">
-              <Typography
-                level="body-sm"
-                textColor="neutral.400"
-                sx={{ cursor: onAuthorClick ? "pointer" : "default" }}
-                onClick={onAuthorClick}
-              >
-                @{post.authorUsername}
-              </Typography>
-              {onToggleFollow && isLoggedIn ? (
-                <button
-                  type="button"
-                  className="inline-follow-button inline-follow-button-compact"
-                  onClick={onToggleFollow}
-                >
-                  {post.authorProfile?.isFollowing ? "Following" : "Follow"}
-                </button>
-              ) : null}
             </Stack>
             <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
               {post.category ? (
@@ -98,7 +114,7 @@ export default function PostCard({
               ))}
             </Stack>
             {post.description ? (
-              <Typography level="body-md" textColor="neutral.300">
+              <Typography level="body-md" textColor="neutral.300" sx={{ lineHeight: 1.65 }}>
                 {post.description.length > 140 ? `${post.description.slice(0, 140)}...` : post.description}
               </Typography>
             ) : null}

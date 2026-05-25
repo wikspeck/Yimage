@@ -8,8 +8,9 @@ export default function Footer() {
   return (
     <Sheet
       variant="plain"
+      className="app-footer"
       sx={{
-        py: 4,
+        py: 3,
         textAlign: "center"
       }}
     >
@@ -21,7 +22,7 @@ export default function Footer() {
           {user?.isAdmin ? <Link component={RouterLink} to="/moderation" underline="hover">Moderation</Link> : null}
         </Stack>
         <Typography level="body-sm" textColor="neutral.500">
-          Yimage on Cloudflare Pages, Workers, R2, and D1
+          Yimage, built for the scroll.
         </Typography>
       </Stack>
     </Sheet>

@@ -198,27 +198,47 @@ export default function DiscoverPage() {
   return (
     <Box className="page-shell">
       <Stack spacing={3}>
-        <Card variant="outlined" className="content-card">
-          <Stack spacing={1.5}>
-            <Typography level="h1" sx={{ letterSpacing: "-0.06em", fontSize: { xs: "2rem", md: "2.8rem" } }}>
-              Discover
-            </Typography>
-            <Typography level="body-md" textColor="neutral.400" sx={{ maxWidth: 640 }}>
-              Search by title, creator, hashtag, or category and explore what is rising across Yimage.
-            </Typography>
+        <Card variant="outlined" className="content-card feed-hero-card">
+          <Stack spacing={2}>
+            <Stack direction="row" justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2} flexWrap="wrap">
+              <div>
+                <Typography level="body-sm" className="feed-hero-kicker">
+                  Your social canvas
+                </Typography>
+                <Typography level="h1" sx={{ letterSpacing: "-0.07em", fontSize: { xs: "2.2rem", md: "3.1rem" }, lineHeight: 0.95 }}>
+                  Home feed
+                </Typography>
+                <Typography level="body-md" textColor="neutral.300" sx={{ maxWidth: 620, mt: 1 }}>
+                  Discover bold visuals, creator threads, and fast-moving conversations in a cleaner, more immersive feed.
+                </Typography>
+              </div>
+
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                <Button variant="solid" color="primary" onClick={() => navigate(user ? "/create" : "/login?next=/create")} sx={{ borderRadius: "999px" }}>
+                  Create post
+                </Button>
+                {!user ? (
+                  <Button variant="soft" color="neutral" onClick={() => navigate("/signup")} sx={{ borderRadius: "999px" }}>
+                    Create account
+                  </Button>
+                ) : null}
+              </Stack>
+            </Stack>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
               <Input
                 value={searchText}
                 onChange={(event) => setSearchText(event.target.value)}
-                placeholder="Search titles, creators, hashtags"
+                placeholder="Search posts, creators, hashtags"
+                className="feed-search-input"
                 sx={{ flex: 1, borderRadius: "999px" }}
               />
               <Select
                 value={selectedCategory}
                 onChange={(_, value) => updateFilters({ category: value || "" })}
                 placeholder="All categories"
-                sx={{ minWidth: { xs: "100%", md: 180 }, borderRadius: "14px" }}
+                className="feed-filter-select"
+                sx={{ minWidth: { xs: "100%", md: 180 }, borderRadius: "16px" }}
               >
                 <Option value="">All categories</Option>
                 {categories.map((category) => (
@@ -229,23 +249,12 @@ export default function DiscoverPage() {
               </Select>
               <Button
                 variant="solid"
-                color="neutral"
+                color="primary"
                 onClick={() => updateFilters({ query: searchText, hashtag: "" })}
                 sx={{ borderRadius: "999px" }}
               >
                 Search
               </Button>
-            </Stack>
-
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-              <Button variant="soft" color="neutral" onClick={() => navigate(user ? "/create" : "/login?next=/create")} sx={{ borderRadius: "999px" }}>
-                Create post
-              </Button>
-              {!user ? (
-                <Button variant="plain" color="neutral" onClick={() => navigate("/signup")} sx={{ borderRadius: "999px" }}>
-                  Create account
-                </Button>
-              ) : null}
             </Stack>
           </Stack>
         </Card>

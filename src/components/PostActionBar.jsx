@@ -125,6 +125,9 @@ export default function PostActionBar({
   const isUpvoted = post.viewerVote === "up";
   const isDownvoted = post.viewerVote === "down";
   const isReposted = Boolean(post.hasReposted);
+  const commentsCount = post.commentsCount ?? 0;
+  const repostCount = post.repostCount ?? 0;
+  const viewsCount = post.views ?? 0;
 
   function getButtonClassName(isActive, extraClassName = "") {
     return `${extraClassName} icon-button${isActive ? " icon-button-active" : ""}`.trim();
@@ -133,30 +136,29 @@ export default function PostActionBar({
   return (
     <Stack spacing={1.1} className="post-actions-shell">
       <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" flexWrap="wrap" className="post-actions-row">
-        <Stack direction="row" spacing={0.75} alignItems="center" className="vote-cluster">
+        <Stack direction="row" spacing={0.5} alignItems="center" className="vote-cluster">
           <Button
             size="sm"
             variant="plain"
             color="neutral"
             onClick={() => (isLoggedIn ? onUpvote?.() : onRequireLogin?.())}
             loading={isBusy}
-            className={getButtonClassName(isUpvoted)}
-            aria-label="Upvote"
+            className={getButtonClassName(isUpvoted, "social-action-button")}
+            aria-label="Like"
           >
             <UpIcon />
+            <span>{score}</span>
           </Button>
-          <Typography level="title-sm" sx={{ minWidth: 24, textAlign: "center", color: "#ffffff" }}>
-            {score}
-          </Typography>
           <Button
             size="sm"
             variant="plain"
             color="neutral"
             onClick={() => (isLoggedIn ? onDownvote?.() : onRequireLogin?.())}
-            className={getButtonClassName(isDownvoted)}
-            aria-label="Downvote"
+            className={getButtonClassName(isDownvoted, "social-action-button")}
+            aria-label="Unlike"
           >
             <DownIcon />
+            <span className="sr-only">Unlike</span>
           </Button>
         </Stack>
 
@@ -166,17 +168,18 @@ export default function PostActionBar({
             variant="plain"
             color="neutral"
             onClick={() => onComment?.()}
-            className="icon-button"
+            className="icon-button social-action-button"
             aria-label="Comments"
           >
             <CommentIcon />
+            <span>{commentsCount}</span>
           </Button>
           <Button
             size="sm"
             variant="plain"
             color="neutral"
             onClick={() => onShare?.()}
-            className="icon-button share-button"
+            className="icon-button social-action-button share-button"
             aria-label="Share"
           >
             <ShareIcon />
@@ -186,10 +189,11 @@ export default function PostActionBar({
             variant="plain"
             color="neutral"
             onClick={() => (isLoggedIn ? onRepost?.() : onRequireLogin?.())}
-            className={getButtonClassName(isReposted)}
+            className={getButtonClassName(isReposted, "social-action-button")}
             aria-label="Repost"
           >
             <RepostIcon />
+            <span>{repostCount}</span>
           </Button>
           <Button
             size="sm"
@@ -197,7 +201,7 @@ export default function PostActionBar({
             href={getDownloadUrl(post.id)}
             variant="plain"
             color="neutral"
-            className="download-button"
+            className="download-button social-action-button"
             aria-label="Save image"
           >
             <SaveIcon />
@@ -208,7 +212,7 @@ export default function PostActionBar({
             variant="plain"
             color="neutral"
             onClick={() => onReport?.()}
-            className="icon-button"
+            className="icon-button social-action-button"
             aria-label="Report"
           >
             <ReportIcon />
@@ -219,7 +223,7 @@ export default function PostActionBar({
               variant="plain"
               color="danger"
               onClick={() => onDelete?.()}
-              className="icon-button icon-button-danger"
+              className="icon-button icon-button-danger social-action-button"
               aria-label="Delete post"
             >
               <TrashIcon />
@@ -229,17 +233,11 @@ export default function PostActionBar({
       </Stack>
 
       <Stack direction="row" spacing={1.25} useFlexGap flexWrap="wrap" alignItems="center" className="post-stats-row">
-        <Stack direction="row" spacing={0.45} alignItems="center">
-          <CommentIcon />
-          <Typography level="body-sm" sx={{ color: "#ffffff" }}>
-            {post.commentsCount}
-          </Typography>
-        </Stack>
         <Typography level="body-sm" sx={{ color: "rgba(255,255,255,0.72)" }}>
-          {post.repostCount ?? 0} reposts
+          {repostCount} reposts
         </Typography>
         <Typography level="body-sm" sx={{ color: "rgba(255,255,255,0.72)" }}>
-          {post.views} views
+          {viewsCount} views
         </Typography>
       </Stack>
     </Stack>
