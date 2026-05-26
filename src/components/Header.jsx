@@ -26,7 +26,7 @@ function NavItem({ active, label, iconSrc, selectedIconSrc, onClick }) {
   );
 }
 
-export default function Header({ onOpenLogin, onOpenSignup, onCreate, onDiscover, onProfile, onSearch }) {
+export default function Header({ onOpenLogin, onOpenSignup, onCreate, onHome, onDiscover, onProfile, onSearch }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -41,7 +41,7 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onDiscover
     <>
       <Sheet variant="plain" className="top-brand-bar">
         <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
-          <button type="button" className="brand-lockup" onClick={onDiscover} aria-label="Go to Yimage home">
+          <button type="button" className="brand-lockup" onClick={onHome} aria-label="Go to Yimage home">
             <Box
               component="img"
               src="/yimage-logo-platform.svg"
@@ -97,14 +97,14 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onDiscover
             label="Home"
             iconSrc="/nav-home.svg"
             selectedIconSrc="/nav-home-selected.svg"
-            onClick={onDiscover}
+            onClick={onHome}
           />
           <NavItem
             active={isDiscover}
             label="Discover"
             iconSrc="/nav-discover.svg"
             selectedIconSrc="/nav-discover-selected.svg"
-            onClick={onSearch}
+            onClick={onDiscover}
           />
           <NavItem
             active={isSearch}

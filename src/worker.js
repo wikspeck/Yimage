@@ -381,6 +381,7 @@ function toPublicUser(user) {
     displayName: user.displayName || "",
     bio: user.bio || "",
     avatarUrl,
+    followingCount: Number(user.followingCount || 0),
     isAdmin: Boolean(user.isAdmin),
     moderationStatus: user.moderationStatus || MODERATION_STATES.ACTIVE
   };
@@ -1116,7 +1117,18 @@ async function listPosts(env, userId, options = {}) {
     conditions.push("COALESCE(posts.moderation_status, 'active') NOT IN ('under_review', 'hidden', 'removed')");
   }
 
-  if (view === "discover") {
+  if (view === "home" && userId) {
+    conditions.push(
+      `EXISTS (
+        SELECT 1
+        FROM follows
+        WHERE follows.follower_id = ?
+          AND follows.following_id = posts.author_id
+      )`
+    );
+    bindings.push(userId);
+    orderClause = "ORDER BY posts.created_at DESC, posts.id DESC";
+  } else if (view === "discover") {
     if (mode === "following") {
       if (!userId) {
         throw new Error("Log in to use the followers-only feed.");
@@ -1416,7 +1428,89 @@ async function handleLogout(request, env) {
 
 async function handleMe(request, env) {
   const user = await getCurrentUser(request, env);
-  return success({ user: user ? toPublicUser(user) : null });
+  if (!user) {
+    return success({ user: null });
+  }
+
+  const counts = await env.DB.prepare(
+    `
+      SELECT
+        (SELECT COUNT(*) FROM follows WHERE follower_id = ?) AS followingCount
+    `
+  )
+    .bind(user.id)
+    .first();
+
+  return success({ user: toPublicUser({ ...user, followingCount: counts?.followingCount || 0 }) });
+}
+
+async function handleSearch(request, env) {
+  const viewer = await getCurrentUser(request, env);
+  const url = new URL(request.url);
+  const query = normalizeText(url.searchParams.get("query")).toLowerCase();
+
+  if (!query) {
+    return success({ posts: [], users: [], hashtags: [] });
+  }
+
+  const posts = await listPosts(env, viewer?.id, {
+    query,
+    category: url.searchParams.get("category") || "",
+    hashtag: ""
+  });
+
+  const userRows = await env.DB.prepare(
+    `
+      SELECT
+        users.id,
+        users.username,
+        users.email,
+        users.created_at AS createdAt,
+        COALESCE(users.display_name, '') AS displayName,
+        COALESCE(users.bio, '') AS bio,
+        COALESCE(users.avatar_url, '') AS avatarUrl,
+        COALESCE(users.is_admin, 0) AS isAdmin,
+        COALESCE(users.moderation_status, 'active') AS moderationStatus
+      FROM users
+      WHERE COALESCE(users.moderation_status, 'active') NOT IN ('suspended')
+        AND (
+          LOWER(users.username) LIKE ?
+          OR LOWER(COALESCE(users.display_name, '')) LIKE ?
+          OR LOWER(COALESCE(users.bio, '')) LIKE ?
+        )
+      ORDER BY users.created_at DESC
+      LIMIT 12
+    `
+  )
+    .bind(`%${query}%`, `%${query}%`, `%${query}%`)
+    .all();
+
+  const hashtagRows = await env.DB.prepare(
+    `
+      SELECT
+        hashtags.tag,
+        COUNT(post_hashtags.post_id) AS usageCount
+      FROM hashtags
+      INNER JOIN post_hashtags ON post_hashtags.hashtag_id = hashtags.id
+      INNER JOIN posts ON posts.id = post_hashtags.post_id
+      WHERE COALESCE(posts.moderation_status, 'active') NOT IN ('under_review', 'hidden', 'removed')
+        AND LOWER(hashtags.tag) LIKE ?
+      GROUP BY hashtags.id, hashtags.tag
+      ORDER BY usageCount DESC, hashtags.tag ASC
+      LIMIT 12
+    `
+  )
+    .bind(`%${query.replace(/^#/, "")}%`)
+    .all();
+
+  return success({
+    posts,
+    users: (userRows.results || []).map((item) => toPublicUser(item)),
+    hashtags: (hashtagRows.results || []).map((item) => ({
+      tag: item.tag,
+      usageCount: Number(item.usageCount || 0)
+    }))
+  });
 }
 
 async function handleUpdateProfile(request, env) {
@@ -2627,6 +2721,9 @@ export default {
         }
         if (url.pathname === "/api/auth/me" && request.method === "GET") {
           return await handleMe(request, env);
+        }
+        if (url.pathname === "/api/search" && request.method === "GET") {
+          return await handleSearch(request, env);
         }
         if (url.pathname === "/api/me/profile" && request.method === "PATCH") {
           return await handleUpdateProfile(request, env);

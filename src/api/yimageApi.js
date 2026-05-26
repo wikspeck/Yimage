@@ -70,6 +70,14 @@ export async function getPosts(options = {}) {
   return data.posts;
 }
 
+export async function searchYimage(options = {}) {
+  const params = new URLSearchParams();
+  if (options.query) params.set("query", options.query);
+  if (options.category) params.set("category", options.category);
+  const query = params.toString();
+  return request(`/api/search${query ? `?${query}` : ""}`);
+}
+
 export async function getPost(id) {
   return request(`/api/posts/${id}`);
 }

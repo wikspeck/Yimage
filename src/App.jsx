@@ -54,7 +54,8 @@ function AppLayout() {
       onOpenLogin={() => navigate("/login")}
       onOpenSignup={() => navigate("/signup")}
       onCreate={() => navigate("/create")}
-      onDiscover={() => navigate("/")}
+      onHome={() => navigate("/")}
+      onDiscover={() => navigate("/?view=discover")}
       onSearch={() => navigate("/search")}
       onProfile={() => navigate(user ? `/u/${user.username}` : "/login")}
     />

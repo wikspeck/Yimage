@@ -759,6 +759,41 @@ body,
   color: rgba(255, 255, 255, 0.68);
 }
 
+.search-filter-pill {
+  flex: 0 0 auto;
+  min-width: 88px;
+  justify-content: center;
+}
+
+.search-user-card:hover {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.search-hashtag-chip {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0d0d0d;
+  border-radius: 999px;
+  padding: 10px 14px;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.search-hashtag-chip:hover {
+  background: #151515;
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.search-hashtag-count {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.78rem;
+}
+
 .vote-pill-group {
   display: inline-flex;
   align-items: center;

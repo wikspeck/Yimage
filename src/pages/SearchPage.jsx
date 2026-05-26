@@ -1,94 +1,78 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Box, Button, Card, CircularProgress, Input, Option, Select, Stack, Typography } from "@mui/joy";
+import { Alert, Avatar, Box, Button, Card, CircularProgress, Input, Stack, Typography } from "@mui/joy";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { deletePost, getCategories, getPosts, repostPost, toggleFollow, voteOnPost } from "../api/yimageApi";
+import { deletePost, repostPost, searchYimage, toggleFollow, voteOnPost } from "../api/yimageApi";
 import PostCard from "../components/PostCard";
 import ShareDialog from "../components/ShareDialog";
 import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
+
+const RESULT_FILTERS = ["All", "Posts", "Users", "Hashtags"];
 
 export default function SearchPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [posts, setPosts] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [isLoadingPosts, setIsLoadingPosts] = useState(true);
-  const [postsError, setPostsError] = useState("");
+  const [users, setUsers] = useState([]);
+  const [hashtags, setHashtags] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [toastMessage, setToastMessage] = useState("");
   const [busyPostId, setBusyPostId] = useState("");
   const [sharePostId, setSharePostId] = useState("");
-  const [searchText, setSearchText] = useState(searchParams.get("query") || searchParams.get("hashtag") || "");
-  const selectedCategory = searchParams.get("category") || "";
+  const [searchText, setSearchText] = useState(searchParams.get("query") || "");
+  const [resultType, setResultType] = useState(searchParams.get("type") || "All");
 
-  const activeFilters = useMemo(
-    () => ({
-      query: searchParams.get("query") || "",
-      category: searchParams.get("category") || "",
-      hashtag: searchParams.get("hashtag") || ""
-    }),
-    [searchParams]
-  );
+  const query = useMemo(() => searchParams.get("query") || "", [searchParams]);
 
   useEffect(() => {
-    setSearchText(searchParams.get("query") || searchParams.get("hashtag") || "");
-  }, [searchParams]);
+    setSearchText(query);
+    setResultType(searchParams.get("type") || "All");
+  }, [query, searchParams]);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadCategories() {
-      try {
-        const nextCategories = await getCategories();
-        if (isMounted) {
-          setCategories(nextCategories);
-        }
-      } catch {
-        if (isMounted) {
-          setCategories([]);
-        }
+    async function runSearch() {
+      if (!query) {
+        setPosts([]);
+        setUsers([]);
+        setHashtags([]);
+        setIsLoading(false);
+        return;
       }
-    }
 
-    loadCategories();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadPosts() {
-      setIsLoadingPosts(true);
-      setPostsError("");
+      setIsLoading(true);
+      setError("");
 
       try {
-        const nextPosts = await getPosts(activeFilters);
+        const result = await searchYimage({ query });
         if (isMounted) {
-          setPosts(nextPosts);
+          setPosts(result.posts || []);
+          setUsers(result.users || []);
+          setHashtags(result.hashtags || []);
         }
-      } catch (error) {
+      } catch (searchError) {
         if (isMounted) {
-          setPostsError(error.message || "Could not load posts.");
+          setError(searchError.message || "Could not search right now.");
         }
       } finally {
         if (isMounted) {
-          setIsLoadingPosts(false);
+          setIsLoading(false);
         }
       }
     }
 
-    loadPosts();
+    runSearch();
     return () => {
       isMounted = false;
     };
-  }, [activeFilters]);
+  }, [query]);
 
-  function updateFilters(next) {
+  function updateParams(next) {
     const params = new URLSearchParams(searchParams);
-
     Object.entries(next).forEach(([key, value]) => {
       if (value) {
         params.set(key, value);
@@ -96,20 +80,17 @@ export default function SearchPage() {
         params.delete(key);
       }
     });
-
     setSearchParams(params);
   }
 
   async function handleVote(postId, vote) {
     setBusyPostId(postId);
-    setPostsError("");
-    setNotice("");
-
+    setError("");
     try {
       const result = await voteOnPost(postId, vote);
       setPosts((current) => current.map((post) => (post.id === postId ? result.post : post)));
-    } catch (error) {
-      setPostsError(error.message || "Could not update vote.");
+    } catch (voteError) {
+      setError(voteError.message || "Could not update vote.");
     } finally {
       setBusyPostId("");
     }
@@ -117,15 +98,15 @@ export default function SearchPage() {
 
   async function handleRepost(postId) {
     setBusyPostId(postId);
-    setPostsError("");
+    setError("");
     setNotice("");
 
     try {
       const result = await repostPost(postId);
       setPosts((current) => current.map((post) => (post.id === postId ? result.post : post)));
       setNotice(result.message || "Repost updated.");
-    } catch (error) {
-      setPostsError(error.message || "Could not repost this post.");
+    } catch (repostError) {
+      setError(repostError.message || "Could not repost this post.");
     } finally {
       setBusyPostId("");
     }
@@ -144,9 +125,9 @@ export default function SearchPage() {
       }
 
       setSharePostId(postId);
-    } catch (error) {
-      if (error?.name !== "AbortError") {
-        setPostsError("Could not share this post.");
+    } catch (shareError) {
+      if (shareError?.name !== "AbortError") {
+        setError("Could not share this post.");
       }
     }
   }
@@ -164,8 +145,8 @@ export default function SearchPage() {
             : item
         )
       );
-    } catch (error) {
-      setPostsError(error.message || "Could not update follow status.");
+    } catch (followError) {
+      setError(followError.message || "Could not update follow status.");
     }
   }
 
@@ -181,19 +162,22 @@ export default function SearchPage() {
     }
 
     setBusyPostId(post.id);
-    setPostsError("");
-    setNotice("");
+    setError("");
 
     try {
       await deletePost(post.id);
       setPosts((current) => current.filter((item) => item.id !== post.id));
       setNotice("Post deleted.");
-    } catch (error) {
-      setPostsError(error.message || "Could not delete this post.");
+    } catch (deleteError) {
+      setError(deleteError.message || "Could not delete this post.");
     } finally {
       setBusyPostId("");
     }
   }
+
+  const showPosts = resultType === "All" || resultType === "Posts";
+  const showUsers = resultType === "All" || resultType === "Users";
+  const showHashtags = resultType === "All" || resultType === "Hashtags";
 
   return (
     <Box className="page-shell">
@@ -215,49 +199,51 @@ export default function SearchPage() {
               <Input
                 value={searchText}
                 onChange={(event) => setSearchText(event.target.value)}
-                placeholder="Search posts, users, categories"
+                placeholder="Search posts, users, hashtags"
                 className="feed-search-input"
                 sx={{ flex: 1, borderRadius: "999px" }}
               />
-              <Select
-                value={selectedCategory}
-                onChange={(_, value) => updateFilters({ category: value || "" })}
-                placeholder="Categories"
-                className="feed-filter-select"
-                sx={{ minWidth: { xs: "100%", md: 180 }, borderRadius: "16px" }}
-              >
-                <Option value="">Categories</Option>
-                {categories.map((category) => (
-                  <Option key={category.id} value={category.slug}>
-                    {category.label}
-                  </Option>
-                ))}
-              </Select>
-              <Button
-                variant="solid"
-                color="neutral"
-                onClick={() => updateFilters({ query: searchText, hashtag: "" })}
-                sx={{ borderRadius: "999px" }}
-              >
+              <Button variant="solid" color="neutral" onClick={() => updateParams({ query: searchText })} sx={{ borderRadius: "999px" }}>
                 Search
               </Button>
+            </Stack>
+
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              {RESULT_FILTERS.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={`discover-mode-pill search-filter-pill${resultType === item ? " is-active" : ""}`}
+                  onClick={() => updateParams({ type: item === "All" ? "" : item })}
+                >
+                  <span className="discover-mode-title">{item}</span>
+                </button>
+              ))}
             </Stack>
           </Stack>
         </Card>
 
-        {postsError ? <Alert color="danger" variant="soft">{postsError}</Alert> : null}
+        {error ? <Alert color="danger" variant="soft">{error}</Alert> : null}
         {notice ? <Alert color="neutral" variant="soft">{notice}</Alert> : null}
 
-        {isLoadingPosts ? (
+        {isLoading ? (
           <Card variant="outlined" className="content-card">
             <Stack direction="row" spacing={1.5} alignItems="center">
               <CircularProgress size="sm" />
-              <Typography level="body-md">Loading posts...</Typography>
+              <Typography level="body-md">Searching...</Typography>
             </Stack>
           </Card>
         ) : null}
 
-        {!isLoadingPosts && !posts.length ? (
+        {!query && !isLoading ? (
+          <Card variant="outlined" className="content-card">
+            <Typography level="body-md" textColor="neutral.400">
+              Search posts, users, or hashtags.
+            </Typography>
+          </Card>
+        ) : null}
+
+        {query && !isLoading && !posts.length && !users.length && !hashtags.length ? (
           <Card variant="outlined" className="content-card">
             <Typography level="body-md" textColor="neutral.400">
               No results.
@@ -265,29 +251,73 @@ export default function SearchPage() {
           </Card>
         ) : null}
 
-        <Stack spacing={2}>
-          {posts.map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              isLoggedIn={Boolean(user)}
-              isBusy={busyPostId === post.id}
-              onUpvote={() => handleVote(post.id, "up")}
-              onDownvote={() => handleVote(post.id, "down")}
-              onRepost={() => handleRepost(post.id)}
-              onShare={() => handleShare(post.id)}
-              onToggleFollow={() => handleToggleFollow(post)}
-              canDelete={Boolean(user && (user.id === post.userId || user.isAdmin))}
-              onDelete={() => handleDelete(post)}
-              onHashtagClick={(tag) => {
-                setSearchText(`#${tag}`);
-                updateFilters({ hashtag: tag, query: "" });
-              }}
-              onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
-              onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
-            />
-          ))}
-        </Stack>
+        {showUsers && users.length ? (
+          <Stack spacing={2}>
+            <Typography level="title-lg">Users</Typography>
+            {users.map((profile) => (
+              <Card
+                key={profile.id}
+                variant="outlined"
+                className="content-card search-user-card"
+                sx={{ p: { xs: 2, md: 2.5 }, cursor: "pointer" }}
+                onClick={() => navigate(`/u/${profile.username}`)}
+              >
+                <Stack direction="row" spacing={1.25} alignItems="center">
+                  <Avatar src={profile.avatarUrl || ""} alt={profile.username} sx={{ width: 44, height: 44, bgcolor: "#151515", color: "#ffffff" }}>
+                    {(profile.displayName || profile.username || "Y").slice(0, 1).toUpperCase()}
+                  </Avatar>
+                  <Stack spacing={0.2}>
+                    <Typography level="title-md">{profile.displayName || profile.username}</Typography>
+                    <Typography level="body-sm" textColor="neutral.500">@{profile.username}</Typography>
+                  </Stack>
+                </Stack>
+              </Card>
+            ))}
+          </Stack>
+        ) : null}
+
+        {showHashtags && hashtags.length ? (
+          <Stack spacing={1.5}>
+            <Typography level="title-lg">Hashtags</Typography>
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              {hashtags.map((item) => (
+                <button
+                  key={item.tag}
+                  type="button"
+                  className="search-hashtag-chip"
+                  onClick={() => navigate(`/search?query=%23${encodeURIComponent(item.tag)}`)}
+                >
+                  <span>#{item.tag}</span>
+                  <span className="search-hashtag-count">{item.usageCount}</span>
+                </button>
+              ))}
+            </Stack>
+          </Stack>
+        ) : null}
+
+        {showPosts && posts.length ? (
+          <Stack spacing={2}>
+            <Typography level="title-lg">Posts</Typography>
+            {posts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                isLoggedIn={Boolean(user)}
+                isBusy={busyPostId === post.id}
+                onUpvote={() => handleVote(post.id, "up")}
+                onDownvote={() => handleVote(post.id, "down")}
+                onRepost={() => handleRepost(post.id)}
+                onShare={() => handleShare(post.id)}
+                onToggleFollow={() => handleToggleFollow(post)}
+                canDelete={Boolean(user && (user.id === post.userId || user.isAdmin))}
+                onDelete={() => handleDelete(post)}
+                onHashtagClick={(tag) => updateParams({ query: `#${tag}`, type: "Hashtags" })}
+                onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
+                onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
+              />
+            ))}
+          </Stack>
+        ) : null}
       </Stack>
       <ShareDialog
         open={Boolean(sharePostId)}
