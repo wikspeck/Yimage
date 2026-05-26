@@ -6,6 +6,7 @@ import PostCard from "../components/PostCard";
 import ShareDialog from "../components/ShareDialog";
 import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
+import { usePreferences } from "../context/PreferencesContext";
 
 const DISCOVER_MODES = [
   { key: "trending", title: "Trending" },
@@ -13,8 +14,15 @@ const DISCOVER_MODES = [
   { key: "fresh", title: "Random" }
 ];
 
+const POST_TYPE_FILTERS = [
+  { key: "all", title: "All Posts" },
+  { key: "normal", title: "Normal Posts" },
+  { key: "image-only", title: "Image-Only Posts" }
+];
+
 export default function DiscoverPage() {
   const { user } = useAuth();
+  const { preferences } = usePreferences();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [posts, setPosts] = useState([]);
@@ -25,25 +33,28 @@ export default function DiscoverPage() {
   const [toastMessage, setToastMessage] = useState("");
   const [busyPostId, setBusyPostId] = useState("");
   const [sharePostId, setSharePostId] = useState("");
-  const [searchText, setSearchText] = useState(searchParams.get("query") || searchParams.get("hashtag") || "");
   const selectedCategory = searchParams.get("category") || "";
   const selectedView = searchParams.get("view") || "home";
   const selectedMode = searchParams.get("mode") || (selectedView === "discover" ? "trending" : "home");
+  const selectedPostType = searchParams.get("postType") || preferences.defaultFeedPostType || "all";
 
   const activeFilters = useMemo(
     () => ({
-      query: searchParams.get("query") || "",
       category: searchParams.get("category") || "",
-      hashtag: searchParams.get("hashtag") || "",
       view: searchParams.get("view") || "home",
-      mode: searchParams.get("mode") || (searchParams.get("view") === "discover" ? "trending" : "home")
+      mode: searchParams.get("mode") || (searchParams.get("view") === "discover" ? "trending" : "home"),
+      postType: searchParams.get("postType") || preferences.defaultFeedPostType || "all"
     }),
-    [searchParams]
+    [preferences.defaultFeedPostType, searchParams]
   );
 
   useEffect(() => {
-    setSearchText(searchParams.get("query") || searchParams.get("hashtag") || "");
-  }, [searchParams]);
+    if (!searchParams.get("postType") && preferences.defaultFeedPostType && preferences.defaultFeedPostType !== "all") {
+      const next = new URLSearchParams(searchParams);
+      next.set("postType", preferences.defaultFeedPostType);
+      setSearchParams(next);
+    }
+  }, [preferences.defaultFeedPostType, searchParams, setSearchParams]);
 
   useEffect(() => {
     let isMounted = true;
@@ -111,12 +122,15 @@ export default function DiscoverPage() {
   }
 
   function activateDiscoverMode(mode) {
-    updateFilters({ view: "discover", mode, query: "", hashtag: "" });
+    updateFilters({ view: "discover", mode });
   }
 
   function resetToHomeFeed() {
-    setSearchText("");
-    setSearchParams(new URLSearchParams());
+    const next = new URLSearchParams();
+    if (preferences.defaultFeedPostType && preferences.defaultFeedPostType !== "all") {
+      next.set("postType", preferences.defaultFeedPostType);
+    }
+    setSearchParams(next);
   }
 
   async function handleVote(postId, vote) {
@@ -274,6 +288,19 @@ export default function DiscoverPage() {
                 </Select>
               </Stack>
             ) : null}
+
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              {POST_TYPE_FILTERS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={`discover-mode-pill search-filter-pill${selectedPostType === item.key ? " is-active" : ""}`}
+                  onClick={() => updateFilters({ postType: item.key === "all" ? "" : item.key })}
+                >
+                  <span className="discover-mode-title">{item.title}</span>
+                </button>
+              ))}
+            </Stack>
           </Stack>
         </Card>
 

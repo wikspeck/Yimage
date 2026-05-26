@@ -388,6 +388,9 @@ function toPublicUser(user) {
 }
 
 function toPostResponse(post, viewerVote = null, viewerHasReposted = false, repostsRemainingToday = 3) {
+  const derivedPostType = normalizeText(post.postType).toLowerCase() === "image-only" || (!normalizeText(post.title) && !normalizeText(post.description))
+    ? "image-only"
+    : "normal";
   return {
     id: post.id,
     userId: post.userId,
@@ -410,6 +413,7 @@ function toPostResponse(post, viewerVote = null, viewerHasReposted = false, repo
           label: post.categoryLabel
         }
       : null,
+    postType: derivedPostType,
     hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
     hasLiked: viewerVote === "up",
     viewerVote,
@@ -1106,6 +1110,7 @@ async function listPosts(env, userId, options = {}) {
   const creatorQuery = searchQuery.replace(/^@+/, "");
   const category = normalizeText(options.category).toLowerCase();
   const hashtag = normalizeHashtag(options.hashtag);
+  const postType = normalizeText(options.postType).toLowerCase();
   const view = normalizeText(options.view).toLowerCase();
   const mode = normalizeText(options.mode).toLowerCase();
   const includeModerated = Boolean(options.includeModerated);
@@ -1115,6 +1120,14 @@ async function listPosts(env, userId, options = {}) {
 
   if (!includeModerated) {
     conditions.push("COALESCE(posts.moderation_status, 'active') NOT IN ('under_review', 'hidden', 'removed')");
+  }
+
+  if (postType === "normal") {
+    conditions.push("(LENGTH(TRIM(COALESCE(posts.title, ''))) > 0 OR LENGTH(TRIM(COALESCE(posts.description, ''))) > 0)");
+  }
+
+  if (postType === "image-only") {
+    conditions.push("(LENGTH(TRIM(COALESCE(posts.title, ''))) = 0 AND LENGTH(TRIM(COALESCE(posts.description, ''))) = 0)");
   }
 
   if (view === "home" && userId) {
@@ -1456,7 +1469,8 @@ async function handleSearch(request, env) {
   const posts = await listPosts(env, viewer?.id, {
     query,
     category: url.searchParams.get("category") || "",
-    hashtag: ""
+    hashtag: "",
+    postType: url.searchParams.get("postType") || ""
   });
 
   const userRows = await env.DB.prepare(
@@ -1617,19 +1631,22 @@ async function handleCreatePost(request, env) {
   if (turnstileFailure) {
     return turnstileFailure;
   }
+  const postType = normalizeText(formData.get("postType")).toLowerCase() === "image-only" ? "image-only" : "normal";
   const title = normalizeText(formData.get("title"));
   const description = normalizeText(formData.get("description"));
   const categoryId = normalizeText(formData.get("categoryId"));
   const hashtags = parseHashtags(formData.get("hashtags"));
   const image = formData.get("image");
+  const finalTitle = postType === "image-only" ? "" : title;
+  const finalDescription = postType === "image-only" ? "" : description;
 
-  if (!title) {
+  if (postType === "normal" && !title) {
     return fail("Title is required.");
   }
-  if (title.length > MAX_TITLE_LENGTH) {
+  if (finalTitle.length > MAX_TITLE_LENGTH) {
     return fail(`Title must be ${MAX_TITLE_LENGTH} characters or fewer.`);
   }
-  if (description.length > MAX_DESCRIPTION_LENGTH) {
+  if (finalDescription.length > MAX_DESCRIPTION_LENGTH) {
     return fail(`Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`);
   }
   const imageValidationMessage = await validateUploadedImageFile(image, "Image");
@@ -1674,8 +1691,8 @@ async function handleCreatePost(request, env) {
     postId,
     imageBytes,
     mimeType: image.type,
-    title,
-    description
+    title: finalTitle,
+    description: finalDescription
   });
   const moderationStatus = imageModeration?.moderationStatus || MODERATION_STATES.ACTIVE;
 
@@ -1697,7 +1714,7 @@ async function handleCreatePost(request, env) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?)
     `
   )
-    .bind(postId, user.id, title, description, imageKey, image.type, createdAt, resolvedCategoryId, moderationStatus)
+    .bind(postId, user.id, finalTitle, finalDescription, imageKey, image.type, createdAt, resolvedCategoryId, moderationStatus)
     .run();
 
   await syncPostHashtags(env, postId, hashtags);
@@ -1705,16 +1722,16 @@ async function handleCreatePost(request, env) {
     userId: user.id,
     targetType: "post",
     targetId: postId,
-    title,
-    description
+    title: finalTitle,
+    description: finalDescription
   });
   const textModeration = await runAiTextModeration(env, {
     userId: user.id,
     targetType: "post",
     targetId: postId,
     fields: {
-      title,
-      description
+      title: finalTitle,
+      description: finalDescription
     }
   });
   const post = await getPostRecord(env, postId, true);
@@ -1751,7 +1768,8 @@ async function handleListPosts(request, env) {
     category: url.searchParams.get("category") || "",
     hashtag: url.searchParams.get("hashtag") || "",
     view: url.searchParams.get("view") || "",
-    mode: url.searchParams.get("mode") || ""
+    mode: url.searchParams.get("mode") || "",
+    postType: url.searchParams.get("postType") || ""
   });
   return success({ posts });
 }

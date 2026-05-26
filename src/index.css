@@ -794,18 +794,21 @@ body,
   font-size: 0.78rem;
 }
 
-.vote-pill-group {
-  display: inline-flex;
-  align-items: center;
-}
-
-.vote-primary-button {
-  min-width: 74px !important;
-  justify-content: center !important;
-}
-
-.vote-secondary-button {
+.vote-icon-button {
   min-width: 42px !important;
+  padding: 0 !important;
+}
+
+.vote-count {
+  min-width: 18px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.vote-count.is-active {
+  color: #ffffff;
 }
 
 .repost-button.icon-button-active {
@@ -818,6 +821,91 @@ body,
 .repost-button.icon-button-active .action-icon-boxed,
 .repost-button.icon-button-active span {
   color: #000000 !important;
+}
+
+.vote-icon-button.icon-button-active {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-color: #ffffff !important;
+}
+
+.vote-icon-button.icon-button-active .action-icon-wrap,
+.vote-icon-button.icon-button-active .action-icon-boxed {
+  color: #000000 !important;
+}
+
+.settings-card {
+  max-width: 760px;
+}
+
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #ffffff;
+}
+
+.compact-mode .content-card,
+.compact-mode .post-card,
+.compact-mode .auth-card {
+  border-radius: 22px !important;
+}
+
+.compact-mode .page-shell {
+  padding-top: 12px;
+  padding-bottom: 16px;
+}
+
+.compact-mode .post-card {
+  padding: 16px !important;
+}
+
+.larger-text body,
+.larger-text .nav-item-label,
+.larger-text .discover-mode-title,
+.larger-text .settings-toggle-row,
+.larger-text .post-card,
+.larger-text .content-card {
+  font-size: 1.04em;
+}
+
+.high-contrast .content-card,
+.high-contrast .post-card,
+.high-contrast .auth-card,
+.high-contrast .icon-button,
+.high-contrast .download-button,
+.high-contrast .discover-mode-pill,
+.high-contrast .search-hashtag-chip {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.high-contrast .post-tag-chip,
+.high-contrast .feed-divider,
+.high-contrast .nav-divider {
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.theme-dark body,
+.theme-dark .app-shell,
+.theme-dark .app-main {
+  background: #000000;
+}
+
+.theme-dark .content-card,
+.theme-dark .post-card,
+.theme-dark .auth-card {
+  background: #050505 !important;
+}
+
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  scroll-behavior: auto !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
 }
 
 .feed-search-input,
@@ -895,11 +983,6 @@ body,
     justify-content: center;
     gap: 8px;
     flex-wrap: wrap;
-  }
-
-  .vote-pill-group {
-    flex: 1 1 auto;
-    justify-content: center;
   }
 
   .post-stats-row {

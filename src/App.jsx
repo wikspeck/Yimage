@@ -4,12 +4,14 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import CookieConsentBanner from "./components/CookieConsentBanner";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { PreferencesProvider } from "./context/PreferencesContext";
 import CreatePostPage from "./pages/CreatePostPage";
 import DiscoverPage from "./pages/DiscoverPage";
 import LoginPage from "./pages/LoginPage";
 import PostPage from "./pages/PostPage";
 import ProfilePage from "./pages/ProfilePage";
 import SearchPage from "./pages/SearchPage";
+import SettingsPage from "./pages/SettingsPage";
 import SignupPage from "./pages/SignupPage";
 import ModerationPage from "./pages/ModerationPage";
 import CommunityGuidelinesPage from "./pages/CommunityGuidelinesPage";
@@ -57,6 +59,7 @@ function AppLayout() {
       onHome={() => navigate("/")}
       onDiscover={() => navigate("/?view=discover")}
       onSearch={() => navigate("/search")}
+      onSettings={() => navigate("/settings")}
       onProfile={() => navigate(user ? `/u/${user.username}` : "/login")}
     />
   );
@@ -73,6 +76,7 @@ function AppRoutes() {
               <Route path="/" element={<DiscoverPage />} />
               <Route path="/discover" element={<Navigate to="/" replace />} />
               <Route path="/search" element={<SearchPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
               <Route
                 path="/create"
                 element={
@@ -123,7 +127,9 @@ export default function App() {
   return (
     <CssVarsProvider defaultMode="dark">
       <CssBaseline />
-      <AppRoutes />
+      <PreferencesProvider>
+        <AppRoutes />
+      </PreferencesProvider>
     </CssVarsProvider>
   );
 }

@@ -6,11 +6,18 @@ import PostCard from "../components/PostCard";
 import ShareDialog from "../components/ShareDialog";
 import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
+import { usePreferences } from "../context/PreferencesContext";
 
 const RESULT_FILTERS = ["All", "Posts", "Users", "Hashtags"];
+const POST_TYPE_FILTERS = [
+  { key: "all", title: "All Posts" },
+  { key: "normal", title: "Normal Posts" },
+  { key: "image-only", title: "Image-Only Posts" }
+];
 
 export default function SearchPage() {
   const { user } = useAuth();
+  const { preferences } = usePreferences();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [posts, setPosts] = useState([]);
@@ -24,6 +31,7 @@ export default function SearchPage() {
   const [sharePostId, setSharePostId] = useState("");
   const [searchText, setSearchText] = useState(searchParams.get("query") || "");
   const [resultType, setResultType] = useState(searchParams.get("type") || "All");
+  const selectedPostType = searchParams.get("postType") || preferences.defaultFeedPostType || "all";
 
   const query = useMemo(() => searchParams.get("query") || "", [searchParams]);
 
@@ -48,7 +56,7 @@ export default function SearchPage() {
       setError("");
 
       try {
-        const result = await searchYimage({ query });
+        const result = await searchYimage({ query, postType: selectedPostType });
         if (isMounted) {
           setPosts(result.posts || []);
           setUsers(result.users || []);
@@ -69,7 +77,7 @@ export default function SearchPage() {
     return () => {
       isMounted = false;
     };
-  }, [query]);
+  }, [query, selectedPostType]);
 
   function updateParams(next) {
     const params = new URLSearchParams(searchParams);
@@ -217,6 +225,19 @@ export default function SearchPage() {
                   onClick={() => updateParams({ type: item === "All" ? "" : item })}
                 >
                   <span className="discover-mode-title">{item}</span>
+                </button>
+              ))}
+            </Stack>
+
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              {POST_TYPE_FILTERS.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  className={`discover-mode-pill search-filter-pill${selectedPostType === item.key ? " is-active" : ""}`}
+                  onClick={() => updateParams({ postType: item.key === "all" ? "" : item.key })}
+                >
+                  <span className="discover-mode-title">{item.title}</span>
                 </button>
               ))}
             </Stack>

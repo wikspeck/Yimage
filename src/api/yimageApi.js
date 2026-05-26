@@ -40,13 +40,14 @@ async function request(url, init = {}) {
   }
 }
 
-export async function createPost({ title, description, imageFile, categoryId = "", hashtags = "", turnstileToken = "" }) {
+export async function createPost({ title, description, imageFile, categoryId = "", hashtags = "", turnstileToken = "", postType = "normal" }) {
   const formData = new FormData();
   formData.append("title", title);
   formData.append("description", description);
   formData.append("categoryId", categoryId);
   formData.append("hashtags", hashtags);
   formData.append("turnstileToken", turnstileToken);
+  formData.append("postType", postType);
   formData.append("image", imageFile);
 
   const data = await request("/api/posts", {
@@ -65,6 +66,7 @@ export async function getPosts(options = {}) {
   if (options.hashtag) params.set("hashtag", options.hashtag);
   if (options.view) params.set("view", options.view);
   if (options.mode) params.set("mode", options.mode);
+  if (options.postType && options.postType !== "all") params.set("postType", options.postType);
   const query = params.toString();
   const data = await request(`/api/posts${query ? `?${query}` : ""}`);
   return data.posts;
@@ -74,6 +76,7 @@ export async function searchYimage(options = {}) {
   const params = new URLSearchParams();
   if (options.query) params.set("query", options.query);
   if (options.category) params.set("category", options.category);
+  if (options.postType && options.postType !== "all") params.set("postType", options.postType);
   const query = params.toString();
   return request(`/api/search${query ? `?${query}` : ""}`);
 }

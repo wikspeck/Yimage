@@ -26,7 +26,7 @@ function NavItem({ active, label, iconSrc, selectedIconSrc, onClick }) {
   );
 }
 
-export default function Header({ onOpenLogin, onOpenSignup, onCreate, onHome, onDiscover, onProfile, onSearch }) {
+export default function Header({ onOpenLogin, onOpenSignup, onCreate, onHome, onDiscover, onProfile, onSearch, onSettings }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
@@ -64,6 +64,9 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onHome, on
           <Stack direction="row" spacing={1} alignItems="center">
             {user ? (
               <>
+                <Button variant="plain" color="neutral" onClick={onSettings} sx={{ borderRadius: "999px", color: "#ffffff" }}>
+                  Settings
+                </Button>
                 <Button variant="plain" color="neutral" onClick={onProfile} sx={{ borderRadius: "999px", color: "#ffffff" }}>
                   @{user.username}
                 </Button>

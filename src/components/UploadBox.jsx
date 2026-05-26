@@ -7,6 +7,7 @@ import { validateImageFile } from "../utils/validateImageFile";
 
 export default function UploadBox({ onPostCreated }) {
   const inputRef = useRef(null);
+  const [postType, setPostType] = useState("normal");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
@@ -116,6 +117,7 @@ export default function UploadBox({ onPostCreated }) {
   }
 
   function resetForm() {
+    setPostType("normal");
     setTitle("");
     setDescription("");
     setHashtags("");
@@ -123,7 +125,7 @@ export default function UploadBox({ onPostCreated }) {
   }
 
   async function handleUpload() {
-    if (!title.trim()) {
+    if (postType === "normal" && !title.trim()) {
       setErrorMessage("Add a title before uploading.");
       return;
     }
@@ -138,12 +140,13 @@ export default function UploadBox({ onPostCreated }) {
 
     try {
       const post = await createPost({
-        title: title.trim(),
-        description: description.trim(),
+        title: postType === "image-only" ? "" : title.trim(),
+        description: postType === "image-only" ? "" : description.trim(),
         categoryId,
         hashtags,
         turnstileToken,
-        imageFile: selectedFile
+        imageFile: selectedFile,
+        postType
       });
 
       setCreatedPost(post);
@@ -202,36 +205,54 @@ export default function UploadBox({ onPostCreated }) {
             <Typography level="h2" sx={{ letterSpacing: "-0.05em", fontSize: { xs: "2rem", md: "2.6rem" } }}>
               Publish a new post
             </Typography>
-            <Typography level="body-md" textColor="neutral.400" sx={{ maxWidth: 620 }}>
-              Add a title, an optional caption, and one image.
-            </Typography>
+          </Stack>
+
+          <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            <button
+              type="button"
+              className={`discover-mode-pill search-filter-pill${postType === "normal" ? " is-active" : ""}`}
+              onClick={() => setPostType("normal")}
+            >
+              <span className="discover-mode-title">Normal Post</span>
+            </button>
+            <button
+              type="button"
+              className={`discover-mode-pill search-filter-pill${postType === "image-only" ? " is-active" : ""}`}
+              onClick={() => setPostType("image-only")}
+            >
+              <span className="discover-mode-title">Image-Only</span>
+            </button>
           </Stack>
 
           <Stack spacing={1.25}>
-            <Input
-              placeholder="Title"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              slotProps={{
-                input: {
-                  maxLength: 120
-                }
-              }}
-              sx={{ borderRadius: "18px", minHeight: 48 }}
-            />
-            <Textarea
-              placeholder="Description (optional)"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              minRows={4}
-              maxRows={8}
-              slotProps={{
-                textarea: {
-                  maxLength: 1000
-                }
-              }}
-              sx={{ borderRadius: "18px" }}
-            />
+            {postType === "normal" ? (
+              <>
+                <Input
+                  placeholder="Title"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  slotProps={{
+                    input: {
+                      maxLength: 120
+                    }
+                  }}
+                  sx={{ borderRadius: "18px", minHeight: 48 }}
+                />
+                <Textarea
+                  placeholder="Description"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  minRows={4}
+                  maxRows={8}
+                  slotProps={{
+                    textarea: {
+                      maxLength: 1000
+                    }
+                  }}
+                  sx={{ borderRadius: "18px" }}
+                />
+              </>
+            ) : null}
             <Select
               value={categoryId}
               onChange={(_, nextValue) => setCategoryId(nextValue || "")}
@@ -327,7 +348,7 @@ export default function UploadBox({ onPostCreated }) {
             <Button
               size="lg"
               onClick={handleUpload}
-              disabled={!selectedFile || !title.trim() || isUploading || !turnstileToken}
+              disabled={!selectedFile || (postType === "normal" && !title.trim()) || isUploading || !turnstileToken}
               sx={{
                 borderRadius: "999px",
                 px: 3

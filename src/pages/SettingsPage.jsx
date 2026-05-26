@@ -1,0 +1,73 @@
+import { Card, Option, Select, Stack, Switch, Typography } from "@mui/joy";
+import { usePreferences } from "../context/PreferencesContext";
+
+export default function SettingsPage() {
+  const { preferences, updatePreference } = usePreferences();
+
+  return (
+    <div className="page-shell">
+      <Stack spacing={3}>
+        <Typography level="h1" sx={{ letterSpacing: "-0.06em", fontSize: { xs: "2rem", md: "2.6rem" } }}>
+          Settings
+        </Typography>
+
+        <Card variant="outlined" className="content-card settings-card">
+          <Stack spacing={2}>
+            <Typography level="title-lg">Appearance</Typography>
+            <Select
+              value={preferences.theme}
+              onChange={(_, value) => updatePreference("theme", value || "default")}
+              placeholder="Theme"
+              sx={{ borderRadius: "16px" }}
+            >
+              <Option value="default">Default</Option>
+              <Option value="dark">Dark</Option>
+            </Select>
+            <label className="settings-toggle-row">
+              <span>Compact mode</span>
+              <Switch checked={preferences.compactMode} onChange={(event) => updatePreference("compactMode", event.target.checked)} />
+            </label>
+            <label className="settings-toggle-row">
+              <span>Reduce animations</span>
+              <Switch checked={preferences.reduceMotion} onChange={(event) => updatePreference("reduceMotion", event.target.checked)} />
+            </label>
+          </Stack>
+        </Card>
+
+        <Card variant="outlined" className="content-card settings-card">
+          <Stack spacing={2}>
+            <Typography level="title-lg">Feed</Typography>
+            <Select
+              value={preferences.defaultFeedPostType}
+              onChange={(_, value) => updatePreference("defaultFeedPostType", value || "all")}
+              placeholder="Default feed filter"
+              sx={{ borderRadius: "16px" }}
+            >
+              <Option value="all">All Posts</Option>
+              <Option value="normal">Normal Posts</Option>
+              <Option value="image-only">Image-Only Posts</Option>
+            </Select>
+          </Stack>
+        </Card>
+
+        <Card variant="outlined" className="content-card settings-card">
+          <Stack spacing={2}>
+            <Typography level="title-lg">Accessibility</Typography>
+            <label className="settings-toggle-row">
+              <span>Reduce motion</span>
+              <Switch checked={preferences.reduceMotion} onChange={(event) => updatePreference("reduceMotion", event.target.checked)} />
+            </label>
+            <label className="settings-toggle-row">
+              <span>Larger text</span>
+              <Switch checked={preferences.largerText} onChange={(event) => updatePreference("largerText", event.target.checked)} />
+            </label>
+            <label className="settings-toggle-row">
+              <span>High contrast</span>
+              <Switch checked={preferences.highContrast} onChange={(event) => updatePreference("highContrast", event.target.checked)} />
+            </label>
+          </Stack>
+        </Card>
+      </Stack>
+    </div>
+  );
+}

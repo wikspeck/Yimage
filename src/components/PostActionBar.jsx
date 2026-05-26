@@ -137,26 +137,26 @@ export default function PostActionBar({
     <Stack spacing={1.1} className="post-actions-shell">
       <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" flexWrap="wrap" className="post-actions-row">
         <Stack direction="row" spacing={0.6} alignItems="center" className="vote-cluster">
-          <div className="vote-pill-group">
-            <Button
-              size="sm"
-              variant="plain"
-              color="neutral"
-              onClick={() => (isLoggedIn ? onUpvote?.() : onRequireLogin?.())}
-              loading={isBusy}
-              className={getButtonClassName(isUpvoted, "social-action-button vote-primary-button")}
-              aria-label="Like"
-            >
-              <UpIcon />
-              <span>{score}</span>
-            </Button>
-          </div>
+          <Button
+            size="sm"
+            variant="plain"
+            color="neutral"
+            onClick={() => (isLoggedIn ? onUpvote?.() : onRequireLogin?.())}
+            loading={isBusy}
+            className={getButtonClassName(isUpvoted, "social-action-button vote-icon-button")}
+            aria-label="Like"
+          >
+            <UpIcon />
+          </Button>
+          <Typography level="title-sm" className={`vote-count${isUpvoted ? " is-active" : ""}`}>
+            {score}
+          </Typography>
           <Button
             size="sm"
             variant="plain"
             color="neutral"
             onClick={() => (isLoggedIn ? onDownvote?.() : onRequireLogin?.())}
-            className={getButtonClassName(isDownvoted, "social-action-button vote-secondary-button")}
+            className={getButtonClassName(isDownvoted, "social-action-button vote-icon-button")}
             aria-label="Unlike"
           >
             <DownIcon />
