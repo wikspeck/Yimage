@@ -572,6 +572,219 @@ a {
   margin-left: 112px;
 }
 
+/* Navigation and feed cleanup for the SVG-driven social layout */
+:root {
+  background: #000000;
+  --app-bg: #000000;
+  --panel: #090909;
+  --panel-strong: #111111;
+  --panel-soft: #141414;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --text-soft: rgba(255, 255, 255, 0.68);
+}
+
+body,
+.app-shell,
+.app-main {
+  background: #000000;
+}
+
+.content-card,
+.auth-card,
+.comment-card,
+.post-card,
+.post-media-frame,
+.cookie-banner-card {
+  background: #0a0a0a !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.content-card,
+.auth-card,
+.post-card {
+  border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.top-brand-bar {
+  padding: 12px 0 14px;
+  border: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0;
+  background: #000000;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.brand-title {
+  color: #ffffff;
+}
+
+.brand-subtitle {
+  display: none;
+}
+
+.app-nav-panel {
+  gap: 8px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 0;
+  background: #000000;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.nav-item-inner {
+  border-radius: 18px;
+  transition: transform 180ms ease, background-color 180ms ease;
+}
+
+.nav-item:hover .nav-item-inner {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nav-item.is-active .nav-item-inner {
+  background: transparent;
+  box-shadow: none;
+}
+
+.nav-icon-shell {
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  background: transparent;
+}
+
+.nav-item:hover .nav-icon-shell,
+.nav-item.is-active:hover .nav-icon-shell {
+  background: transparent;
+  transform: scale(1.02);
+}
+
+.nav-icon-image {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+}
+
+.nav-item-label {
+  color: #ffffff;
+}
+
+.nav-divider {
+  width: 100%;
+  height: 1px;
+  margin: 8px 0 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nav-compose-button {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  min-height: 44px;
+  padding: 0 14px;
+  background: #ffffff;
+  color: #000000;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 180ms ease, background-color 180ms ease;
+}
+
+.nav-compose-button:hover {
+  transform: translateY(-1px);
+  background: #d9d9d9;
+}
+
+.feed-hero-card::before {
+  display: none;
+}
+
+.feed-hero-kicker {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.feed-divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.discover-mode-row {
+  align-items: stretch;
+}
+
+.discover-mode-pill {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0d0d0d;
+  border-radius: 20px;
+  padding: 14px 16px;
+  color: #ffffff;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease;
+}
+
+.discover-mode-pill:hover {
+  background: #151515;
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.discover-mode-pill.is-active {
+  background: #1b1b1b;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.discover-mode-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.discover-mode-copy {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.feed-search-input,
+.feed-filter-select,
+.post-preview-media,
+.post-preview-canvas {
+  background: #050505 !important;
+}
+
+.post-card:hover {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.icon-button:hover,
+.download-button:hover,
+.post-tag-chip-clickable:hover,
+.inline-follow-button:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: none !important;
+}
+
+.icon-button-active {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
+}
+
 @media (max-width: 640px) {
   .page-shell,
   .auth-shell {
@@ -650,7 +863,6 @@ a {
 @media (max-width: 900px) {
   .top-brand-bar {
     margin: 12px 12px 0;
-    border-radius: 22px;
   }
 
   .app-main,
@@ -673,7 +885,7 @@ a {
     align-items: center;
     justify-content: space-between;
     padding: 10px;
-    border-radius: 26px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .nav-item {
@@ -687,6 +899,16 @@ a {
 
   .nav-item-label {
     font-size: 0.68rem;
+  }
+
+  .nav-divider {
+    display: none;
+  }
+
+  .nav-compose-button {
+    min-width: 72px;
+    min-height: 40px;
+    padding: 0 12px;
   }
 
   .page-shell {

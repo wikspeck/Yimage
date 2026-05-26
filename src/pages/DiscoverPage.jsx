@@ -7,6 +7,12 @@ import ShareDialog from "../components/ShareDialog";
 import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
 
+const DISCOVER_MODES = [
+  { key: "following", title: "Your Followers Only", description: "Posts from people you follow." },
+  { key: "hot", title: "Hot and New", description: "Newer posts with strong engagement." },
+  { key: "fresh", title: "Find Something New", description: "Recommended, random, and rising content." }
+];
+
 export default function DiscoverPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -21,12 +27,16 @@ export default function DiscoverPage() {
   const [sharePostId, setSharePostId] = useState("");
   const [searchText, setSearchText] = useState(searchParams.get("query") || searchParams.get("hashtag") || "");
   const selectedCategory = searchParams.get("category") || "";
+  const selectedView = searchParams.get("view") || "home";
+  const selectedMode = searchParams.get("mode") || (selectedView === "discover" ? "fresh" : "home");
 
   const activeFilters = useMemo(
     () => ({
       query: searchParams.get("query") || "",
       category: searchParams.get("category") || "",
-      hashtag: searchParams.get("hashtag") || ""
+      hashtag: searchParams.get("hashtag") || "",
+      view: searchParams.get("view") || "home",
+      mode: searchParams.get("mode") || (searchParams.get("view") === "discover" ? "fresh" : "home")
     }),
     [searchParams]
   );
@@ -98,6 +108,15 @@ export default function DiscoverPage() {
     });
 
     setSearchParams(params);
+  }
+
+  function activateDiscoverMode(mode) {
+    updateFilters({ view: "discover", mode });
+  }
+
+  function resetToHomeFeed() {
+    setSearchText("");
+    setSearchParams(new URLSearchParams());
   }
 
   async function handleVote(postId, vote) {
@@ -195,6 +214,12 @@ export default function DiscoverPage() {
     }
   }
 
+  const heroTitle = selectedView === "discover" ? "Discover" : "Home feed";
+  const heroBody = selectedView === "discover"
+    ? "Browse followed creators, hot posts, and discovery mode with topic/category sorting ready to expand later."
+    : "The main feed keeps the UI simple while still feeling social, fast, and clean.";
+  const visibleModes = selectedView === "discover" ? DISCOVER_MODES : [DISCOVER_MODES[2]];
+
   return (
     <Box className="page-shell">
       <Stack spacing={3}>
@@ -203,26 +228,47 @@ export default function DiscoverPage() {
             <Stack direction="row" justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2} flexWrap="wrap">
               <div>
                 <Typography level="body-sm" className="feed-hero-kicker">
-                  Your social canvas
+                  {selectedView === "discover" ? "Find your next scroll" : "Your social canvas"}
                 </Typography>
                 <Typography level="h1" sx={{ letterSpacing: "-0.07em", fontSize: { xs: "2.2rem", md: "3.1rem" }, lineHeight: 0.95 }}>
-                  Home feed
+                  {heroTitle}
                 </Typography>
                 <Typography level="body-md" textColor="neutral.300" sx={{ maxWidth: 620, mt: 1 }}>
-                  Discover bold visuals, creator threads, and fast-moving conversations in a cleaner, more immersive feed.
+                  {heroBody}
                 </Typography>
               </div>
 
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                <Button variant="solid" color="primary" onClick={() => navigate(user ? "/create" : "/login?next=/create")} sx={{ borderRadius: "999px" }}>
+                <Button variant="solid" color="neutral" onClick={() => navigate(user ? "/create" : "/login?next=/create")} sx={{ borderRadius: "999px" }}>
                   Create post
                 </Button>
-                {!user ? (
+                {selectedView === "discover" ? (
+                  <Button variant="plain" color="neutral" onClick={resetToHomeFeed} sx={{ borderRadius: "999px" }}>
+                    Home
+                  </Button>
+                ) : null}
+                {!user && selectedView !== "discover" ? (
                   <Button variant="soft" color="neutral" onClick={() => navigate("/signup")} sx={{ borderRadius: "999px" }}>
                     Create account
                   </Button>
                 ) : null}
               </Stack>
+            </Stack>
+
+            <div className="feed-divider" />
+
+            <Stack direction={{ xs: "column", md: "row" }} spacing={1} className="discover-mode-row">
+              {visibleModes.map((mode) => (
+                <button
+                  key={mode.key}
+                  type="button"
+                  className={`discover-mode-pill${selectedMode === mode.key ? " is-active" : ""}`}
+                  onClick={() => activateDiscoverMode(mode.key)}
+                >
+                  <span className="discover-mode-title">{mode.title}</span>
+                  <span className="discover-mode-copy">{mode.description}</span>
+                </button>
+              ))}
             </Stack>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
@@ -249,8 +295,15 @@ export default function DiscoverPage() {
               </Select>
               <Button
                 variant="solid"
-                color="primary"
-                onClick={() => updateFilters({ query: searchText, hashtag: "" })}
+                color="neutral"
+                onClick={() =>
+                  updateFilters({
+                    query: searchText,
+                    hashtag: "",
+                    view: selectedView === "discover" ? "discover" : "home",
+                    mode: selectedView === "discover" ? selectedMode : "home"
+                  })
+                }
                 sx={{ borderRadius: "999px" }}
               >
                 Search

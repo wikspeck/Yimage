@@ -1105,12 +1105,57 @@ async function listPosts(env, userId, options = {}) {
   const creatorQuery = searchQuery.replace(/^@+/, "");
   const category = normalizeText(options.category).toLowerCase();
   const hashtag = normalizeHashtag(options.hashtag);
+  const view = normalizeText(options.view).toLowerCase();
+  const mode = normalizeText(options.mode).toLowerCase();
   const includeModerated = Boolean(options.includeModerated);
   const conditions = [];
   const bindings = [];
+  let orderClause = "ORDER BY COALESCE(posts.repost_count, 0) DESC, COALESCE(posts.score, COALESCE(posts.like_count, 0)) DESC, posts.created_at DESC, posts.id DESC";
 
   if (!includeModerated) {
     conditions.push("COALESCE(posts.moderation_status, 'active') NOT IN ('under_review', 'hidden', 'removed')");
+  }
+
+  if (view === "discover") {
+    if (mode === "following") {
+      if (!userId) {
+        throw new Error("Log in to use the followers-only feed.");
+      }
+      conditions.push(
+        `EXISTS (
+          SELECT 1
+          FROM follows
+          WHERE follows.follower_id = ?
+            AND follows.following_id = posts.author_id
+        )`
+      );
+      bindings.push(userId);
+      orderClause = "ORDER BY posts.created_at DESC, posts.id DESC";
+    } else if (mode === "hot") {
+      conditions.push("posts.created_at >= datetime('now', '-14 days')");
+      orderClause = `
+        ORDER BY
+          (
+            COALESCE(posts.repost_count, 0) * 4
+            + COALESCE(posts.comments_count, 0) * 3
+            + COALESCE(posts.score, COALESCE(posts.like_count, 0)) * 2
+          ) DESC,
+          posts.created_at DESC,
+          posts.id DESC
+      `;
+    } else {
+      if (userId) {
+        conditions.push(
+          `posts.author_id NOT IN (
+            SELECT follows.following_id
+            FROM follows
+            WHERE follows.follower_id = ?
+          )`
+        );
+        bindings.push(userId);
+      }
+      orderClause = "ORDER BY posts.created_at DESC, RANDOM()";
+    }
   }
 
   if (searchQuery) {
@@ -1184,7 +1229,7 @@ async function listPosts(env, userId, options = {}) {
       INNER JOIN users ON users.id = posts.author_id
       LEFT JOIN categories ON categories.id = posts.category_id
       ${whereClause}
-      ORDER BY COALESCE(posts.repost_count, 0) DESC, COALESCE(posts.score, COALESCE(posts.like_count, 0)) DESC, posts.created_at DESC, posts.id DESC
+      ${orderClause}
       LIMIT 50
     `
   )
@@ -1610,7 +1655,9 @@ async function handleListPosts(request, env) {
   const posts = await listPosts(env, user?.id, {
     query: url.searchParams.get("query") || "",
     category: url.searchParams.get("category") || "",
-    hashtag: url.searchParams.get("hashtag") || ""
+    hashtag: url.searchParams.get("hashtag") || "",
+    view: url.searchParams.get("view") || "",
+    mode: url.searchParams.get("mode") || ""
   });
   return success({ posts });
 }

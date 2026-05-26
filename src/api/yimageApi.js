@@ -63,6 +63,8 @@ export async function getPosts(options = {}) {
   if (options.query) params.set("query", options.query);
   if (options.category) params.set("category", options.category);
   if (options.hashtag) params.set("hashtag", options.hashtag);
+  if (options.view) params.set("view", options.view);
+  if (options.mode) params.set("mode", options.mode);
   const query = params.toString();
   const data = await request(`/api/posts${query ? `?${query}` : ""}`);
   return data.posts;
