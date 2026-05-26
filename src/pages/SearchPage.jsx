@@ -7,13 +7,7 @@ import ShareDialog from "../components/ShareDialog";
 import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
 
-const DISCOVER_MODES = [
-  { key: "following", title: "Your Followers Only" },
-  { key: "hot", title: "Hot and New" },
-  { key: "fresh", title: "Find Something New" }
-];
-
-export default function DiscoverPage() {
+export default function SearchPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -27,16 +21,12 @@ export default function DiscoverPage() {
   const [sharePostId, setSharePostId] = useState("");
   const [searchText, setSearchText] = useState(searchParams.get("query") || searchParams.get("hashtag") || "");
   const selectedCategory = searchParams.get("category") || "";
-  const selectedView = searchParams.get("view") || "home";
-  const selectedMode = searchParams.get("mode") || (selectedView === "discover" ? "fresh" : "home");
 
   const activeFilters = useMemo(
     () => ({
       query: searchParams.get("query") || "",
       category: searchParams.get("category") || "",
-      hashtag: searchParams.get("hashtag") || "",
-      view: searchParams.get("view") || "home",
-      mode: searchParams.get("mode") || (searchParams.get("view") === "discover" ? "fresh" : "home")
+      hashtag: searchParams.get("hashtag") || ""
     }),
     [searchParams]
   );
@@ -108,15 +98,6 @@ export default function DiscoverPage() {
     });
 
     setSearchParams(params);
-  }
-
-  function activateDiscoverMode(mode) {
-    updateFilters({ view: "discover", mode });
-  }
-
-  function resetToHomeFeed() {
-    setSearchText("");
-    setSearchParams(new URLSearchParams());
   }
 
   async function handleVote(postId, vote) {
@@ -214,69 +195,38 @@ export default function DiscoverPage() {
     }
   }
 
-  const heroTitle = selectedView === "discover" ? "Discover" : "Home feed";
-  const visibleModes = selectedView === "discover" ? DISCOVER_MODES : [DISCOVER_MODES[2]];
-
   return (
     <Box className="page-shell">
       <Stack spacing={3}>
         <Card variant="outlined" className="content-card feed-hero-card">
           <Stack spacing={2}>
             <Stack direction="row" justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2} flexWrap="wrap">
-              <div>
-                <Typography level="h1" sx={{ letterSpacing: "-0.07em", fontSize: { xs: "2.2rem", md: "3.1rem" }, lineHeight: 0.95 }}>
-                  {heroTitle}
-                </Typography>
-              </div>
-
-              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                <Button variant="solid" color="neutral" onClick={() => navigate(user ? "/create" : "/login?next=/create")} sx={{ borderRadius: "999px" }}>
-                  Create post
-                </Button>
-                {selectedView === "discover" ? (
-                  <Button variant="plain" color="neutral" onClick={resetToHomeFeed} sx={{ borderRadius: "999px" }}>
-                    Home
-                  </Button>
-                ) : null}
-                {!user && selectedView !== "discover" ? (
-                  <Button variant="soft" color="neutral" onClick={() => navigate("/signup")} sx={{ borderRadius: "999px" }}>
-                    Create account
-                  </Button>
-                ) : null}
-              </Stack>
+              <Typography level="h1" sx={{ letterSpacing: "-0.07em", fontSize: { xs: "2.1rem", md: "2.8rem" }, lineHeight: 0.95 }}>
+                Search
+              </Typography>
+              <Button variant="solid" color="neutral" onClick={() => navigate(user ? "/create" : "/login?next=/create")} sx={{ borderRadius: "999px" }}>
+                Create post
+              </Button>
             </Stack>
 
             <div className="feed-divider" />
-
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1} className="discover-mode-row">
-              {visibleModes.map((mode) => (
-                <button
-                  key={mode.key}
-                  type="button"
-                  className={`discover-mode-pill${selectedMode === mode.key ? " is-active" : ""}`}
-                  onClick={() => activateDiscoverMode(mode.key)}
-                >
-                  <span className="discover-mode-title">{mode.title}</span>
-                </button>
-              ))}
-            </Stack>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
               <Input
                 value={searchText}
                 onChange={(event) => setSearchText(event.target.value)}
-                placeholder="Search posts, creators, hashtags"
+                placeholder="Search posts, users, categories"
                 className="feed-search-input"
                 sx={{ flex: 1, borderRadius: "999px" }}
               />
               <Select
                 value={selectedCategory}
                 onChange={(_, value) => updateFilters({ category: value || "" })}
-                placeholder="All categories"
+                placeholder="Categories"
                 className="feed-filter-select"
                 sx={{ minWidth: { xs: "100%", md: 180 }, borderRadius: "16px" }}
               >
-                <Option value="">All categories</Option>
+                <Option value="">Categories</Option>
                 {categories.map((category) => (
                   <Option key={category.id} value={category.slug}>
                     {category.label}
@@ -286,14 +236,7 @@ export default function DiscoverPage() {
               <Button
                 variant="solid"
                 color="neutral"
-                onClick={() =>
-                  updateFilters({
-                    query: searchText,
-                    hashtag: "",
-                    view: selectedView === "discover" ? "discover" : "home",
-                    mode: selectedView === "discover" ? selectedMode : "home"
-                  })
-                }
+                onClick={() => updateFilters({ query: searchText, hashtag: "" })}
                 sx={{ borderRadius: "999px" }}
               >
                 Search
@@ -317,7 +260,7 @@ export default function DiscoverPage() {
         {!isLoadingPosts && !posts.length ? (
           <Card variant="outlined" className="content-card">
             <Typography level="body-md" textColor="neutral.400">
-              No posts matched those filters.
+              No results.
             </Typography>
           </Card>
         ) : null}

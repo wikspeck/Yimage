@@ -32,7 +32,7 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onDiscover
   const params = new URLSearchParams(location.search);
 
   const isDiscover = location.pathname === "/" && params.get("view") === "discover";
-  const isSearch = location.pathname === "/" && Boolean(params.get("query") || params.get("category") || params.get("hashtag"));
+  const isSearch = location.pathname === "/search";
   const isHome = location.pathname === "/" && !isDiscover && !isSearch;
   const isProfile = location.pathname === "/profile" || location.pathname.startsWith("/u/");
   const isCreate = location.pathname.startsWith("/create");

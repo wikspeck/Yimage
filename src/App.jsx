@@ -9,6 +9,7 @@ import DiscoverPage from "./pages/DiscoverPage";
 import LoginPage from "./pages/LoginPage";
 import PostPage from "./pages/PostPage";
 import ProfilePage from "./pages/ProfilePage";
+import SearchPage from "./pages/SearchPage";
 import SignupPage from "./pages/SignupPage";
 import ModerationPage from "./pages/ModerationPage";
 import CommunityGuidelinesPage from "./pages/CommunityGuidelinesPage";
@@ -54,7 +55,7 @@ function AppLayout() {
       onOpenSignup={() => navigate("/signup")}
       onCreate={() => navigate("/create")}
       onDiscover={() => navigate("/")}
-      onSearch={() => navigate("/?view=discover")}
+      onSearch={() => navigate("/search")}
       onProfile={() => navigate(user ? `/u/${user.username}` : "/login")}
     />
   );
@@ -70,6 +71,7 @@ function AppRoutes() {
             <Routes>
               <Route path="/" element={<DiscoverPage />} />
               <Route path="/discover" element={<Navigate to="/" replace />} />
+              <Route path="/search" element={<SearchPage />} />
               <Route
                 path="/create"
                 element={

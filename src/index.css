@@ -759,6 +759,32 @@ body,
   color: rgba(255, 255, 255, 0.68);
 }
 
+.vote-pill-group {
+  display: inline-flex;
+  align-items: center;
+}
+
+.vote-primary-button {
+  min-width: 74px !important;
+  justify-content: center !important;
+}
+
+.vote-secondary-button {
+  min-width: 42px !important;
+}
+
+.repost-button.icon-button-active {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-color: #ffffff !important;
+}
+
+.repost-button.icon-button-active .action-icon-wrap,
+.repost-button.icon-button-active .action-icon-boxed,
+.repost-button.icon-button-active span {
+  color: #000000 !important;
+}
+
 .feed-search-input,
 .feed-filter-select,
 .post-preview-media,
@@ -834,6 +860,11 @@ body,
     justify-content: center;
     gap: 8px;
     flex-wrap: wrap;
+  }
+
+  .vote-pill-group {
+    flex: 1 1 auto;
+    justify-content: center;
   }
 
   .post-stats-row {
