@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Box, Button, Card, CircularProgress, Input, Option, Select, Stack, Typography } from "@mui/joy";
+import { Alert, Box, Card, CircularProgress, Option, Select, Stack, Typography } from "@mui/joy";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { deletePost, getCategories, getPosts, repostPost, toggleFollow, voteOnPost } from "../api/yimageApi";
 import PostCard from "../components/PostCard";
@@ -242,18 +242,10 @@ export default function DiscoverPage() {
               </Typography>
 
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                <Button variant="solid" color="neutral" onClick={() => navigate(user ? "/create" : "/login?next=/create")} sx={{ borderRadius: "999px" }}>
-                  Create post
-                </Button>
                 {selectedView === "discover" ? (
-                  <Button variant="plain" color="neutral" onClick={resetToHomeFeed} sx={{ borderRadius: "999px" }}>
-                    Home
-                  </Button>
-                ) : null}
-                {!user && selectedView !== "discover" ? (
-                  <Button variant="soft" color="neutral" onClick={() => navigate("/signup")} sx={{ borderRadius: "999px" }}>
-                    Create account
-                  </Button>
+                  <button type="button" className="discover-mode-pill search-filter-pill" onClick={resetToHomeFeed}>
+                    <span className="discover-mode-title">Home</span>
+                  </button>
                 ) : null}
               </Stack>
             </Stack>

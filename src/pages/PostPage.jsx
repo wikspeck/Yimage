@@ -57,6 +57,7 @@ export default function PostPage() {
   const [moderationReview, setModerationReview] = useState(null);
   const [appealMessage, setAppealMessage] = useState("");
   const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -87,6 +88,10 @@ export default function PostPage() {
     return () => {
       isMounted = false;
     };
+  }, [postId]);
+
+  useEffect(() => {
+    setActiveImageIndex(0);
   }, [postId]);
 
   async function handleVote(vote) {
@@ -270,6 +275,13 @@ export default function PostPage() {
     return null;
   }
 
+  const images = Array.isArray(post.images) && post.images.length
+    ? post.images
+    : post.imageUrl
+      ? [{ url: post.imageUrl, key: post.imageKey || post.id }]
+      : [];
+  const activeImage = images[Math.min(activeImageIndex, Math.max(images.length - 1, 0))];
+
   return (
     <div className="page-shell page-shell-wide">
       <Stack spacing={3}>
@@ -280,13 +292,32 @@ export default function PostPage() {
         <div className="post-detail-layout">
           <Card variant="outlined" className="content-card post-detail-media-card">
             <Stack spacing={2}>
-              <AspectRatio
-                ratio="4/5"
-                className="viewer-frame"
-                sx={{ borderRadius: "20px", overflow: "hidden", bgcolor: "#050505" }}
-              >
-                <img src={post.imageUrl} alt={post.title} style={{ objectFit: "contain" }} />
-              </AspectRatio>
+              {activeImage ? (
+                <Stack spacing={1} sx={{ position: "relative" }}>
+                  <AspectRatio
+                    ratio={post.postType === "image-only" ? "4/5" : "16/11"}
+                    className="viewer-frame"
+                    sx={{ borderRadius: "20px", overflow: "hidden", bgcolor: "#050505" }}
+                  >
+                    <img src={activeImage.url} alt={post.title || `${post.authorUsername} post`} style={{ objectFit: "contain" }} />
+                  </AspectRatio>
+                  {images.length > 1 ? (
+                    <div className="post-detail-carousel-controls">
+                      <button type="button" className="post-carousel-arrow is-left" onClick={() => setActiveImageIndex((current) => (current === 0 ? images.length - 1 : current - 1))} aria-label="Previous image">
+                        ‹
+                      </button>
+                      <button type="button" className="post-carousel-arrow is-right" onClick={() => setActiveImageIndex((current) => (current === images.length - 1 ? 0 : current + 1))} aria-label="Next image">
+                        ›
+                      </button>
+                      <div className="post-carousel-dots" aria-hidden="true">
+                        {images.map((image, index) => (
+                          <span key={image.key || image.url || index} className={`post-carousel-dot${index === activeImageIndex ? " is-active" : ""}`} />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </Stack>
+              ) : null}
 
               <Stack spacing={1}>
                 {moderationReview ? (
@@ -294,9 +325,11 @@ export default function PostPage() {
                     {moderationReview.message}
                   </Alert>
                 ) : null}
-                <Typography level="h1" sx={{ letterSpacing: "-0.05em", fontSize: { xs: "1.8rem", md: "2.4rem" } }}>
-                  {post.title}
-                </Typography>
+                {post.title ? (
+                  <Typography level="h1" sx={{ letterSpacing: "-0.05em", fontSize: { xs: "1.8rem", md: "2.4rem" } }}>
+                    {post.title}
+                  </Typography>
+                ) : null}
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center" className="post-author-row">
                   <Typography level="body-sm" textColor="neutral.400">by</Typography>
                   <Link

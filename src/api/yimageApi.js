@@ -40,7 +40,7 @@ async function request(url, init = {}) {
   }
 }
 
-export async function createPost({ title, description, imageFile, categoryId = "", hashtags = "", turnstileToken = "", postType = "normal" }) {
+export async function createPost({ title, description, imageFiles = [], imageFile, categoryId = "", hashtags = "", turnstileToken = "", postType = "normal" }) {
   const formData = new FormData();
   formData.append("title", title);
   formData.append("description", description);
@@ -48,7 +48,13 @@ export async function createPost({ title, description, imageFile, categoryId = "
   formData.append("hashtags", hashtags);
   formData.append("turnstileToken", turnstileToken);
   formData.append("postType", postType);
-  formData.append("image", imageFile);
+  const files = imageFiles.length ? imageFiles : (imageFile ? [imageFile] : []);
+  files.forEach((file) => {
+    formData.append("images", file);
+  });
+  if (imageFile) {
+    formData.append("image", imageFile);
+  }
 
   const data = await request("/api/posts", {
     method: "POST",

@@ -196,9 +196,6 @@ export default function SearchPage() {
               <Typography level="h1" sx={{ letterSpacing: "-0.07em", fontSize: { xs: "2.1rem", md: "2.8rem" }, lineHeight: 0.95 }}>
                 Search
               </Typography>
-              <Button variant="solid" color="neutral" onClick={() => navigate(user ? "/create" : "/login?next=/create")} sx={{ borderRadius: "999px" }}>
-                Create post
-              </Button>
             </Stack>
 
             <div className="feed-divider" />

@@ -391,6 +391,18 @@ function toPostResponse(post, viewerVote = null, viewerHasReposted = false, repo
   const derivedPostType = normalizeText(post.postType).toLowerCase() === "image-only" || (!normalizeText(post.title) && !normalizeText(post.description))
     ? "image-only"
     : "normal";
+  const images = Array.isArray(post.images) && post.images.length
+    ? post.images
+    : post.imageKey
+      ? [
+          {
+            key: post.imageKey,
+            mimeType: post.imageMimeType,
+            url: `/api/image/${post.id}`
+          }
+        ]
+      : [];
+
   return {
     id: post.id,
     userId: post.userId,
@@ -399,6 +411,7 @@ function toPostResponse(post, viewerVote = null, viewerHasReposted = false, repo
     description: post.description || "",
     imageKey: post.imageKey,
     imageUrl: `/api/image/${post.id}`,
+    images,
     createdAt: post.createdAt,
     likeCount: Number(post.likeCount || 0),
     score: Number(post.score ?? (post.likeCount || 0)),
@@ -648,6 +661,44 @@ async function getPostHashtagsMap(env, postIds) {
     }
     result[row.postId].push(row.tag);
   }
+  return result;
+}
+
+async function getPostImagesMap(env, postIds) {
+  if (!postIds.length) {
+    return {};
+  }
+
+  const placeholders = postIds.map(() => "?").join(", ");
+  const rows = await env.DB.prepare(
+    `
+      SELECT
+        post_id AS postId,
+        image_key AS imageKey,
+        image_mime_type AS imageMimeType,
+        sort_order AS sortOrder
+      FROM post_images
+      WHERE post_id IN (${placeholders})
+      ORDER BY sort_order ASC, created_at ASC
+    `
+  )
+    .bind(...postIds)
+    .all();
+
+  const result = {};
+  for (const row of rows.results || []) {
+    if (!result[row.postId]) {
+      result[row.postId] = [];
+    }
+
+    result[row.postId].push({
+      key: row.imageKey,
+      mimeType: row.imageMimeType,
+      sortOrder: Number(row.sortOrder || 0),
+      url: row.imageKey ? `/api/image/${row.postId}?index=${Number(row.sortOrder || 0)}` : ""
+    });
+  }
+
   return result;
 }
 
@@ -1005,7 +1056,9 @@ async function getPostRecord(env, postId, includeModerated = false) {
   }
 
   const hashtagsByPost = await getPostHashtagsMap(env, [postId]);
+  const imagesByPost = await getPostImagesMap(env, [postId]);
   row.hashtags = hashtagsByPost[postId] || [];
+  row.images = imagesByPost[postId] || [];
   return row;
 }
 
@@ -1266,10 +1319,12 @@ async function listPosts(env, userId, options = {}) {
   const votesByPost = await getViewerVoteMap(env, userId, postIds);
   const repostsByPost = await getViewerRepostMap(env, userId, postIds);
   const hashtagsByPost = await getPostHashtagsMap(env, postIds);
+  const imagesByPost = await getPostImagesMap(env, postIds);
   const repostsRemainingToday = await getRepostsRemainingToday(env, userId);
 
   return posts.map((post) => {
     post.hashtags = hashtagsByPost[post.id] || [];
+    post.images = imagesByPost[post.id] || [];
     return toPostResponse(post, votesByPost[post.id] || null, repostsByPost[post.id], repostsRemainingToday);
   });
 }
@@ -1636,7 +1691,9 @@ async function handleCreatePost(request, env) {
   const description = normalizeText(formData.get("description"));
   const categoryId = normalizeText(formData.get("categoryId"));
   const hashtags = parseHashtags(formData.get("hashtags"));
-  const image = formData.get("image");
+  const uploadedImages = formData.getAll("images").filter((item) => item instanceof File);
+  const legacyImage = formData.get("image");
+  const images = uploadedImages.length ? uploadedImages : (legacyImage instanceof File ? [legacyImage] : []);
   const finalTitle = postType === "image-only" ? "" : title;
   const finalDescription = postType === "image-only" ? "" : description;
 
@@ -1649,11 +1706,27 @@ async function handleCreatePost(request, env) {
   if (finalDescription.length > MAX_DESCRIPTION_LENGTH) {
     return fail(`Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer.`);
   }
-  const imageValidationMessage = await validateUploadedImageFile(image, "Image");
-  if (imageValidationMessage) {
-    return fail(imageValidationMessage);
+  if (!images.length) {
+    return fail("Choose an image before uploading.");
   }
-  const imageBytes = new Uint8Array(await image.arrayBuffer());
+  if (postType === "image-only" && images.length > 1) {
+    return fail("Image-only posts support one image right now.");
+  }
+  if (postType === "normal" && images.length > 4) {
+    return fail("Normal posts support up to 4 images.");
+  }
+
+  const preparedImages = [];
+  for (const image of images) {
+    const imageValidationMessage = await validateUploadedImageFile(image, "Image");
+    if (imageValidationMessage) {
+      return fail(imageValidationMessage);
+    }
+    preparedImages.push({
+      file: image,
+      bytes: new Uint8Array(await image.arrayBuffer())
+    });
+  }
 
   let resolvedCategoryId = null;
   if (categoryId) {
@@ -1678,19 +1751,26 @@ async function handleCreatePost(request, env) {
     return fail("Could not create post id.", 500);
   }
 
-  const imageKey = getImageKey(postId, ALLOWED_IMAGE_TYPES[image.type]);
+  const primaryImage = preparedImages[0];
+  const primaryImageKey = getImageKey(postId, ALLOWED_IMAGE_TYPES[primaryImage.file.type]);
   const createdAt = toIsoDate();
 
-  await env.YIMAGE_BUCKET.put(imageKey, imageBytes, {
-    httpMetadata: {
-      contentType: image.type
-    }
-  });
+  for (let index = 0; index < preparedImages.length; index += 1) {
+    const currentImage = preparedImages[index];
+    const imageId = index === 0 ? postId : `${postId}-${index + 1}`;
+    const imageKey = getImageKey(imageId, ALLOWED_IMAGE_TYPES[currentImage.file.type]);
+    await env.YIMAGE_BUCKET.put(imageKey, currentImage.bytes, {
+      httpMetadata: {
+        contentType: currentImage.file.type
+      }
+    });
+    currentImage.imageKey = imageKey;
+  }
 
   const imageModeration = await runAiImageModeration(env, {
     postId,
-    imageBytes,
-    mimeType: image.type,
+    imageBytes: primaryImage.bytes,
+    mimeType: primaryImage.file.type,
     title: finalTitle,
     description: finalDescription
   });
@@ -1714,8 +1794,26 @@ async function handleCreatePost(request, env) {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, ?, ?)
     `
   )
-    .bind(postId, user.id, finalTitle, finalDescription, imageKey, image.type, createdAt, resolvedCategoryId, moderationStatus)
+    .bind(postId, user.id, finalTitle, finalDescription, primaryImageKey, primaryImage.file.type, createdAt, resolvedCategoryId, moderationStatus)
     .run();
+
+  for (let index = 0; index < preparedImages.length; index += 1) {
+    const currentImage = preparedImages[index];
+    await env.DB.prepare(
+      `
+        INSERT INTO post_images (
+          id,
+          post_id,
+          image_key,
+          image_mime_type,
+          sort_order,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?)
+      `
+    )
+      .bind(createId("postimg_"), postId, currentImage.imageKey, currentImage.file.type, index, createdAt)
+      .run();
+  }
 
   await syncPostHashtags(env, postId, hashtags);
   await runSafetyAssessment(env, {
@@ -2641,14 +2739,22 @@ async function handleImage(request, env, postId) {
     return fail("Image not found.", 404);
   }
 
-  const object = await env.YIMAGE_BUCKET.get(post.imageKey);
+  const url = new URL(request.url);
+  const requestedIndex = Number(url.searchParams.get("index") || 0);
+  const selectedImage = Array.isArray(post.images) && post.images[requestedIndex]
+    ? post.images[requestedIndex]
+    : null;
+  const imageKey = selectedImage?.key || post.imageKey;
+  const imageMimeType = selectedImage?.mimeType || post.imageMimeType;
+
+  const object = await env.YIMAGE_BUCKET.get(imageKey);
   if (!object) {
     return fail("Image not found.", 404);
   }
 
   return new Response(object.body, {
     headers: {
-      "Content-Type": post.imageMimeType || object.httpMetadata?.contentType || "application/octet-stream",
+      "Content-Type": imageMimeType || object.httpMetadata?.contentType || "application/octet-stream",
       "Cache-Control": "public, max-age=3600"
     }
   });

@@ -1,9 +1,24 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Avatar, Card, Link, Sheet, Stack, Typography } from "@mui/joy";
 import { Link as RouterLink } from "react-router-dom";
 import PostActionBar from "./PostActionBar";
 import ReportDialog from "./ReportDialog";
 import { formatRelativeTime } from "../utils/formatters";
+
+function getPostImages(post) {
+  if (Array.isArray(post.images) && post.images.length) {
+    return post.images;
+  }
+
+  return post.imageUrl
+    ? [
+        {
+          url: post.imageUrl,
+          key: post.imageKey || post.id
+        }
+      ]
+    : [];
+}
 
 export default function PostCard({
   post,
@@ -21,26 +36,39 @@ export default function PostCard({
   onRequireLogin
 }) {
   const [reportOpen, setReportOpen] = useState(false);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const images = useMemo(() => getPostImages(post), [post]);
+  const hasMedia = images.length > 0;
+  const isImageOnly = post.postType === "image-only";
+  const activeImage = hasMedia ? images[Math.min(activeImageIndex, images.length - 1)] : null;
+  const title = post.title?.trim();
+  const description = post.description?.trim();
+
+  function showPreviousImage(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    setActiveImageIndex((current) => (current === 0 ? images.length - 1 : current - 1));
+  }
+
+  function showNextImage(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    setActiveImageIndex((current) => (current === images.length - 1 ? 0 : current + 1));
+  }
 
   return (
     <>
-      <Card
-        variant="outlined"
-        className="post-card"
-        sx={{
-          p: { xs: 2, md: 2.5 }
-        }}
-      >
-        <Stack spacing={2}>
-          <Stack direction="row" justifyContent="space-between" spacing={1.5} alignItems="flex-start">
-            <Stack direction="row" spacing={1.25} alignItems="center" sx={{ minWidth: 0 }}>
+      <Card variant="outlined" className={`post-card ${isImageOnly ? "post-card-image-only" : "post-card-normal"}`}>
+        <Stack spacing={1.15}>
+          <Stack direction="row" justifyContent="space-between" spacing={1.25} alignItems="flex-start">
+            <Stack direction="row" spacing={1.1} alignItems="center" sx={{ minWidth: 0 }}>
               <Avatar
                 src={post.authorProfile?.avatarUrl || ""}
                 alt={post.authorUsername}
                 sx={{
-                  width: 44,
-                  height: 44,
-                  bgcolor: "rgba(111, 92, 255, 0.22)",
+                  width: 38,
+                  height: 38,
+                  bgcolor: "rgba(255, 255, 255, 0.1)",
                   color: "#f4f7ff",
                   fontWeight: 700
                 }}
@@ -48,14 +76,14 @@ export default function PostCard({
                 {(post.authorUsername || "Y").slice(0, 1).toUpperCase()}
               </Avatar>
               <Stack spacing={0.15} sx={{ minWidth: 0 }}>
-                <Stack direction="row" spacing={0.9} alignItems="center" flexWrap="wrap">
-                  <Typography level="title-md" sx={{ cursor: onAuthorClick ? "pointer" : "default" }} onClick={onAuthorClick}>
+                <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap">
+                  <Typography level="title-sm" sx={{ cursor: onAuthorClick ? "pointer" : "default" }} onClick={onAuthorClick}>
                     {post.authorProfile?.displayName || post.authorUsername}
                   </Typography>
-                  <Typography level="body-sm" textColor="neutral.500">
+                  <Typography level="body-xs" textColor="neutral.500">
                     @{post.authorUsername}
                   </Typography>
-                  <Typography level="body-sm" textColor="neutral.500">
+                  <Typography level="body-xs" textColor="neutral.500">
                     {formatRelativeTime(post.createdAt)}
                   </Typography>
                 </Stack>
@@ -75,37 +103,63 @@ export default function PostCard({
             </Typography>
           </Stack>
 
-          <Sheet
-            className="post-media-frame"
-            sx={{
-              overflow: "hidden"
-            }}
-          >
+          {title ? (
             <Link component={RouterLink} to={`/${post.id}`} underline="none" color="neutral">
-              <div className="post-preview-media">
-                <div className="post-preview-canvas">
-                  <img src={post.imageUrl} alt={post.title} className="post-preview-image" />
-                </div>
-              </div>
+              <Typography level={isImageOnly ? "title-md" : "title-lg"} className="post-title">
+                {title}
+              </Typography>
             </Link>
-          </Sheet>
+          ) : null}
 
-          <Stack spacing={1}>
-            <Stack direction="row" justifyContent="space-between" spacing={1.5}>
-              <Link component={RouterLink} to={`/${post.id}`} underline="none" color="neutral">
-                <Typography level="title-lg" sx={{ letterSpacing: "-0.03em" }}>{post.title}</Typography>
+          {hasMedia ? (
+            <Sheet className={`post-media-frame ${isImageOnly ? "is-image-only" : "is-normal"}`} sx={{ overflow: "hidden" }}>
+              <Link component={RouterLink} to={`/${post.id}`} underline="none" color="neutral" className="post-media-link">
+                <div className={`post-preview-media ${isImageOnly ? "is-image-only" : "is-normal"}`}>
+                  <div className={`post-preview-canvas ${isImageOnly ? "is-image-only" : "is-normal"}`}>
+                    <img
+                      key={activeImage?.url}
+                      src={activeImage?.url}
+                      alt={title || `${post.authorUsername} post`}
+                      className="post-preview-image"
+                    />
+                  </div>
+                </div>
               </Link>
-            </Stack>
-            <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
+              {images.length > 1 ? (
+                <>
+                  <button type="button" className="post-carousel-arrow is-left" onClick={showPreviousImage} aria-label="Previous image">
+                    ‹
+                  </button>
+                  <button type="button" className="post-carousel-arrow is-right" onClick={showNextImage} aria-label="Next image">
+                    ›
+                  </button>
+                  <div className="post-carousel-dots" aria-hidden="true">
+                    {images.map((image, index) => (
+                      <span key={image.key || image.url || index} className={`post-carousel-dot${index === activeImageIndex ? " is-active" : ""}`} />
+                    ))}
+                  </div>
+                </>
+              ) : null}
+            </Sheet>
+          ) : null}
+
+          {description ? (
+            <Typography level="body-sm" textColor="neutral.300" className="post-description">
+              {description.length > 180 ? `${description.slice(0, 180)}...` : description}
+            </Typography>
+          ) : null}
+
+          {(post.category || (post.hashtags || []).length) ? (
+            <Stack direction="row" spacing={0.6} useFlexGap flexWrap="wrap">
               {post.category ? (
-                <Typography level="body-sm" className="post-tag-chip">
+                <Typography level="body-xs" className="post-tag-chip">
                   {post.category.label}
                 </Typography>
               ) : null}
               {(post.hashtags || []).map((tag) => (
                 <Typography
                   key={tag}
-                  level="body-sm"
+                  level="body-xs"
                   className="post-tag-chip post-tag-chip-clickable"
                   onClick={() => onHashtagClick?.(tag)}
                 >
@@ -113,12 +167,7 @@ export default function PostCard({
                 </Typography>
               ))}
             </Stack>
-            {post.description ? (
-              <Typography level="body-md" textColor="neutral.300" sx={{ lineHeight: 1.65 }}>
-                {post.description.length > 140 ? `${post.description.slice(0, 140)}...` : post.description}
-              </Typography>
-            ) : null}
-          </Stack>
+          ) : null}
 
           <PostActionBar
             post={post}

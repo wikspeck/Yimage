@@ -10,11 +10,11 @@ export default function UploadBox({ onPostCreated }) {
   const [postType, setPostType] = useState("normal");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [categories, setCategories] = useState([]);
   const [categoryId, setCategoryId] = useState("");
   const [hashtags, setHashtags] = useState("");
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewUrls, setPreviewUrls] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -27,18 +27,18 @@ export default function UploadBox({ onPostCreated }) {
   const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
 
   useEffect(() => {
-    if (!selectedFile) {
-      setPreviewUrl("");
+    if (!selectedFiles.length) {
+      setPreviewUrls([]);
       return undefined;
     }
 
-    const nextUrl = URL.createObjectURL(selectedFile);
-    setPreviewUrl(nextUrl);
+    const nextUrls = selectedFiles.map((file) => URL.createObjectURL(file));
+    setPreviewUrls(nextUrls);
 
     return () => {
-      URL.revokeObjectURL(nextUrl);
+      nextUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [selectedFile]);
+  }, [selectedFiles]);
 
   useEffect(() => {
     let isMounted = true;
@@ -63,28 +63,42 @@ export default function UploadBox({ onPostCreated }) {
     };
   }, []);
 
+  useEffect(() => {
+    setSelectedFiles((current) => (postType === "image-only" ? current.slice(0, 1) : current));
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
+  }, [postType]);
+
   function resetMessages() {
     setErrorMessage("");
     setSuccessMessage("");
     setAppealNotice("");
   }
 
-  function handleFileSelection(file) {
+  function handleFileSelection(fileList) {
     resetMessages();
-    const validation = validateImageFile(file);
+    const nextFiles = Array.from(fileList || []).filter(Boolean);
 
-    if (!validation.valid) {
-      setSelectedFile(null);
-      setErrorMessage(validation.message);
+    if (!nextFiles.length) {
       return;
     }
 
-    setSelectedFile(file);
+    const limitedFiles = (postType === "image-only" ? nextFiles.slice(0, 1) : nextFiles.slice(0, 4));
+    for (const file of limitedFiles) {
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        setSelectedFiles([]);
+        setErrorMessage(validation.message);
+        return;
+      }
+    }
+
+    setSelectedFiles(limitedFiles);
   }
 
   function handleInputChange(event) {
-    const [file] = event.target.files || [];
-    handleFileSelection(file);
+    handleFileSelection(event.target.files || []);
   }
 
   function handleDragOver(event) {
@@ -100,8 +114,7 @@ export default function UploadBox({ onPostCreated }) {
   function handleDrop(event) {
     event.preventDefault();
     setIsDragging(false);
-    const [file] = event.dataTransfer.files || [];
-    handleFileSelection(file);
+    handleFileSelection(event.dataTransfer.files || []);
   }
 
   function handleOpenPicker() {
@@ -109,7 +122,7 @@ export default function UploadBox({ onPostCreated }) {
   }
 
   function handleRemove() {
-    setSelectedFile(null);
+    setSelectedFiles([]);
     resetMessages();
     if (inputRef.current) {
       inputRef.current.value = "";
@@ -130,7 +143,7 @@ export default function UploadBox({ onPostCreated }) {
       return;
     }
 
-    if (!selectedFile) {
+    if (!selectedFiles.length) {
       setErrorMessage("Choose an image before uploading.");
       return;
     }
@@ -145,7 +158,8 @@ export default function UploadBox({ onPostCreated }) {
         categoryId,
         hashtags,
         turnstileToken,
-        imageFile: selectedFile,
+        imageFiles: selectedFiles,
+        imageFile: selectedFiles[0],
         postType
       });
 
@@ -201,11 +215,9 @@ export default function UploadBox({ onPostCreated }) {
         }}
       >
         <Stack spacing={2.5}>
-          <Stack spacing={1}>
-            <Typography level="h2" sx={{ letterSpacing: "-0.05em", fontSize: { xs: "2rem", md: "2.6rem" } }}>
-              Publish a new post
-            </Typography>
-          </Stack>
+          <Typography level="h2" sx={{ letterSpacing: "-0.05em", fontSize: { xs: "2rem", md: "2.6rem" } }}>
+            New post
+          </Typography>
 
           <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
             <button
@@ -231,28 +243,21 @@ export default function UploadBox({ onPostCreated }) {
                   placeholder="Title"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
-                  slotProps={{
-                    input: {
-                      maxLength: 120
-                    }
-                  }}
+                  slotProps={{ input: { maxLength: 120 } }}
                   sx={{ borderRadius: "18px", minHeight: 48 }}
                 />
                 <Textarea
                   placeholder="Description"
                   value={description}
                   onChange={(event) => setDescription(event.target.value)}
-                  minRows={4}
-                  maxRows={8}
-                  slotProps={{
-                    textarea: {
-                      maxLength: 1000
-                    }
-                  }}
+                  minRows={3}
+                  maxRows={7}
+                  slotProps={{ textarea: { maxLength: 1000 } }}
                   sx={{ borderRadius: "18px" }}
                 />
               </>
             ) : null}
+
             <Select
               value={categoryId}
               onChange={(_, nextValue) => setCategoryId(nextValue || "")}
@@ -267,7 +272,7 @@ export default function UploadBox({ onPostCreated }) {
               ))}
             </Select>
             <Input
-              placeholder="Hashtags (example: art sunset city)"
+              placeholder="Hashtags"
               value={hashtags}
               onChange={(event) => setHashtags(event.target.value)}
               sx={{ borderRadius: "18px", minHeight: 48 }}
@@ -294,6 +299,7 @@ export default function UploadBox({ onPostCreated }) {
               ref={inputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple={postType === "normal"}
               onChange={handleInputChange}
               style={{ display: "none" }}
             />
@@ -314,10 +320,10 @@ export default function UploadBox({ onPostCreated }) {
                 +
               </Box>
               <Typography level="title-md">
-                {selectedFile ? "Image selected" : "Drop your image here"}
+                {selectedFiles.length ? `${selectedFiles.length} image${selectedFiles.length > 1 ? "s" : ""} selected` : "Drop image here"}
               </Typography>
               <Typography level="body-sm" textColor="neutral.400">
-                JPG, PNG, WEBP, GIF. Up to 10 MB.
+                {postType === "normal" ? "Up to 4 images." : "Single image."}
               </Typography>
               <Button
                 type="button"
@@ -334,10 +340,10 @@ export default function UploadBox({ onPostCreated }) {
             </Stack>
           </Sheet>
 
-          {selectedFile ? (
+          {selectedFiles.length ? (
             <ImagePreviewCard
-              file={selectedFile}
-              previewUrl={previewUrl}
+              files={selectedFiles}
+              previewUrls={previewUrls}
               onRemove={handleRemove}
               onChooseDifferent={handleOpenPicker}
             />
@@ -348,17 +354,14 @@ export default function UploadBox({ onPostCreated }) {
             <Button
               size="lg"
               onClick={handleUpload}
-              disabled={!selectedFile || (postType === "normal" && !title.trim()) || isUploading || !turnstileToken}
-              sx={{
-                borderRadius: "999px",
-                px: 3
-              }}
+              disabled={!selectedFiles.length || (postType === "normal" && !title.trim()) || isUploading || !turnstileToken}
+              sx={{ borderRadius: "999px", px: 3 }}
             >
               {isUploading ? <CircularProgress size="sm" color="neutral" /> : "Publish post"}
             </Button>
-            {selectedFile ? (
+            {selectedFiles.length ? (
               <Button variant="plain" color="neutral" onClick={handleRemove} sx={{ borderRadius: "999px" }}>
-                Remove image
+                Remove image{selectedFiles.length > 1 ? "s" : ""}
               </Button>
             ) : null}
           </Stack>

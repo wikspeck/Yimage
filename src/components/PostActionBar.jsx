@@ -134,8 +134,8 @@ export default function PostActionBar({
   }
 
   return (
-    <Stack spacing={1.1} className="post-actions-shell">
-      <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" flexWrap="wrap" className="post-actions-row">
+    <Stack spacing={0.75} className="post-actions-shell">
+      <Stack direction="row" spacing={0.75} alignItems="center" justifyContent="space-between" flexWrap="wrap" className="post-actions-row">
         <Stack direction="row" spacing={0.6} alignItems="center" className="vote-cluster">
           <Button
             size="sm"
@@ -164,7 +164,7 @@ export default function PostActionBar({
           </Button>
         </Stack>
 
-        <Stack direction="row" spacing={0.4} alignItems="center" flexWrap="wrap" className="action-cluster">
+        <Stack direction="row" spacing={0.35} alignItems="center" flexWrap="wrap" className="action-cluster">
           <Button
             size="sm"
             variant="plain"
@@ -234,11 +234,11 @@ export default function PostActionBar({
         </Stack>
       </Stack>
 
-      <Stack direction="row" spacing={1.25} useFlexGap flexWrap="wrap" alignItems="center" className="post-stats-row">
-        <Typography level="body-sm" sx={{ color: "rgba(255,255,255,0.72)" }}>
+      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center" className="post-stats-row">
+        <Typography level="body-xs" sx={{ color: "rgba(255,255,255,0.56)" }}>
           {repostCount} reposts
         </Typography>
-        <Typography level="body-sm" sx={{ color: "rgba(255,255,255,0.72)" }}>
+        <Typography level="body-xs" sx={{ color: "rgba(255,255,255,0.56)" }}>
           {viewsCount} views
         </Typography>
       </Stack>

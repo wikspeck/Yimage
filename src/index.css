@@ -496,6 +496,293 @@ a {
   color: #8de8ff;
 }
 
+.app-nav-panel {
+  justify-content: space-between;
+  padding: 24px 12px;
+}
+
+.nav-item-inner {
+  gap: 6px;
+  padding: 10px 8px;
+}
+
+.nav-divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
+}
+
+.nav-compose-button {
+  min-height: 48px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #ffffff;
+  color: #050505;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 180ms ease, opacity 180ms ease, background-color 180ms ease;
+}
+
+.nav-compose-button:hover {
+  transform: translateY(-1px) scale(1.02);
+}
+
+.nav-compose-button.is-active {
+  background: #f1f1f1;
+}
+
+.post-card {
+  padding: 14px 16px !important;
+  border-radius: 24px !important;
+}
+
+.post-title {
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.post-description {
+  line-height: 1.45;
+}
+
+.post-media-frame {
+  position: relative;
+  border-radius: 20px;
+  background: #070707;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.post-preview-media {
+  padding: 8px;
+  background: #080808;
+}
+
+.post-preview-media.is-normal {
+  padding: 8px;
+}
+
+.post-preview-media.is-image-only {
+  padding: 10px;
+}
+
+.post-preview-canvas {
+  width: 100%;
+  margin: 0 auto;
+  padding: 0;
+  border-radius: 18px;
+  background: #020202;
+}
+
+.post-preview-canvas.is-normal {
+  aspect-ratio: 16 / 10;
+  max-height: 320px;
+}
+
+.post-preview-canvas.is-image-only {
+  aspect-ratio: 4 / 5;
+  max-height: 520px;
+}
+
+.post-preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 18px;
+  animation: postImageFade 180ms ease;
+}
+
+.post-card-image-only .post-actions-shell,
+.post-card-normal .post-actions-shell {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 10px;
+}
+
+.post-actions-row {
+  min-height: 34px;
+}
+
+.social-action-button,
+.icon-button,
+.download-button {
+  min-width: 34px !important;
+  min-height: 34px !important;
+  padding: 0 10px !important;
+  gap: 6px !important;
+  border-radius: 999px !important;
+}
+
+.vote-icon-button {
+  min-width: 36px !important;
+  padding: 0 !important;
+}
+
+.vote-cluster {
+  gap: 8px;
+}
+
+.vote-count {
+  min-width: 18px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.vote-count.is-active {
+  color: #ffffff;
+}
+
+.action-cluster {
+  gap: 6px;
+}
+
+.post-stats-row {
+  min-height: auto;
+}
+
+.post-carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 160ms ease, transform 160ms ease, background-color 160ms ease;
+  z-index: 2;
+}
+
+.post-media-frame:hover .post-carousel-arrow,
+.post-detail-carousel-controls .post-carousel-arrow {
+  opacity: 1;
+}
+
+.post-carousel-arrow:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-50%) scale(1.03);
+}
+
+.post-carousel-arrow.is-left {
+  left: 12px;
+}
+
+.post-carousel-arrow.is-right {
+  right: 12px;
+}
+
+.post-carousel-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  gap: 6px;
+  z-index: 2;
+}
+
+.post-carousel-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.post-carousel-dot.is-active {
+  background: #ffffff;
+}
+
+.feed-hero-card {
+  padding: 14px 16px !important;
+}
+
+.discover-mode-row {
+  align-items: center;
+}
+
+.search-user-card {
+  padding: 14px 16px !important;
+}
+
+.post-detail-carousel-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.post-detail-carousel-controls .post-carousel-arrow,
+.post-detail-carousel-controls .post-carousel-dots {
+  pointer-events: auto;
+}
+
+@keyframes postImageFade {
+  from {
+    opacity: 0.7;
+    transform: scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 900px) {
+  .app-main {
+    padding-left: 98px;
+  }
+
+  .top-brand-bar {
+    margin-left: 112px;
+  }
+
+  .post-preview-canvas.is-normal {
+    aspect-ratio: 16 / 11;
+    max-height: 260px;
+  }
+
+  .post-preview-canvas.is-image-only {
+    max-height: 420px;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-shell {
+    padding: 14px 14px 24px;
+  }
+
+  .app-nav-shell {
+    width: 80px;
+    left: 12px;
+    top: 12px;
+    bottom: 12px;
+  }
+
+  .top-brand-bar {
+    margin: 12px 14px 0 100px;
+    padding: 10px 14px;
+  }
+
+  .post-card {
+    padding: 12px !important;
+  }
+
+  .post-preview-canvas.is-normal {
+    max-height: 220px;
+  }
+
+  .post-preview-canvas.is-image-only {
+    max-height: 320px;
+  }
+}
+
 .feed-hero-card {
   position: relative;
   overflow: hidden;
