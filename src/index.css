@@ -877,6 +877,30 @@ body,
   background: #000000;
 }
 
+html,
+body {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+body::-webkit-scrollbar,
+.comments-sheet-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+body::-webkit-scrollbar-track,
+.comments-sheet-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body::-webkit-scrollbar-thumb,
+.comments-sheet-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
 .content-card,
 .auth-card,
 .comment-card,
@@ -895,6 +919,7 @@ body,
 }
 
 .top-brand-bar {
+  margin: 0;
   padding: 12px 0 14px;
   border: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -1382,7 +1407,7 @@ body,
 
 .top-brand-bar,
 .app-footer {
-  margin-left: 112px;
+  margin: 0;
   padding-left: 24px;
   padding-right: 24px;
 }
@@ -1482,6 +1507,61 @@ body,
   background: #090909;
 }
 
+.profile-stat-button {
+  appearance: none;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.profile-stat-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #121212;
+}
+
+.profile-social-sheet {
+  width: min(100%, 560px);
+}
+
+.profile-social-item {
+  width: 100%;
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #0b0b0b;
+  border-radius: 18px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #ffffff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.profile-social-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #111111;
+}
+
+.profile-social-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.profile-social-name {
+  font-weight: 700;
+}
+
+.profile-social-handle {
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.85rem;
+}
+
 @media (max-width: 900px) {
   .top-brand-bar,
   .app-footer {
@@ -1505,7 +1585,7 @@ body,
 /* Media, focus mode, and mobile-nav polish */
 .top-brand-bar,
 .app-footer {
-  margin-left: 0;
+  margin: 0;
   padding-left: 18px;
   padding-right: 18px;
 }
@@ -1516,6 +1596,8 @@ body,
   z-index: 80;
   min-height: 60px;
   width: 100%;
+  left: 0;
+  right: 0;
 }
 
 .brand-version {
@@ -1551,6 +1633,7 @@ body,
 .app-footer {
   width: 100%;
   text-align: center;
+  justify-self: stretch;
 }
 
 .page-shell {
@@ -1819,14 +1902,29 @@ body,
   .vote-cluster,
   .action-cluster {
     width: 100%;
-    justify-content: space-evenly;
+    justify-content: center;
+    gap: 10px;
   }
 
   .social-action-button,
   .icon-button,
   .download-button {
-    min-width: 40px !important;
-    min-height: 40px !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
+    padding: 0 11px !important;
+  }
+
+  .vote-count {
+    min-width: 22px;
+    font-size: 1.02rem;
+  }
+
+  .post-description {
+    line-height: 1.5;
+  }
+
+  .post-card .inline-follow-button-compact {
+    min-height: 26px !important;
   }
 
   .comments-sheet {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Avatar, Button, Card, CircularProgress, Input, Stack, Textarea, Typography } from "@mui/joy";
+import { Alert, Avatar, Button, Card, Input, Modal, ModalClose, Option, Select, Sheet, Stack, Textarea, Typography } from "@mui/joy";
 import { useNavigate, useParams } from "react-router-dom";
 import { deletePost, getUserProfile, toggleFollow } from "../api/yimageApi";
 import BackButton from "../components/BackButton";
@@ -17,6 +17,9 @@ export default function ProfilePage() {
   const username = routeUsername || user?.username;
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
+  const [reposts, setReposts] = useState([]);
+  const [followers, setFollowers] = useState([]);
+  const [following, setFollowing] = useState([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -26,6 +29,9 @@ export default function ProfilePage() {
   const [reportOpen, setReportOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [activeFeed, setActiveFeed] = useState("posts");
+  const [socialSheet, setSocialSheet] = useState("");
+  const [socialQuery, setSocialQuery] = useState("");
   const isOwnProfile = Boolean(user && profile && user.username === profile.username);
 
   useEffect(() => {
@@ -44,6 +50,9 @@ export default function ProfilePage() {
         if (isMounted) {
           setProfile(result.profile);
           setPosts(result.posts);
+          setReposts(result.reposts || []);
+          setFollowers(result.followers || []);
+          setFollowing(result.following || []);
           setDisplayName(result.profile.displayName || "");
           setBio(result.profile.bio || "");
           setAvatarUrl(result.profile.avatarUrl || "");
@@ -220,6 +229,9 @@ export default function ProfilePage() {
     return null;
   }
 
+  const visiblePosts = activeFeed === "reposts" ? reposts : posts;
+  const socialItems = socialSheet === "followers" ? followers : socialSheet === "following" ? following : [];
+
   return (
     <div className="page-shell profile-page-shell">
       <Stack spacing={3}>
@@ -283,14 +295,14 @@ export default function ProfilePage() {
                 <span className="profile-stat-value">{profile.postsCount}</span>
                 <span className="profile-stat-label">Posts</span>
               </div>
-              <div className="profile-stat-pill">
+              <button type="button" className="profile-stat-pill profile-stat-button" onClick={() => setSocialSheet("followers")}>
                 <span className="profile-stat-value">{profile.followersCount}</span>
                 <span className="profile-stat-label">Followers</span>
-              </div>
-              <div className="profile-stat-pill">
+              </button>
+              <button type="button" className="profile-stat-pill profile-stat-button" onClick={() => setSocialSheet("following")}>
                 <span className="profile-stat-value">{profile.followingCount}</span>
                 <span className="profile-stat-label">Following</span>
-              </div>
+              </button>
             </Stack>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
@@ -346,14 +358,20 @@ export default function ProfilePage() {
         <Card variant="outlined" className="content-card profile-posts-card">
           <Stack spacing={1.6}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1.5}>
-              <Typography level="title-lg">Posts</Typography>
-              <Typography level="body-sm" textColor="neutral.500">{posts.length}</Typography>
+              <Typography level="title-lg">Profile feed</Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography level="body-sm" textColor="neutral.500">{visiblePosts.length}</Typography>
+                <Select value={activeFeed} onChange={(_, value) => setActiveFeed(value || "posts")} size="sm" sx={{ minWidth: 118, borderRadius: "14px" }}>
+                  <Option value="posts">Posts</Option>
+                  <Option value="reposts">Reposts</Option>
+                </Select>
+              </Stack>
             </Stack>
             <div className="profile-divider" />
 
-            {posts.length ? (
+            {visiblePosts.length ? (
               <Stack spacing={2}>
-                {posts.map((post) => (
+                {visiblePosts.map((post) => (
                   <PostCard
                     key={post.id}
                     post={post}
@@ -374,12 +392,55 @@ export default function ProfilePage() {
             ) : (
               <div className="profile-empty-state">
                 <Typography level="body-md" textColor="neutral.400">
-                  No posts yet.
+                  {activeFeed === "reposts" ? "No reposts yet." : "No posts yet."}
                 </Typography>
               </div>
             )}
           </Stack>
         </Card>
+        <Modal open={Boolean(socialSheet)} onClose={() => setSocialSheet("")} className="comments-sheet-modal">
+          <Sheet variant="outlined" className="comments-sheet profile-social-sheet">
+            <Stack spacing={1.25} sx={{ height: "100%" }}>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                <div className="comments-sheet-head">
+                  <ModalClose className="comments-sheet-close" />
+                </div>
+                <Typography level="title-lg">{socialSheet === "followers" ? "Followers" : "Following"}</Typography>
+                <div className="comments-sheet-spacer" />
+              </Stack>
+              <Input
+                value={socialQuery}
+                onChange={(event) => setSocialQuery(event.target.value)}
+                placeholder={`Search ${socialSheet}`}
+                sx={{ borderRadius: "16px" }}
+              />
+              <div className="comments-sheet-list">
+                <Stack spacing={1}>
+                  {socialItems
+                    .filter((item) => {
+                      const query = socialQuery.trim().toLowerCase();
+                      if (!query) {
+                        return true;
+                      }
+                      return item.username.toLowerCase().includes(query) || (item.displayName || "").toLowerCase().includes(query);
+                    })
+                    .sort((a, b) => a.username.localeCompare(b.username))
+                    .map((item) => (
+                      <button key={item.id} type="button" className="profile-social-item" onClick={() => { setSocialSheet(""); setSocialQuery(""); navigate(`/u/${item.username}`); }}>
+                        <Avatar src={item.avatarUrl || ""} alt={item.username} sx={{ width: 42, height: 42, bgcolor: "#111111" }}>
+                          {(item.displayName || item.username || "Y").slice(0, 1).toUpperCase()}
+                        </Avatar>
+                        <span className="profile-social-copy">
+                          <span className="profile-social-name">{item.displayName || item.username}</span>
+                          <span className="profile-social-handle">@{item.username}</span>
+                        </span>
+                      </button>
+                    ))}
+                </Stack>
+              </div>
+            </Stack>
+          </Sheet>
+        </Modal>
         <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} targetType="user" targetId={profile.id} title="Report profile" />
         <ToastNotice open={Boolean(toastMessage)} message={toastMessage} onClose={() => setToastMessage("")} />
       </Stack>

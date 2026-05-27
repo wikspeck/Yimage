@@ -2596,6 +2596,7 @@ async function handleModerationAction(request, env) {
 async function handleGetProfile(request, env, username) {
   const normalizedUsername = normalizeUsername(username);
   const viewer = await getCurrentUser(request, env);
+  const url = new URL(request.url);
   const profileUser = await env.DB.prepare(
     `
       SELECT
@@ -2676,26 +2677,124 @@ async function handleGetProfile(request, env, username) {
   const votesByPost = await getViewerVoteMap(env, viewer?.id, postIds);
   const repostsByPost = await getViewerRepostMap(env, viewer?.id, postIds);
   const hashtagsByPost = await getPostHashtagsMap(env, postIds);
+  const imagesByPost = await getPostImagesMap(env, postIds);
   const repostsRemainingToday = await getRepostsRemainingToday(env, viewer?.id);
   const profilePosts = (postRows.results || []).map((post) => {
     post.hashtags = hashtagsByPost[post.id] || [];
+    post.images = imagesByPost[post.id] || [];
     return toPostResponse(post, votesByPost[post.id] || null, repostsByPost[post.id], repostsRemainingToday);
   });
 
+  const repostRows = await env.DB.prepare(
+    `
+      SELECT
+        posts.id,
+        posts.author_id AS userId,
+        users.username AS authorUsername,
+        posts.title,
+        COALESCE(posts.description, '') AS description,
+        posts.image_key AS imageKey,
+        COALESCE(posts.image_mime_type, 'application/octet-stream') AS imageMimeType,
+        posts.created_at AS createdAt,
+        COALESCE(posts.like_count, 0) AS likeCount,
+        COALESCE(posts.score, COALESCE(posts.like_count, 0)) AS score,
+        COALESCE(posts.comments_count, 0) AS commentsCount,
+        COALESCE(posts.views, 0) AS views,
+        COALESCE(posts.repost_count, 0) AS repostCount,
+        posts.category_id AS categoryId,
+        categories.slug AS categorySlug,
+        categories.label AS categoryLabel
+      FROM reposts
+      INNER JOIN posts ON posts.id = reposts.post_id
+      INNER JOIN users ON users.id = posts.author_id
+      LEFT JOIN categories ON categories.id = posts.category_id
+      WHERE reposts.user_id = ?
+        ${canViewModeratedPosts
+          ? "AND COALESCE(posts.moderation_status, 'active') NOT IN ('removed')"
+          : "AND COALESCE(posts.moderation_status, 'active') NOT IN ('under_review', 'hidden', 'removed')"}
+      ORDER BY reposts.created_at DESC, reposts.id DESC
+      LIMIT 50
+    `
+  )
+    .bind(profileUser.id)
+    .all();
+
+  const repostPostIds = (repostRows.results || []).map((post) => post.id);
+  const repostVotesByPost = await getViewerVoteMap(env, viewer?.id, repostPostIds);
+  const repostViewerMap = await getViewerRepostMap(env, viewer?.id, repostPostIds);
+  const repostHashtagsByPost = await getPostHashtagsMap(env, repostPostIds);
+  const repostImagesByPost = await getPostImagesMap(env, repostPostIds);
+  const profileReposts = (repostRows.results || []).map((post) => {
+    post.hashtags = repostHashtagsByPost[post.id] || [];
+    post.images = repostImagesByPost[post.id] || [];
+    return toPostResponse(post, repostVotesByPost[post.id] || null, repostViewerMap[post.id], repostsRemainingToday);
+  });
+
+  const socialSearch = normalizeText(url.searchParams.get("socialQuery")).toLowerCase();
+  const searchBinding = `%${socialSearch}%`;
+  const followersRows = await env.DB.prepare(
+    `
+      SELECT
+        users.id,
+        users.username,
+        users.email,
+        users.created_at AS createdAt,
+        COALESCE(users.display_name, '') AS displayName,
+        COALESCE(users.bio, '') AS bio,
+        COALESCE(users.avatar_url, '') AS avatarUrl,
+        COALESCE(users.is_admin, 0) AS isAdmin,
+        COALESCE(users.moderation_status, 'active') AS moderationStatus
+      FROM follows
+      INNER JOIN users ON users.id = follows.follower_id
+      WHERE follows.following_id = ?
+        AND (? = '%%' OR LOWER(users.username) LIKE ? OR LOWER(COALESCE(users.display_name, '')) LIKE ?)
+      ORDER BY LOWER(users.username) ASC
+      LIMIT 100
+    `
+  )
+    .bind(profileUser.id, searchBinding, searchBinding, searchBinding)
+    .all();
+
+  const followingRows = await env.DB.prepare(
+    `
+      SELECT
+        users.id,
+        users.username,
+        users.email,
+        users.created_at AS createdAt,
+        COALESCE(users.display_name, '') AS displayName,
+        COALESCE(users.bio, '') AS bio,
+        COALESCE(users.avatar_url, '') AS avatarUrl,
+        COALESCE(users.is_admin, 0) AS isAdmin,
+        COALESCE(users.moderation_status, 'active') AS moderationStatus
+      FROM follows
+      INNER JOIN users ON users.id = follows.following_id
+      WHERE follows.follower_id = ?
+        AND (? = '%%' OR LOWER(users.username) LIKE ? OR LOWER(COALESCE(users.display_name, '')) LIKE ?)
+      ORDER BY LOWER(users.username) ASC
+      LIMIT 100
+    `
+  )
+    .bind(profileUser.id, searchBinding, searchBinding, searchBinding)
+    .all();
+
   return success({
-      profile: {
-        id: profileUser.id,
-        username: profileUser.username,
-        createdAt: profileUser.createdAt,
-        displayName: profileUser.displayName || profileUser.username,
-        bio: profileUser.bio || "",
-        avatarUrl: profileUser.avatarUrl || "",
-        postsCount: Number(counts?.postsCount || 0),
-        followersCount: Number(counts?.followersCount || 0),
-        followingCount: Number(counts?.followingCount || 0),
+    profile: {
+      id: profileUser.id,
+      username: profileUser.username,
+      createdAt: profileUser.createdAt,
+      displayName: profileUser.displayName || profileUser.username,
+      bio: profileUser.bio || "",
+      avatarUrl: profileUser.avatarUrl || "",
+      postsCount: Number(counts?.postsCount || 0),
+      followersCount: Number(counts?.followersCount || 0),
+      followingCount: Number(counts?.followingCount || 0),
       isFollowing
     },
-    posts: profilePosts
+    posts: profilePosts,
+    reposts: profileReposts,
+    followers: (followersRows.results || []).map((item) => toPublicUser(item)),
+    following: (followingRows.results || []).map((item) => toPublicUser(item))
   });
 }
 
