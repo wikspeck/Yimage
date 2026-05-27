@@ -55,9 +55,14 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onHome, on
               }}
             />
             <Box className="brand-copy">
-              <Typography level="title-lg" className="brand-title">
-                Yimage
-              </Typography>
+              <Stack direction="row" spacing={0.9} alignItems="center">
+                <Typography level="title-lg" className="brand-title">
+                  Yimage
+                </Typography>
+                <Typography level="body-xs" className="brand-version">
+                  0.1.0
+                </Typography>
+              </Stack>
             </Box>
           </button>
 

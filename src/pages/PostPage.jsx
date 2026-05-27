@@ -1,55 +1,24 @@
 import { useEffect, useState } from "react";
-import { Alert, AspectRatio, Button, Card, CircularProgress, Link, Stack, Textarea, Typography } from "@mui/joy";
+import { Alert, Button, Card, CircularProgress, Link, Stack, Textarea, Typography } from "@mui/joy";
 import { useNavigate, useParams } from "react-router-dom";
-import { createAppeal, createComment, deletePost, getPost, getPostComments, replyToComment, repostPost, toggleFollow, voteOnComment, voteOnPost } from "../api/yimageApi";
-import AuthPromptCard from "../components/AuthPromptCard";
+import { createAppeal, deletePost, getPost, repostPost, toggleFollow, voteOnPost } from "../api/yimageApi";
 import BackButton from "../components/BackButton";
-import CommentThread from "../components/CommentThread";
 import PostActionBar from "../components/PostActionBar";
+import PostCommentsSheet from "../components/PostCommentsSheet";
 import ReportDialog from "../components/ReportDialog";
 import ShareDialog from "../components/ShareDialog";
 import ToastNotice from "../components/ToastNotice";
-import TurnstileWidget from "../components/TurnstileWidget";
 import { useAuth } from "../context/AuthContext";
 import { formatFullDate, formatRelativeTime } from "../utils/formatters";
-
-function replaceComment(comments, updatedComment) {
-  return comments.map((comment) => {
-    if (comment.id === updatedComment.id) {
-      return { ...updatedComment, replies: comment.replies || [] };
-    }
-    if (comment.replies?.length) {
-      return { ...comment, replies: replaceComment(comment.replies, updatedComment) };
-    }
-    return comment;
-  });
-}
-
-function appendReply(comments, reply) {
-  return comments.map((comment) => {
-    if (comment.id === reply.parentId) {
-      return { ...comment, replies: [...(comment.replies || []), reply] };
-    }
-    if (comment.replies?.length) {
-      return { ...comment, replies: appendReply(comment.replies, reply) };
-    }
-    return comment;
-  });
-}
 
 export default function PostPage() {
   const { postId } = useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [post, setPost] = useState(null);
-  const [comments, setComments] = useState([]);
-  const [commentText, setCommentText] = useState("");
-  const [commentTurnstileToken, setCommentTurnstileToken] = useState("");
-  const [commentTurnstileResetKey, setCommentTurnstileResetKey] = useState(0);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
-  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [actionNotice, setActionNotice] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -58,6 +27,7 @@ export default function PostPage() {
   const [appealMessage, setAppealMessage] = useState("");
   const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [commentsOpen, setCommentsOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -67,15 +37,14 @@ export default function PostPage() {
       setError("");
 
       try {
-        const [postResult, nextComments] = await Promise.all([getPost(postId), getPostComments(postId)]);
+        const postResult = await getPost(postId);
         if (isMounted) {
           setPost(postResult.post);
           setModerationReview(postResult.moderationReview || null);
-          setComments(nextComments);
         }
       } catch (loadError) {
         if (isMounted) {
-          setError(loadError.message || "Could not load this post.");
+          setError(loadError.message || "Something went wrong loading this section.");
         }
       } finally {
         if (isMounted) {
@@ -103,7 +72,7 @@ export default function PostPage() {
       const result = await voteOnPost(postId, vote);
       setPost(result.post);
     } catch (actionError) {
-      setError(actionError.message || "Could not update vote.");
+      setError(actionError.message || "Something went wrong loading this section.");
     } finally {
       setIsBusy(false);
     }
@@ -119,42 +88,9 @@ export default function PostPage() {
       setPost(result.post);
       setActionNotice(result.message || "Repost updated.");
     } catch (actionError) {
-      setError(actionError.message || "Could not repost this post.");
+      setError(actionError.message || "Something went wrong loading this section.");
     } finally {
       setIsBusy(false);
-    }
-  }
-
-  async function handleCreateComment(event) {
-    event.preventDefault();
-    setIsSubmittingComment(true);
-    setError("");
-
-    try {
-      const comment = await createComment(postId, commentText, commentTurnstileToken);
-      setComments((current) => [...current, comment]);
-      setCommentText("");
-      setPost((current) => ({ ...current, commentsCount: current.commentsCount + 1 }));
-    } catch (actionError) {
-      setError(actionError.message || "Could not add comment.");
-    } finally {
-      setIsSubmittingComment(false);
-      setCommentTurnstileResetKey((current) => current + 1);
-    }
-  }
-
-  async function handleReply(parentId, text, turnstileToken) {
-    const reply = await replyToComment(postId, text, parentId, turnstileToken);
-    setComments((current) => appendReply(current, reply));
-    setPost((current) => ({ ...current, commentsCount: current.commentsCount + 1 }));
-  }
-
-  async function handleCommentVote(commentId, vote) {
-    try {
-      const updated = await voteOnComment(commentId, vote);
-      setComments((current) => replaceComment(current, updated));
-    } catch (voteError) {
-      setError(voteError.message || "Could not vote on this comment.");
     }
   }
 
@@ -163,7 +99,7 @@ export default function PostPage() {
       await navigator.clipboard.writeText(window.location.href);
       setToastMessage("Copied link to clipboard.");
     } catch {
-      setError("Could not copy this link.");
+      setError("Something went wrong loading this section.");
     }
   }
 
@@ -172,14 +108,14 @@ export default function PostPage() {
 
     try {
       if (navigator.share && window.matchMedia("(max-width: 820px)").matches) {
-        await navigator.share({ title: post.title, url: link });
+        await navigator.share({ title: post.title || "Yimage post", url: link });
         return;
       }
 
       setShareOpen(true);
     } catch (shareError) {
       if (shareError?.name !== "AbortError") {
-        setError("Could not share this post.");
+        setError("Something went wrong loading this section.");
       }
     }
   }
@@ -189,7 +125,7 @@ export default function PostPage() {
       const profile = await toggleFollow(post.authorUsername);
       setPost((current) => ({ ...current, authorProfile: profile }));
     } catch (followError) {
-      setError(followError.message || "Could not update follow status.");
+      setError(followError.message || "Something went wrong loading this section.");
     }
   }
 
@@ -219,7 +155,7 @@ export default function PostPage() {
       setToastMessage("Appeal submitted.");
       setAppealMessage("");
     } catch (appealError) {
-      setError(appealError.message || "Could not submit your appeal.");
+      setError(appealError.message || "Something went wrong loading this section.");
     } finally {
       setIsSubmittingAppeal(false);
     }
@@ -244,7 +180,7 @@ export default function PostPage() {
       await deletePost(post.id);
       navigate("/", { replace: true });
     } catch (deleteError) {
-      setError(deleteError.message || "Could not delete this post.");
+      setError(deleteError.message || "Something went wrong loading this section.");
     } finally {
       setIsBusy(false);
     }
@@ -283,222 +219,158 @@ export default function PostPage() {
   const activeImage = images[Math.min(activeImageIndex, Math.max(images.length - 1, 0))];
 
   return (
-    <div className="page-shell page-shell-wide">
+    <div className="page-shell post-view-shell">
       <Stack spacing={3}>
         <BackButton fallbackTo="/" label="Back" />
         {error ? <Alert color="danger" variant="soft">{error}</Alert> : null}
         {actionNotice ? <Alert color="neutral" variant="soft">{actionNotice}</Alert> : null}
 
-        <div className="post-detail-layout">
-          <Card variant="outlined" className="content-card post-detail-media-card">
-            <Stack spacing={2}>
-              {activeImage ? (
-                <Stack spacing={1} sx={{ position: "relative" }}>
-                  <AspectRatio
-                    ratio={post.postType === "image-only" ? "4/5" : "16/11"}
-                    className="viewer-frame"
-                    sx={{ borderRadius: "20px", overflow: "hidden", bgcolor: "#050505" }}
-                  >
-                    <img src={activeImage.url} alt={post.title || `${post.authorUsername} post`} style={{ objectFit: "contain" }} />
-                  </AspectRatio>
-                  {images.length > 1 ? (
-                    <div className="post-detail-carousel-controls">
-                      <button type="button" className="post-carousel-arrow is-left" onClick={() => setActiveImageIndex((current) => (current === 0 ? images.length - 1 : current - 1))} aria-label="Previous image">
-                        ‹
-                      </button>
-                      <button type="button" className="post-carousel-arrow is-right" onClick={() => setActiveImageIndex((current) => (current === images.length - 1 ? 0 : current + 1))} aria-label="Next image">
-                        ›
-                      </button>
-                      <div className="post-carousel-dots" aria-hidden="true">
-                        {images.map((image, index) => (
-                          <span key={image.key || image.url || index} className={`post-carousel-dot${index === activeImageIndex ? " is-active" : ""}`} />
-                        ))}
-                      </div>
+        <Card variant="outlined" className="content-card post-detail-media-card post-detail-single-card">
+          <Stack spacing={2}>
+            {activeImage ? (
+              <Stack spacing={1} sx={{ position: "relative" }}>
+                <div className="viewer-frame viewer-frame-adaptive">
+                  <img src={activeImage.url} alt={post.title || `${post.authorUsername} post`} className="viewer-image" />
+                </div>
+                {images.length > 1 ? (
+                  <div className="post-detail-carousel-controls">
+                    <button type="button" className="post-carousel-arrow is-left" onClick={() => setActiveImageIndex((current) => (current === 0 ? images.length - 1 : current - 1))} aria-label="Previous image">
+                      {"<"}
+                    </button>
+                    <button type="button" className="post-carousel-arrow is-right" onClick={() => setActiveImageIndex((current) => (current === images.length - 1 ? 0 : current + 1))} aria-label="Next image">
+                      {">"}
+                    </button>
+                    <div className="post-carousel-dots" aria-hidden="true">
+                      {images.map((image, index) => (
+                        <span key={image.key || image.url || index} className={`post-carousel-dot${index === activeImageIndex ? " is-active" : ""}`} />
+                      ))}
                     </div>
-                  ) : null}
-                </Stack>
-              ) : null}
-
-              <Stack spacing={1}>
-                {moderationReview ? (
-                  <Alert color="warning" variant="soft">
-                    {moderationReview.message}
-                  </Alert>
+                  </div>
                 ) : null}
-                {post.title ? (
-                  <Typography level="h1" sx={{ letterSpacing: "-0.05em", fontSize: { xs: "1.8rem", md: "2.4rem" } }}>
-                    {post.title}
-                  </Typography>
-                ) : null}
-                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center" className="post-author-row">
-                  <Typography level="body-sm" textColor="neutral.400">by</Typography>
-                  <Link
-                    underline="hover"
-                    color="neutral"
-                    onClick={() => navigate(`/u/${post.authorUsername}`)}
-                    sx={{ cursor: "pointer", fontWeight: 600 }}
-                  >
-                    @{post.authorUsername}
-                  </Link>
-                  {user && user.username !== post.authorUsername ? (
-                    <Button
-                      size="sm"
-                      variant={post.authorProfile?.isFollowing ? "soft" : "plain"}
-                      color="neutral"
-                      onClick={handleFollowToggle}
-                      className="inline-follow-button"
-                    >
-                      {post.authorProfile?.isFollowing ? "Following" : "Follow"}
-                    </Button>
-                  ) : null}
-                  <Typography level="body-sm" textColor="neutral.500">
-                    {formatRelativeTime(post.createdAt)} / {formatFullDate(post.createdAt)}
-                  </Typography>
-                </Stack>
-                <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
-                  {post.category ? <Typography level="body-sm" className="post-tag-chip">{post.category.label}</Typography> : null}
-                  {(post.hashtags || []).map((tag) => (
-                    <Typography
-                      key={tag}
-                      level="body-sm"
-                      className="post-tag-chip post-tag-chip-clickable"
-                      onClick={() => navigate(`/?hashtag=${encodeURIComponent(tag)}`)}
-                    >
-                      #{tag}
-                    </Typography>
-                  ))}
-                </Stack>
-                {post.description ? <Typography level="body-lg" textColor="neutral.300">{post.description}</Typography> : null}
               </Stack>
+            ) : null}
 
-              <div className="post-detail-action-panel">
-                <PostActionBar
-                  post={post}
-                  isLoggedIn={Boolean(user)}
-                  isBusy={isBusy}
-                  onUpvote={() => handleVote("up")}
-                  onDownvote={() => handleVote("down")}
-                  onRepost={handleRepost}
-                  onShare={handleShare}
-                  onReport={() => setReportOpen(true)}
-                  onDelete={handleDeletePost}
-                  canDelete={Boolean(user && (user.id === post.userId || user.isAdmin))}
-                  onComment={() => document.getElementById("comments")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
-                />
-              </div>
-
+            <Stack spacing={1}>
               {moderationReview ? (
-                <Card variant="outlined" className="content-card">
-                  <Stack spacing={1.25}>
-                    <Typography level="title-md">Appeal moderation</Typography>
-                    {moderationReview.aiFinding ? (
-                      <Typography level="body-sm" textColor="neutral.400">
-                        Risk {moderationReview.aiFinding.riskScore} • {(moderationReview.aiFinding.labels || []).join(", ") || "image safety review"} • {moderationReview.aiFinding.aiReason}
-                      </Typography>
-                    ) : null}
-                    {moderationReview.appeal?.status === "pending" ? (
-                      <Alert color="neutral" variant="soft">
-                        You already have a pending appeal for this post.
-                      </Alert>
-                    ) : (
-                      <>
-                        <Textarea
-                          minRows={3}
-                          maxRows={6}
-                          value={appealMessage}
-                          onChange={(event) => setAppealMessage(event.target.value)}
-                          placeholder="Explain why you think this post should be restored."
-                          sx={{ borderRadius: "18px" }}
-                        />
-                        <Button loading={isSubmittingAppeal} onClick={handleAppealSubmit} sx={{ borderRadius: "999px", alignSelf: "flex-start" }}>
-                          Appeal
-                        </Button>
-                      </>
-                    )}
-                  </Stack>
-                </Card>
+                <Alert color="warning" variant="soft">
+                  {moderationReview.message}
+                </Alert>
               ) : null}
-
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap" className="post-detail-secondary-actions">
-                <Button variant="soft" color="neutral" component="a" href={`https://yimage.org/${post.id}`} sx={{ borderRadius: "999px" }}>
-                  Share page
-                </Button>
-                <Button variant="plain" color="neutral" onClick={handleCopyLink} sx={{ borderRadius: "999px" }}>
-                  Copy link
-                </Button>
-              </Stack>
-            </Stack>
-          </Card>
-
-          <Card variant="outlined" className="content-card post-detail-comments">
-            <Stack spacing={2.25} id="comments" className="comment-panel-shell">
-              <Stack spacing={0.4}>
-                <Typography level="title-lg">Comments</Typography>
+              {post.title ? (
+                <Typography level="h1" sx={{ letterSpacing: "-0.05em", fontSize: { xs: "1.7rem", md: "2.2rem" } }}>
+                  {post.title}
+                </Typography>
+              ) : null}
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center" className="post-author-row">
+                <Typography level="body-sm" textColor="neutral.400">by</Typography>
+                <Link
+                  underline="hover"
+                  color="neutral"
+                  onClick={() => navigate(`/u/${post.authorUsername}`)}
+                  sx={{ cursor: "pointer", fontWeight: 600 }}
+                >
+                  @{post.authorUsername}
+                </Link>
+                {user && user.username !== post.authorUsername ? (
+                  <Button
+                    size="sm"
+                    variant={post.authorProfile?.isFollowing ? "soft" : "plain"}
+                    color="neutral"
+                    onClick={handleFollowToggle}
+                    className="inline-follow-button"
+                  >
+                    {post.authorProfile?.isFollowing ? "Following" : "Follow"}
+                  </Button>
+                ) : null}
                 <Typography level="body-sm" textColor="neutral.500">
-                  Keep the post visible while you read, reply, and vote.
+                  {formatRelativeTime(post.createdAt)} / {formatFullDate(post.createdAt)}
                 </Typography>
               </Stack>
-
-              {user ? (
-                <Card variant="outlined" className="comment-composer-card">
-                  <Stack component="form" spacing={1.5} onSubmit={handleCreateComment}>
-                    <Textarea
-                      minRows={3}
-                      maxRows={6}
-                      maxLength={400}
-                      placeholder="Write a comment"
-                      value={commentText}
-                      onChange={(event) => setCommentText(event.target.value)}
-                      sx={{ borderRadius: "18px" }}
-                    />
-                    <TurnstileWidget onTokenChange={setCommentTurnstileToken} resetKey={commentTurnstileResetKey} />
-                    <Stack
-                      direction={{ xs: "column", sm: "row" }}
-                      justifyContent="space-between"
-                      spacing={1}
-                      alignItems={{ xs: "stretch", sm: "center" }}
-                    >
-                      <Typography level="body-sm" textColor="neutral.500">
-                        Commenting as @{user.username}
-                      </Typography>
-                      <Button type="submit" loading={isSubmittingComment} disabled={!commentText.trim() || !commentTurnstileToken} sx={{ borderRadius: "999px" }}>
-                        Post comment
-                      </Button>
-                    </Stack>
-                  </Stack>
-                </Card>
-              ) : (
-                <AuthPromptCard
-                  onLogin={() => navigate(`/login?next=/${post.id}`)}
-                  onSignup={() => navigate(`/signup?next=/${post.id}`)}
-                  message="Log in to vote, reply, and join the comment thread."
-                />
-              )}
-
-              {!comments.length ? (
-                <Card variant="outlined" className="content-card">
-                  <Typography level="body-md" textColor="neutral.400">No comments yet.</Typography>
-                </Card>
-              ) : (
-                <Stack spacing={1.5} className="comment-thread-list">
-                  {comments.map((comment) => (
-                    <CommentThread
-                      key={comment.id}
-                      comment={comment}
-                      isLoggedIn={Boolean(user)}
-                      onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
-                      onReply={handleReply}
-                      onVote={handleCommentVote}
-                    />
-                  ))}
-                </Stack>
-              )}
+              <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
+                {post.category ? <Typography level="body-sm" className="post-tag-chip">{post.category.label}</Typography> : null}
+                {(post.hashtags || []).map((tag) => (
+                  <Typography
+                    key={tag}
+                    level="body-sm"
+                    className="post-tag-chip post-tag-chip-clickable"
+                    onClick={() => navigate(`/?hashtag=${encodeURIComponent(tag)}`)}
+                  >
+                    #{tag}
+                  </Typography>
+                ))}
+              </Stack>
+              {post.description ? <Typography level="body-md" textColor="neutral.300">{post.description}</Typography> : null}
             </Stack>
-          </Card>
-        </div>
+
+            <div className="post-detail-action-panel">
+              <PostActionBar
+                post={post}
+                isLoggedIn={Boolean(user)}
+                isBusy={isBusy}
+                onUpvote={() => handleVote("up")}
+                onDownvote={() => handleVote("down")}
+                onRepost={handleRepost}
+                onShare={handleShare}
+                onReport={() => setReportOpen(true)}
+                onDelete={handleDeletePost}
+                canDelete={Boolean(user && (user.id === post.userId || user.isAdmin))}
+                onComment={() => setCommentsOpen(true)}
+                onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
+              />
+            </div>
+
+            {moderationReview ? (
+              <Card variant="outlined" className="content-card">
+                <Stack spacing={1.25}>
+                  <Typography level="title-md">Appeal moderation</Typography>
+                  {moderationReview.aiFinding ? (
+                    <Typography level="body-sm" textColor="neutral.400">
+                      Risk {moderationReview.aiFinding.riskScore} • {(moderationReview.aiFinding.labels || []).join(", ") || "image safety review"} • {moderationReview.aiFinding.aiReason}
+                    </Typography>
+                  ) : null}
+                  {moderationReview.appeal?.status === "pending" ? (
+                    <Alert color="neutral" variant="soft">
+                      You already have a pending appeal for this post.
+                    </Alert>
+                  ) : (
+                    <>
+                      <Textarea
+                        minRows={3}
+                        maxRows={6}
+                        value={appealMessage}
+                        onChange={(event) => setAppealMessage(event.target.value)}
+                        placeholder="Explain why you think this post should be restored."
+                        sx={{ borderRadius: "18px" }}
+                      />
+                      <Button loading={isSubmittingAppeal} onClick={handleAppealSubmit} sx={{ borderRadius: "999px", alignSelf: "flex-start" }}>
+                        Appeal
+                      </Button>
+                    </>
+                  )}
+                </Stack>
+              </Card>
+            ) : null}
+
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap" className="post-detail-secondary-actions">
+              <Button variant="soft" color="neutral" component="a" href={`https://yimage.org/${post.id}`} sx={{ borderRadius: "999px" }}>
+                Share page
+              </Button>
+              <Button variant="plain" color="neutral" onClick={handleCopyLink} sx={{ borderRadius: "999px" }}>
+                Copy link
+              </Button>
+            </Stack>
+          </Stack>
+        </Card>
 
         <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} targetType="post" targetId={post.id} title="Report post" />
+        <PostCommentsSheet
+          open={commentsOpen}
+          onClose={() => setCommentsOpen(false)}
+          post={post}
+          user={user}
+          onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
+          onCommentCountChange={(delta) => setPost((current) => ({ ...current, commentsCount: current.commentsCount + delta }))}
+        />
         <ShareDialog
           open={shareOpen}
           onClose={() => setShareOpen(false)}

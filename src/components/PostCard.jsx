@@ -1,8 +1,11 @@
 import { useMemo, useState } from "react";
-import { Avatar, Card, Link, Sheet, Stack, Typography } from "@mui/joy";
-import { Link as RouterLink } from "react-router-dom";
+import { Avatar, Card, Link, Stack, Typography } from "@mui/joy";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import PostActionBar from "./PostActionBar";
+import PostCommentsSheet from "./PostCommentsSheet";
+import PostFocusDialog from "./PostFocusDialog";
 import ReportDialog from "./ReportDialog";
+import { useAuth } from "../context/AuthContext";
 import { formatRelativeTime } from "../utils/formatters";
 
 function getPostImages(post) {
@@ -35,7 +38,11 @@ export default function PostCard({
   onDelete,
   onRequireLogin
 }) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [reportOpen, setReportOpen] = useState(false);
+  const [focusOpen, setFocusOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const images = useMemo(() => getPostImages(post), [post]);
   const hasMedia = images.length > 0;
@@ -45,21 +52,29 @@ export default function PostCard({
   const description = post.description?.trim();
 
   function showPreviousImage(event) {
-    event.preventDefault();
-    event.stopPropagation();
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
     setActiveImageIndex((current) => (current === 0 ? images.length - 1 : current - 1));
   }
 
   function showNextImage(event) {
-    event.preventDefault();
-    event.stopPropagation();
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
     setActiveImageIndex((current) => (current === images.length - 1 ? 0 : current + 1));
+  }
+
+  async function handleCopyLink() {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/${post.id}`);
+    } catch {
+      // no-op; focus mode should stay usable even if clipboard fails
+    }
   }
 
   return (
     <>
       <Card variant="outlined" className={`post-card ${isImageOnly ? "post-card-image-only" : "post-card-normal"}`}>
-        <Stack spacing={1.15}>
+        <Stack spacing={1.05}>
           <Stack direction="row" justifyContent="space-between" spacing={1.25} alignItems="flex-start">
             <Stack direction="row" spacing={1.1} alignItems="center" sx={{ minWidth: 0 }}>
               <Avatar
@@ -104,7 +119,7 @@ export default function PostCard({
           </Stack>
 
           {title ? (
-            <Link component={RouterLink} to={`/${post.id}`} underline="none" color="neutral">
+            <Link component={RouterLink} to={`/${post.id}`} underline="none" color="neutral" className="post-title-link">
               <Typography level={isImageOnly ? "title-md" : "title-lg"} className="post-title">
                 {title}
               </Typography>
@@ -112,26 +127,35 @@ export default function PostCard({
           ) : null}
 
           {hasMedia ? (
-            <Sheet className={`post-media-frame ${isImageOnly ? "is-image-only" : "is-normal"}`} sx={{ overflow: "hidden" }}>
-              <Link component={RouterLink} to={`/${post.id}`} underline="none" color="neutral" className="post-media-link">
-                <div className={`post-preview-media ${isImageOnly ? "is-image-only" : "is-normal"}`}>
-                  <div className={`post-preview-canvas ${isImageOnly ? "is-image-only" : "is-normal"}`}>
-                    <img
-                      key={activeImage?.url}
-                      src={activeImage?.url}
-                      alt={title || `${post.authorUsername} post`}
-                      className="post-preview-image"
-                    />
-                  </div>
+            <div
+              className={`post-media-frame ${isImageOnly ? "is-image-only" : "is-normal"}`}
+              role="button"
+              tabIndex={0}
+              onClick={() => setFocusOpen(true)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setFocusOpen(true);
+                }
+              }}
+            >
+              <div className={`post-preview-media ${isImageOnly ? "is-image-only" : "is-normal"}`}>
+                <div className={`post-preview-canvas ${isImageOnly ? "is-image-only" : "is-normal"}`}>
+                  <img
+                    key={activeImage?.url}
+                    src={activeImage?.url}
+                    alt={title || `${post.authorUsername} post`}
+                    className="post-preview-image"
+                  />
                 </div>
-              </Link>
+              </div>
               {images.length > 1 ? (
                 <>
                   <button type="button" className="post-carousel-arrow is-left" onClick={showPreviousImage} aria-label="Previous image">
-                    ‹
+                    {"<"}
                   </button>
                   <button type="button" className="post-carousel-arrow is-right" onClick={showNextImage} aria-label="Next image">
-                    ›
+                    {">"}
                   </button>
                   <div className="post-carousel-dots" aria-hidden="true">
                     {images.map((image, index) => (
@@ -140,7 +164,7 @@ export default function PostCard({
                   </div>
                 </>
               ) : null}
-            </Sheet>
+            </div>
           ) : null}
 
           {description ? (
@@ -180,11 +204,34 @@ export default function PostCard({
             onReport={() => setReportOpen(true)}
             onDelete={onDelete}
             canDelete={canDelete}
-            onComment={() => window.location.assign(`/${post.id}#comments`)}
+            onComment={() => setCommentsOpen(true)}
             onRequireLogin={onRequireLogin}
           />
         </Stack>
       </Card>
+
+      <PostFocusDialog
+        open={focusOpen}
+        onClose={() => setFocusOpen(false)}
+        post={post}
+        images={images}
+        activeImageIndex={activeImageIndex}
+        onPrevious={showPreviousImage}
+        onNext={showNextImage}
+        onShare={() => onShare?.()}
+        onCopyLink={handleCopyLink}
+        onOpenPost={() => navigate(`/${post.id}`)}
+      />
+
+      <PostCommentsSheet
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        post={post}
+        user={user}
+        onRequireLogin={onRequireLogin}
+        onCommentCountChange={() => {}}
+      />
+
       <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} targetType="post" targetId={post.id} title="Report post" />
     </>
   );

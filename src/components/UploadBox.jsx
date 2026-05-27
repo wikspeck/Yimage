@@ -325,6 +325,9 @@ export default function UploadBox({ onPostCreated }) {
               <Typography level="body-sm" textColor="neutral.400">
                 {postType === "normal" ? "Up to 4 images." : "Single image."}
               </Typography>
+              <Typography level="body-sm" textColor="neutral.500">
+                Best upload format: 3:4 portrait or landscape. Other ratios will be scaled to fit.
+              </Typography>
               <Button
                 type="button"
                 variant="soft"

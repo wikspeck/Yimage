@@ -1501,3 +1501,338 @@ body,
     min-height: auto;
   }
 }
+
+/* Media, focus mode, and mobile-nav polish */
+.top-brand-bar,
+.app-footer {
+  margin-left: 0;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+
+.top-brand-bar {
+  position: sticky;
+  top: 0;
+  z-index: 80;
+  min-height: 60px;
+  width: 100%;
+}
+
+.brand-version {
+  padding: 3px 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+}
+
+.app-main {
+  padding-top: 8px;
+}
+
+.app-nav-shell {
+  top: 70px;
+  bottom: 0;
+  width: 94px;
+}
+
+.app-nav-panel {
+  justify-content: center;
+  gap: 18px;
+  padding-top: 22px;
+  padding-bottom: 96px;
+}
+
+.nav-item-inner {
+  gap: 8px;
+}
+
+.app-footer {
+  width: 100%;
+  text-align: center;
+}
+
+.page-shell {
+  width: min(100%, 960px);
+}
+
+.post-view-shell {
+  width: min(100%, 980px);
+}
+
+.post-card {
+  width: fit-content;
+  max-width: min(100%, 700px);
+  align-self: flex-start;
+}
+
+.post-card-normal {
+  max-width: min(100%, 640px);
+}
+
+.post-card-image-only {
+  max-width: min(100%, 760px);
+}
+
+.post-media-frame {
+  display: inline-flex;
+  align-self: flex-start;
+  max-width: 100%;
+  cursor: zoom-in;
+}
+
+.post-preview-media,
+.post-preview-canvas {
+  background: #060606 !important;
+}
+
+.post-preview-canvas {
+  display: inline-flex;
+  width: auto;
+  max-width: 100%;
+  min-height: 0;
+}
+
+.post-preview-canvas.is-normal,
+.post-preview-canvas.is-image-only {
+  aspect-ratio: auto;
+  max-height: none;
+}
+
+.post-preview-image {
+  width: auto;
+  max-width: min(100%, 520px);
+  height: auto;
+  max-height: 420px;
+  object-fit: contain;
+}
+
+.post-card-normal .post-preview-image {
+  max-width: min(100%, 460px);
+  max-height: 320px;
+}
+
+.post-card-image-only .post-preview-image {
+  max-width: min(100%, 640px);
+  max-height: 520px;
+}
+
+.viewer-frame-adaptive {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  border-radius: 22px;
+  background: #050505;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.viewer-image {
+  display: block;
+  max-width: 100%;
+  max-height: 78vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 18px;
+}
+
+.post-detail-single-card {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.focus-modal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.focus-dialog {
+  width: min(92vw, 980px);
+  max-height: 92vh;
+  padding: 16px;
+  border-radius: 28px;
+  background: #050505 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.focus-dialog-media-shell {
+  position: relative;
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  border-radius: 24px;
+  background: #020202;
+}
+
+.focus-dialog-image {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 18px;
+  animation: postImageFade 180ms ease;
+}
+
+.focus-arrow {
+  opacity: 1;
+}
+
+.comments-sheet-modal {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.48);
+}
+
+.comments-sheet {
+  width: min(100%, 780px);
+  height: min(82vh, 760px);
+  padding: 14px;
+  border-top-left-radius: 26px;
+  border-top-right-radius: 26px;
+  background: #050505 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.comments-sheet-head,
+.comments-sheet-spacer {
+  width: 32px;
+  min-width: 32px;
+}
+
+.comments-sheet-close {
+  position: static !important;
+  transform: none !important;
+  margin: 0 !important;
+}
+
+.comments-sheet-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.comments-sheet-composer {
+  position: sticky;
+  bottom: 0;
+}
+
+.post-actions-row {
+  gap: 10px;
+}
+
+.action-cluster {
+  gap: 8px;
+}
+
+.comment-card .MuiStack-root[direction="row"],
+.comments-sheet .comment-card .MuiStack-root[direction="row"] {
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .top-brand-bar {
+    padding-left: 12px;
+    padding-right: 12px;
+    min-height: 56px;
+  }
+
+  .app-main {
+    padding-top: 6px;
+    padding-bottom: 120px;
+  }
+
+  .app-nav-shell {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: 100%;
+    height: 84px;
+    z-index: 85;
+  }
+
+  .app-nav-panel {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 10px 14px;
+    background: rgba(0, 0, 0, 0.96);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .nav-item {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .nav-item-inner {
+    padding: 6px 2px;
+  }
+
+  .nav-divider {
+    display: none;
+  }
+
+  .nav-compose-button {
+    min-width: 70px;
+    min-height: 42px;
+    align-self: center;
+  }
+
+  .app-footer {
+    padding-bottom: 112px;
+  }
+
+  .page-shell {
+    padding-bottom: 128px;
+  }
+
+  .post-card,
+  .post-card-normal,
+  .post-card-image-only {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .post-preview-image,
+  .post-card-normal .post-preview-image,
+  .post-card-image-only .post-preview-image {
+    max-width: 100%;
+    max-height: 52vh;
+  }
+
+  .post-actions-row {
+    justify-content: center;
+  }
+
+  .vote-cluster,
+  .action-cluster {
+    width: 100%;
+    justify-content: space-evenly;
+  }
+
+  .social-action-button,
+  .icon-button,
+  .download-button {
+    min-width: 40px !important;
+    min-height: 40px !important;
+  }
+
+  .comments-sheet {
+    width: 100%;
+    height: min(84vh, 760px);
+    border-top-left-radius: 24px;
+    border-top-right-radius: 24px;
+  }
+}
