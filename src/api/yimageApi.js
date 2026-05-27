@@ -9,13 +9,19 @@ async function readResponse(response) {
     }
 
     if (!response.ok || data.ok === false) {
-      throw new Error(data.message || `Request failed with status ${response.status}.`);
+      const fallbackMessage = response.status >= 500
+        ? "Something went wrong loading this section."
+        : `Request failed with status ${response.status}.`;
+      throw new Error(data.message || fallbackMessage);
     }
 
     return data;
   }
 
   const text = await response.text().catch(() => "");
+  if (response.status >= 500) {
+    throw new Error("Something went wrong loading this section.");
+  }
   throw new Error(text.trim() || `The server returned ${response.status} ${response.statusText || "response"}.`);
 }
 

@@ -152,6 +152,11 @@ function fail(message, status = 400, details) {
   );
 }
 
+function isMissingTableError(error, tableName) {
+  const message = String(error?.message || error || "").toLowerCase();
+  return message.includes("no such table") && (!tableName || message.includes(String(tableName).toLowerCase()));
+}
+
 function getCookie(request, name) {
   const rawCookie = request.headers.get("Cookie") || "";
   const parts = rawCookie.split(";").map((part) => part.trim());
@@ -670,20 +675,32 @@ async function getPostImagesMap(env, postIds) {
   }
 
   const placeholders = postIds.map(() => "?").join(", ");
-  const rows = await env.DB.prepare(
-    `
-      SELECT
-        post_id AS postId,
-        image_key AS imageKey,
-        image_mime_type AS imageMimeType,
-        sort_order AS sortOrder
-      FROM post_images
-      WHERE post_id IN (${placeholders})
-      ORDER BY sort_order ASC, created_at ASC
-    `
-  )
-    .bind(...postIds)
-    .all();
+  let rows;
+
+  try {
+    rows = await env.DB.prepare(
+      `
+        SELECT
+          post_id AS postId,
+          image_key AS imageKey,
+          image_mime_type AS imageMimeType,
+          sort_order AS sortOrder
+        FROM post_images
+        WHERE post_id IN (${placeholders})
+        ORDER BY sort_order ASC, created_at ASC
+      `
+    )
+      .bind(...postIds)
+      .all();
+  } catch (error) {
+    if (isMissingTableError(error, "post_images")) {
+      console.error("D1 migration missing: post_images table not found while loading post images.", {
+        postIds
+      });
+      return {};
+    }
+    throw error;
+  }
 
   const result = {};
   for (const row of rows.results || []) {
@@ -1696,6 +1713,7 @@ async function handleCreatePost(request, env) {
   const images = uploadedImages.length ? uploadedImages : (legacyImage instanceof File ? [legacyImage] : []);
   const finalTitle = postType === "image-only" ? "" : title;
   const finalDescription = postType === "image-only" ? "" : description;
+  let postImagesTableReady = true;
 
   if (postType === "normal" && !title) {
     return fail("Title is required.");
@@ -1714,6 +1732,24 @@ async function handleCreatePost(request, env) {
   }
   if (postType === "normal" && images.length > 4) {
     return fail("Normal posts support up to 4 images.");
+  }
+
+  try {
+    await env.DB.prepare("SELECT 1 FROM post_images LIMIT 1").all();
+  } catch (error) {
+    if (isMissingTableError(error, "post_images")) {
+      postImagesTableReady = false;
+      console.error("D1 migration missing: post_images table not found during post creation.", {
+        postType,
+        imageCount: images.length
+      });
+    } else {
+      throw error;
+    }
+  }
+
+  if (!postImagesTableReady && images.length > 1) {
+    return fail("Something went wrong publishing this post.", 503);
   }
 
   const preparedImages = [];
@@ -1797,22 +1833,33 @@ async function handleCreatePost(request, env) {
     .bind(postId, user.id, finalTitle, finalDescription, primaryImageKey, primaryImage.file.type, createdAt, resolvedCategoryId, moderationStatus)
     .run();
 
-  for (let index = 0; index < preparedImages.length; index += 1) {
-    const currentImage = preparedImages[index];
-    await env.DB.prepare(
-      `
-        INSERT INTO post_images (
-          id,
-          post_id,
-          image_key,
-          image_mime_type,
-          sort_order,
-          created_at
-        ) VALUES (?, ?, ?, ?, ?, ?)
-      `
-    )
-      .bind(createId("postimg_"), postId, currentImage.imageKey, currentImage.file.type, index, createdAt)
-      .run();
+  if (postImagesTableReady) {
+    try {
+      for (let index = 0; index < preparedImages.length; index += 1) {
+        const currentImage = preparedImages[index];
+        await env.DB.prepare(
+          `
+            INSERT INTO post_images (
+              id,
+              post_id,
+              image_key,
+              image_mime_type,
+              sort_order,
+              created_at
+            ) VALUES (?, ?, ?, ?, ?, ?)
+          `
+        )
+          .bind(createId("postimg_"), postId, currentImage.imageKey, currentImage.file.type, index, createdAt)
+          .run();
+      }
+    } catch (error) {
+      console.error("Could not store post_images rows.", {
+        postId,
+        imageCount: preparedImages.length,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return fail("Something went wrong publishing this post.", 500);
+    }
   }
 
   await syncPostHashtags(env, postId, hashtags);
@@ -2932,7 +2979,7 @@ export default {
           pathname: url.pathname,
           error: thrown instanceof Error ? thrown.message : String(thrown)
         });
-        return fail(thrown?.message || "Unexpected server error.", 500);
+        return fail("Something went wrong loading this section.", 500);
       }
     })();
 

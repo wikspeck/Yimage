@@ -1366,3 +1366,138 @@ body,
     align-self: stretch;
   }
 }
+
+/* App chrome polish */
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.app-main {
+  min-height: calc(100vh - 146px);
+  padding-left: 112px;
+  padding-bottom: 12px;
+}
+
+.top-brand-bar,
+.app-footer {
+  margin-left: 112px;
+  padding-left: 24px;
+  padding-right: 24px;
+}
+
+.top-brand-bar {
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+}
+
+.app-footer {
+  min-height: 64px;
+  padding-top: 14px;
+  padding-bottom: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: #000000;
+}
+
+.page-shell,
+.page-shell-wide {
+  min-height: calc(100vh - 154px);
+}
+
+.app-nav-shell {
+  top: 82px;
+  bottom: 74px;
+}
+
+.app-nav-panel {
+  justify-content: space-evenly;
+  padding: 14px 10px;
+}
+
+.nav-item {
+  display: flex;
+}
+
+.nav-item-inner {
+  width: 100%;
+}
+
+.nav-divider {
+  margin: 8px 0;
+}
+
+.profile-page-shell {
+  width: min(100%, 920px);
+}
+
+.profile-hero-card,
+.profile-edit-card,
+.profile-posts-card {
+  border-radius: 28px !important;
+}
+
+.profile-divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.profile-stats-row {
+  gap: 10px;
+}
+
+.profile-stat-pill {
+  min-width: 110px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: #0d0d0d;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-stat-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.profile-stat-label {
+  font-size: 0.76rem;
+  color: rgba(255, 255, 255, 0.58);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.profile-empty-state {
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  background: #090909;
+}
+
+@media (max-width: 900px) {
+  .top-brand-bar,
+  .app-footer {
+    margin-left: 0;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .app-main {
+    min-height: auto;
+    padding-left: 0;
+    padding-bottom: 92px;
+  }
+
+  .page-shell,
+  .page-shell-wide {
+    min-height: auto;
+  }
+}

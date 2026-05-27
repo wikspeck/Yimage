@@ -6,15 +6,8 @@ export default function Footer() {
   const { user } = useAuth();
 
   return (
-    <Sheet
-      variant="plain"
-      className="app-footer"
-      sx={{
-        py: 3,
-        textAlign: "center"
-      }}
-    >
-      <Stack spacing={1} alignItems="center">
+    <Sheet variant="plain" className="app-footer">
+      <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} useFlexGap justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }}>
         <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" justifyContent="center">
           <Link component={RouterLink} to="/guidelines" underline="hover">Community Guidelines</Link>
           <Link component={RouterLink} to="/dmca" underline="hover">DMCA</Link>

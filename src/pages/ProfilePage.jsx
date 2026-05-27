@@ -221,25 +221,25 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="page-shell">
+    <div className="page-shell profile-page-shell">
       <Stack spacing={3}>
         <BackButton fallbackTo="/" label="Back" />
         {error ? <Alert color="danger" variant="soft">{error}</Alert> : null}
         {notice ? <Alert color="neutral" variant="soft">{notice}</Alert> : null}
 
-        <Card variant="outlined" className="content-card">
-          <Stack spacing={2}>
+        <Card variant="outlined" className="content-card profile-hero-card">
+          <Stack spacing={2.2}>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }}>
               <Avatar
                 src={profile.avatarUrl || undefined}
                 alt={profile.displayName || profile.username}
-                sx={{ width: 84, height: 84, fontSize: "1.5rem", bgcolor: "#111111" }}
+                sx={{ width: 92, height: 92, fontSize: "1.65rem", bgcolor: "#111111" }}
               >
                 {(profile.displayName || profile.username || "Y").slice(0, 1).toUpperCase()}
               </Avatar>
 
-              <Stack spacing={0.75} sx={{ minWidth: 0 }}>
-                <Typography level="h1" sx={{ letterSpacing: "-0.05em" }}>
+              <Stack spacing={0.85} sx={{ minWidth: 0, flex: 1 }}>
+                <Typography level="h1" sx={{ letterSpacing: "-0.05em", lineHeight: 0.95 }}>
                   {profile.displayName || profile.username}
                 </Typography>
                 <Typography level="body-md" textColor="neutral.400">
@@ -276,10 +276,21 @@ export default function ProfilePage() {
               </Stack>
             </Stack>
 
-            <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap">
-              <Typography level="body-md">{profile.postsCount} posts</Typography>
-              <Typography level="body-md">{profile.followersCount} followers</Typography>
-              <Typography level="body-md">{profile.followingCount} following</Typography>
+            <div className="profile-divider" />
+
+            <Stack direction="row" spacing={1.25} useFlexGap flexWrap="wrap" className="profile-stats-row">
+              <div className="profile-stat-pill">
+                <span className="profile-stat-value">{profile.postsCount}</span>
+                <span className="profile-stat-label">Posts</span>
+              </div>
+              <div className="profile-stat-pill">
+                <span className="profile-stat-value">{profile.followersCount}</span>
+                <span className="profile-stat-label">Followers</span>
+              </div>
+              <div className="profile-stat-pill">
+                <span className="profile-stat-value">{profile.followingCount}</span>
+                <span className="profile-stat-label">Following</span>
+              </div>
             </Stack>
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
@@ -301,7 +312,7 @@ export default function ProfilePage() {
         </Card>
 
         {isOwnProfile ? (
-          <Card variant="outlined" className="content-card">
+          <Card variant="outlined" className="content-card profile-edit-card">
             <Stack component="form" spacing={1.5} onSubmit={handleProfileSave}>
               <Typography level="title-lg">Edit profile</Typography>
               <Input
@@ -332,25 +343,43 @@ export default function ProfilePage() {
           </Card>
         ) : null}
 
-        <Stack spacing={2}>
-          {posts.map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              isLoggedIn={Boolean(user)}
-              isBusy={false}
-              onUpvote={() => navigate(`/${post.id}`)}
-              onDownvote={() => navigate(`/${post.id}`)}
-              onRepost={() => navigate(`/${post.id}`)}
-              onShare={() => handleSharePost(post.id)}
-              canDelete={Boolean(user && (user.id === post.userId || user.isAdmin))}
-              onDelete={() => handleDeletePost(post)}
-              onHashtagClick={(tag) => navigate(`/?hashtag=${encodeURIComponent(tag)}`)}
-              onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
-              onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
-            />
-          ))}
-        </Stack>
+        <Card variant="outlined" className="content-card profile-posts-card">
+          <Stack spacing={1.6}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1.5}>
+              <Typography level="title-lg">Posts</Typography>
+              <Typography level="body-sm" textColor="neutral.500">{posts.length}</Typography>
+            </Stack>
+            <div className="profile-divider" />
+
+            {posts.length ? (
+              <Stack spacing={2}>
+                {posts.map((post) => (
+                  <PostCard
+                    key={post.id}
+                    post={post}
+                    isLoggedIn={Boolean(user)}
+                    isBusy={false}
+                    onUpvote={() => navigate(`/${post.id}`)}
+                    onDownvote={() => navigate(`/${post.id}`)}
+                    onRepost={() => navigate(`/${post.id}`)}
+                    onShare={() => handleSharePost(post.id)}
+                    canDelete={Boolean(user && (user.id === post.userId || user.isAdmin))}
+                    onDelete={() => handleDeletePost(post)}
+                    onHashtagClick={(tag) => navigate(`/?hashtag=${encodeURIComponent(tag)}`)}
+                    onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
+                    onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
+                  />
+                ))}
+              </Stack>
+            ) : (
+              <div className="profile-empty-state">
+                <Typography level="body-md" textColor="neutral.400">
+                  No posts yet.
+                </Typography>
+              </div>
+            )}
+          </Stack>
+        </Card>
         <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} targetType="user" targetId={profile.id} title="Report profile" />
         <ToastNotice open={Boolean(toastMessage)} message={toastMessage} onClose={() => setToastMessage("")} />
       </Stack>
