@@ -47,6 +47,24 @@ export default function SettingsPage() {
               <Option value="normal">Normal Posts</Option>
               <Option value="image-only">Image-Only Posts</Option>
             </Select>
+            <Select
+              value={preferences.defaultDiscoverMode}
+              onChange={(_, value) => updatePreference("defaultDiscoverMode", value || "trending")}
+              placeholder="Default discover mode"
+              sx={{ borderRadius: "16px" }}
+            >
+              <Option value="trending">Trending</Option>
+              <Option value="hot">Hot and New</Option>
+              <Option value="fresh">Random</Option>
+            </Select>
+            <label className="settings-toggle-row">
+              <span>Show image-only posts first</span>
+              <Switch checked={preferences.showImageOnlyPostsFirst} onChange={(event) => updatePreference("showImageOnlyPostsFirst", event.target.checked)} />
+            </label>
+            <label className="settings-toggle-row">
+              <span>Keep comments open</span>
+              <Switch checked={preferences.autoOpenCommentsAfterPostingComment} onChange={(event) => updatePreference("autoOpenCommentsAfterPostingComment", event.target.checked)} />
+            </label>
           </Stack>
         </Card>
 

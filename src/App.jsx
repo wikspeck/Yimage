@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import CookieConsentBanner from "./components/CookieConsentBanner";
+import AppErrorBoundary from "./components/AppErrorBoundary";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { PreferencesProvider } from "./context/PreferencesContext";
 import CreatePostPage from "./pages/CreatePostPage";
@@ -72,43 +73,45 @@ function AppRoutes() {
         <div className="app-shell">
           <AppLayout />
           <main className="app-main">
-            <Routes>
-              <Route path="/" element={<DiscoverPage />} />
-              <Route path="/discover" element={<Navigate to="/" replace />} />
-              <Route path="/search" element={<SearchPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route
-                path="/create"
-                element={
-                  <RequireAuth>
-                    <CreatePostPage />
-                  </RequireAuth>
-                }
-              />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/signup" element={<SignupPage />} />
-              <Route path="/guidelines" element={<CommunityGuidelinesPage />} />
-              <Route path="/dmca" element={<DmcaPage />} />
-              <Route path="/cookies" element={<CookiePolicyPage />} />
-              <Route
-                path="/profile"
-                element={
-                  <RequireAuth>
-                    <NavigateToOwnProfile />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/moderation"
-                element={
-                  <RequireModerator>
-                    <ModerationPage />
-                  </RequireModerator>
-                }
-              />
-              <Route path="/u/:username" element={<ProfilePage />} />
-              <Route path="/:postId" element={<PostPage />} />
-            </Routes>
+            <AppErrorBoundary>
+              <Routes>
+                <Route path="/" element={<DiscoverPage />} />
+                <Route path="/discover" element={<Navigate to="/" replace />} />
+                <Route path="/search" element={<SearchPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route
+                  path="/create"
+                  element={
+                    <RequireAuth>
+                      <CreatePostPage />
+                    </RequireAuth>
+                  }
+                />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/signup" element={<SignupPage />} />
+                <Route path="/guidelines" element={<CommunityGuidelinesPage />} />
+                <Route path="/dmca" element={<DmcaPage />} />
+                <Route path="/cookies" element={<CookiePolicyPage />} />
+                <Route
+                  path="/profile"
+                  element={
+                    <RequireAuth>
+                      <NavigateToOwnProfile />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/moderation"
+                  element={
+                    <RequireModerator>
+                      <ModerationPage />
+                    </RequireModerator>
+                  }
+                />
+                <Route path="/u/:username" element={<ProfilePage />} />
+                <Route path="/:postId" element={<PostPage />} />
+              </Routes>
+            </AppErrorBoundary>
           </main>
           <Footer />
           <CookieConsentBanner />

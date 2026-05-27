@@ -35,17 +35,17 @@ export default function DiscoverPage() {
   const [sharePostId, setSharePostId] = useState("");
   const selectedCategory = searchParams.get("category") || "";
   const selectedView = searchParams.get("view") || "home";
-  const selectedMode = searchParams.get("mode") || (selectedView === "discover" ? "trending" : "home");
+  const selectedMode = searchParams.get("mode") || (selectedView === "discover" ? preferences.defaultDiscoverMode || "trending" : "home");
   const selectedPostType = searchParams.get("postType") || preferences.defaultFeedPostType || "all";
 
   const activeFilters = useMemo(
     () => ({
       category: searchParams.get("category") || "",
       view: searchParams.get("view") || "home",
-      mode: searchParams.get("mode") || (searchParams.get("view") === "discover" ? "trending" : "home"),
+      mode: searchParams.get("mode") || (searchParams.get("view") === "discover" ? preferences.defaultDiscoverMode || "trending" : "home"),
       postType: searchParams.get("postType") || preferences.defaultFeedPostType || "all"
     }),
-    [preferences.defaultFeedPostType, searchParams]
+    [preferences.defaultDiscoverMode, preferences.defaultFeedPostType, searchParams]
   );
 
   useEffect(() => {
@@ -88,7 +88,11 @@ export default function DiscoverPage() {
       try {
         const nextPosts = await getPosts(activeFilters);
         if (isMounted) {
-          setPosts(nextPosts);
+          setPosts(
+            preferences.showImageOnlyPostsFirst
+              ? [...nextPosts].sort((a, b) => (a.postType === "image-only" ? -1 : 0) - (b.postType === "image-only" ? -1 : 0))
+              : nextPosts
+          );
         }
       } catch (error) {
         if (isMounted) {
@@ -105,7 +109,7 @@ export default function DiscoverPage() {
     return () => {
       isMounted = false;
     };
-  }, [activeFilters]);
+  }, [activeFilters, preferences.showImageOnlyPostsFirst]);
 
   function updateFilters(next) {
     const params = new URLSearchParams(searchParams);
@@ -330,10 +334,7 @@ export default function DiscoverPage() {
               onToggleFollow={() => handleToggleFollow(post)}
               canDelete={Boolean(user && (user.id === post.userId || user.isAdmin))}
               onDelete={() => handleDelete(post)}
-              onHashtagClick={(tag) => {
-                setSearchText(`#${tag}`);
-                updateFilters({ hashtag: tag, query: "" });
-              }}
+              onHashtagClick={(tag) => updateFilters({ hashtag: tag, query: "" })}
               onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
               onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
             />

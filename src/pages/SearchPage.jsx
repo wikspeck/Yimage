@@ -58,7 +58,12 @@ export default function SearchPage() {
       try {
         const result = await searchYimage({ query, postType: selectedPostType });
         if (isMounted) {
-          setPosts(result.posts || []);
+          const nextPosts = result.posts || [];
+          setPosts(
+            preferences.showImageOnlyPostsFirst
+              ? [...nextPosts].sort((a, b) => (a.postType === "image-only" ? -1 : 0) - (b.postType === "image-only" ? -1 : 0))
+              : nextPosts
+          );
           setUsers(result.users || []);
           setHashtags(result.hashtags || []);
         }
@@ -77,7 +82,7 @@ export default function SearchPage() {
     return () => {
       isMounted = false;
     };
-  }, [query, selectedPostType]);
+  }, [preferences.showImageOnlyPostsFirst, query, selectedPostType]);
 
   function updateParams(next) {
     const params = new URLSearchParams(searchParams);

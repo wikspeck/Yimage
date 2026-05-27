@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Avatar, Button, Card, Input, Modal, ModalClose, Option, Select, Sheet, Stack, Textarea, Typography } from "@mui/joy";
+import { Alert, Avatar, Button, Card, CircularProgress, Input, Modal, ModalClose, Option, Select, Sheet, Stack, Textarea, Typography } from "@mui/joy";
 import { useNavigate, useParams } from "react-router-dom";
 import { deletePost, getUserProfile, toggleFollow } from "../api/yimageApi";
 import BackButton from "../components/BackButton";
@@ -398,7 +398,7 @@ export default function ProfilePage() {
             )}
           </Stack>
         </Card>
-        <Modal open={Boolean(socialSheet)} onClose={() => setSocialSheet("")} className="comments-sheet-modal">
+        <Modal open={Boolean(socialSheet)} onClose={() => { setSocialSheet(""); setSocialQuery(""); }} className="comments-sheet-modal">
           <Sheet variant="outlined" className="comments-sheet profile-social-sheet">
             <Stack spacing={1.25} sx={{ height: "100%" }}>
               <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>

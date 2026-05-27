@@ -73,7 +73,7 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onHome, on
                   Settings
                 </Button>
                 <Button variant="plain" color="neutral" onClick={onProfile} sx={{ borderRadius: "999px", color: "#ffffff" }}>
-                  @{user.username}
+                  Account
                 </Button>
                 <Button variant="plain" color="neutral" onClick={logout} sx={{ borderRadius: "999px", color: "#ffffff" }}>
                   Log out

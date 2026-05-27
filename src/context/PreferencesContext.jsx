@@ -8,7 +8,10 @@ const DEFAULT_PREFERENCES = {
   reduceMotion: false,
   largerText: false,
   highContrast: false,
-  defaultFeedPostType: "all"
+  defaultFeedPostType: "all",
+  defaultDiscoverMode: "trending",
+  showImageOnlyPostsFirst: false,
+  autoOpenCommentsAfterPostingComment: true
 };
 
 const PreferencesContext = createContext(null);
