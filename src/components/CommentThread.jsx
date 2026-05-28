@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, Card, Stack, Textarea, Typography } from "@mui/joy";
+import { Avatar, Button, Card, Stack, Textarea, Typography } from "@mui/joy";
 import { formatRelativeTime } from "../utils/formatters";
 import ReportDialog from "./ReportDialog";
 import TurnstileWidget from "./TurnstileWidget";
@@ -69,8 +69,16 @@ function CommentNode({ comment, isLoggedIn, onRequireLogin, onReply, onVote, dep
     <Stack spacing={1.2} sx={{ ml: depth ? { xs: 1.25, sm: 2.25 } : 0 }}>
       <Card variant="outlined" className="comment-card">
         <Stack spacing={1}>
-          <Stack direction="row" justifyContent="space-between" spacing={1}>
-            <Typography level="title-sm">@{comment.authorUsername}</Typography>
+          <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="center">
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
+              <Avatar src={comment.authorAvatarUrl || ""} alt={comment.authorUsername} sx={{ width: 30, height: 30, bgcolor: "#111111", fontSize: "0.8rem" }}>
+                {(comment.authorDisplayName || comment.authorUsername || "Y").slice(0, 1).toUpperCase()}
+              </Avatar>
+              <Stack spacing={0} sx={{ minWidth: 0 }}>
+                <Typography level="title-sm">{comment.authorDisplayName || comment.authorUsername}</Typography>
+                <Typography level="body-xs" textColor="neutral.500">@{comment.authorUsername}</Typography>
+              </Stack>
+            </Stack>
             <Typography level="body-sm" textColor="neutral.500">
               {formatRelativeTime(comment.createdAt)}
             </Typography>
@@ -128,7 +136,7 @@ function CommentNode({ comment, isLoggedIn, onRequireLogin, onReply, onVote, dep
                 <Button size="sm" variant="plain" color="neutral" onClick={() => setReplyOpen(false)} sx={{ borderRadius: "999px" }}>
                   Cancel
                 </Button>
-                <Button type="submit" size="sm" loading={isSubmitting} disabled={!replyText.trim() || !turnstileToken} sx={{ borderRadius: "999px" }}>
+                <Button type="submit" size="sm" loading={isSubmitting} disabled={!replyText.trim() || !turnstileToken} className="app-primary-button" sx={{ borderRadius: "999px" }}>
                   Reply
                 </Button>
               </Stack>

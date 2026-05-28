@@ -102,6 +102,9 @@ export default function Header({
           <Stack direction="row" spacing={1} alignItems="center">
             {user ? (
               <>
+                <Typography level="body-sm" sx={{ color: "rgba(255,255,255,0.72)", fontWeight: 700 }}>
+                  @{user.username}
+                </Typography>
                 <Button variant="plain" color="neutral" onClick={logout} sx={{ borderRadius: "999px", color: "#ffffff" }}>
                   Log out
                 </Button>

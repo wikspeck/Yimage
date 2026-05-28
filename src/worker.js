@@ -412,6 +412,13 @@ function toPostResponse(post, viewerVote = null, viewerHasReposted = false, repo
     id: post.id,
     userId: post.userId,
     authorUsername: post.authorUsername,
+    authorProfile: {
+      displayName: post.authorDisplayName || post.authorUsername,
+      avatarUrl: post.authorAvatarUrl && post.authorAvatarUrl.startsWith("avatars/")
+        ? `/api/users/${post.authorUsername}/avatar`
+        : post.authorAvatarUrl || "",
+      isFollowing: Boolean(post.authorIsFollowing)
+    },
     title: post.title,
     description: post.description || "",
     imageKey: post.imageKey,
@@ -447,6 +454,10 @@ function toCommentResponse(comment, viewerVote = null) {
     parentId: comment.parentId || null,
     authorId: comment.authorId,
     authorUsername: comment.authorUsername,
+    authorDisplayName: comment.authorDisplayName || comment.authorUsername,
+    authorAvatarUrl: comment.authorAvatarUrl && comment.authorAvatarUrl.startsWith("avatars/")
+      ? `/api/users/${comment.authorUsername}/avatar`
+      : comment.authorAvatarUrl || "",
     text: comment.text,
     createdAt: comment.createdAt,
     score: Number(comment.score || 0),
@@ -1043,6 +1054,8 @@ async function getPostRecord(env, postId, includeModerated = false) {
         posts.id,
         posts.author_id AS userId,
         users.username AS authorUsername,
+        COALESCE(users.display_name, '') AS authorDisplayName,
+        COALESCE(users.avatar_url, '') AS authorAvatarUrl,
         posts.title,
         COALESCE(posts.description, '') AS description,
         posts.image_key AS imageKey,
@@ -1306,6 +1319,8 @@ async function listPosts(env, userId, options = {}) {
         posts.id,
         posts.author_id AS userId,
         users.username AS authorUsername,
+        COALESCE(users.display_name, '') AS authorDisplayName,
+        COALESCE(users.avatar_url, '') AS authorAvatarUrl,
         posts.title,
         COALESCE(posts.description, '') AS description,
         posts.image_key AS imageKey,
@@ -2149,6 +2164,8 @@ async function handleCommentsList(request, env, postId) {
         comments.parent_id AS parentId,
         comments.author_id AS authorId,
         users.username AS authorUsername,
+        COALESCE(users.display_name, '') AS authorDisplayName,
+        COALESCE(users.avatar_url, '') AS authorAvatarUrl,
         comments.text,
         comments.created_at AS createdAt,
         COALESCE(comments.score, 0) AS score
@@ -2206,6 +2223,8 @@ async function handleCommentCreate(request, env, postId) {
     parentId: resolvedParentId,
     authorId: user.id,
     authorUsername: user.username,
+    authorDisplayName: user.displayName || user.username,
+    authorAvatarUrl: user.avatarUrl || "",
     text,
     createdAt: toIsoDate(),
     score: 0
@@ -2248,7 +2267,7 @@ async function handleCommentVote(request, env, commentId) {
     return fail("Comment not found.", 404);
   }
 
-  const author = await env.DB.prepare("SELECT username AS authorUsername FROM users WHERE id = ? LIMIT 1").bind(comment.authorId).first();
+  const author = await env.DB.prepare("SELECT username AS authorUsername, COALESCE(display_name, '') AS authorDisplayName, COALESCE(avatar_url, '') AS authorAvatarUrl FROM users WHERE id = ? LIMIT 1").bind(comment.authorId).first();
   const existingVote = await env.DB.prepare("SELECT id, value FROM comment_votes WHERE user_id = ? AND comment_id = ? LIMIT 1")
     .bind(user.id, commentId)
     .first();
@@ -2276,6 +2295,8 @@ async function handleCommentVote(request, env, commentId) {
   await env.DB.prepare("UPDATE comments SET score = COALESCE(score, 0) + ? WHERE id = ?").bind(scoreDelta, commentId).run();
   comment.score = Number(comment.score || 0) + scoreDelta;
   comment.authorUsername = author?.authorUsername || "unknown";
+  comment.authorDisplayName = author?.authorDisplayName || comment.authorUsername;
+  comment.authorAvatarUrl = author?.authorAvatarUrl || "";
 
   return success({ comment: toCommentResponse(comment, finalVote) });
 }
@@ -2646,6 +2667,8 @@ async function handleGetProfile(request, env, username) {
         posts.id,
         posts.author_id AS userId,
         users.username AS authorUsername,
+        COALESCE(users.display_name, '') AS authorDisplayName,
+        COALESCE(users.avatar_url, '') AS authorAvatarUrl,
         posts.title,
         COALESCE(posts.description, '') AS description,
         posts.image_key AS imageKey,
@@ -2691,6 +2714,8 @@ async function handleGetProfile(request, env, username) {
         posts.id,
         posts.author_id AS userId,
         users.username AS authorUsername,
+        COALESCE(users.display_name, '') AS authorDisplayName,
+        COALESCE(users.avatar_url, '') AS authorAvatarUrl,
         posts.title,
         COALESCE(posts.description, '') AS description,
         posts.image_key AS imageKey,

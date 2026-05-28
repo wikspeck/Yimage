@@ -26,6 +26,15 @@ export default function UploadBox({ onPostCreated }) {
   const [appealNotice, setAppealNotice] = useState("");
   const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
 
+  function normalizeHashtagInput(value) {
+    return value
+      .split(/[\s,]+/)
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => (item.startsWith("#") ? item : `#${item}`))
+      .join(" ");
+  }
+
   useEffect(() => {
     if (!selectedFiles.length) {
       setPreviewUrls([]);
@@ -271,12 +280,18 @@ export default function UploadBox({ onPostCreated }) {
                 </Option>
               ))}
             </Select>
-            <Input
-              placeholder="Hashtags"
-              value={hashtags}
-              onChange={(event) => setHashtags(event.target.value)}
-              sx={{ borderRadius: "18px", minHeight: 48 }}
-            />
+            <Stack spacing={0.6}>
+              <Input
+                placeholder="#summer #art #fun"
+                value={hashtags}
+                onChange={(event) => setHashtags(event.target.value)}
+                onBlur={() => setHashtags((current) => normalizeHashtagInput(current))}
+                sx={{ borderRadius: "18px", minHeight: 48 }}
+              />
+              <Typography level="body-xs" textColor="neutral.500">
+                Start each hashtag with # so it can be detected.
+              </Typography>
+            </Stack>
           </Stack>
 
           <Sheet

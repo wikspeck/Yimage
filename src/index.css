@@ -648,7 +648,7 @@ a {
   height: 34px;
   border: 0;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.82);
   color: #ffffff;
   display: inline-flex;
   align-items: center;
@@ -658,6 +658,8 @@ a {
   cursor: pointer;
   transition: opacity 160ms ease, transform 160ms ease, background-color 160ms ease;
   z-index: 2;
+  padding: 0;
+  line-height: 1;
 }
 
 .post-media-frame:hover .post-carousel-arrow,
@@ -666,7 +668,7 @@ a {
 }
 
 .post-carousel-arrow:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.26);
   transform: translateY(-50%) scale(1.03);
 }
 
@@ -1002,10 +1004,10 @@ body::-webkit-scrollbar-thumb,
   appearance: none;
   border: 0;
   border-radius: 999px;
-  width: 58px;
-  height: 58px;
-  min-height: 58px;
-  min-width: 58px;
+  width: 54px;
+  height: 54px;
+  min-height: 54px;
+  min-width: 54px;
   padding: 0;
   background: #ffffff;
   color: #000000;
@@ -1023,9 +1025,12 @@ body::-webkit-scrollbar-thumb,
 }
 
 .nav-compose-plus {
-  font-size: 2rem;
+  font-size: 1.82rem;
   line-height: 1;
   font-weight: 400;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .nav-menu-button {
@@ -1033,22 +1038,22 @@ body::-webkit-scrollbar-thumb,
   border: 0;
   background: transparent;
   color: #7b7b7b;
-  width: 42px;
-  height: 42px;
+  width: 46px;
+  height: 46px;
   border-radius: 999px;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 5px;
   align-self: center;
   cursor: pointer;
   transition: background-color 180ms ease, transform 180ms ease;
 }
 
 .nav-menu-button span {
-  width: 16px;
-  height: 1.5px;
+  width: 18px;
+  height: 1.8px;
   border-radius: 999px;
   background: currentColor;
 }
@@ -1710,7 +1715,7 @@ body::-webkit-scrollbar-thumb,
   justify-content: center;
   gap: 26px;
   padding-top: 40px;
-  padding-bottom: 28px;
+  padding-bottom: 18px;
 }
 
 .nav-item-inner {
@@ -2002,16 +2007,16 @@ body::-webkit-scrollbar-thumb,
   }
 
   .nav-compose-button {
-    min-width: 54px;
-    min-height: 54px;
-    width: 54px;
-    height: 54px;
+    min-width: 50px;
+    min-height: 50px;
+    width: 50px;
+    height: 50px;
     align-self: center;
   }
 
   .nav-menu-button {
-    width: 40px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
     flex-shrink: 0;
   }
 
