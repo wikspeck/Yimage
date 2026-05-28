@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Box, Card, CircularProgress, Option, Select, Stack, Typography } from "@mui/joy";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { deletePost, getCategories, getPosts, repostPost, toggleFollow, voteOnPost } from "../api/yimageApi";
 import PostCard from "../components/PostCard";
 import ShareDialog from "../components/ShareDialog";
@@ -27,6 +27,7 @@ export default function DiscoverPage() {
   const { openLogin, openSignup } = useAuthModal();
   const { preferences } = usePreferences();
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [posts, setPosts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -37,18 +38,18 @@ export default function DiscoverPage() {
   const [busyPostId, setBusyPostId] = useState("");
   const [sharePostId, setSharePostId] = useState("");
   const selectedCategory = searchParams.get("category") || "";
-  const selectedView = searchParams.get("view") || "home";
+  const selectedView = location.pathname === "/discover" ? "discover" : "home";
   const selectedMode = searchParams.get("mode") || (selectedView === "discover" ? preferences.defaultDiscoverMode || "trending" : "home");
   const selectedPostType = searchParams.get("postType") || preferences.defaultFeedPostType || "all";
 
   const activeFilters = useMemo(
     () => ({
-      category: searchParams.get("category") || "",
-      view: searchParams.get("view") || "home",
-      mode: searchParams.get("mode") || (searchParams.get("view") === "discover" ? preferences.defaultDiscoverMode || "trending" : "home"),
-      postType: searchParams.get("postType") || preferences.defaultFeedPostType || "all"
-    }),
-    [preferences.defaultDiscoverMode, preferences.defaultFeedPostType, searchParams]
+        category: searchParams.get("category") || "",
+        view: location.pathname === "/discover" ? "discover" : "home",
+        mode: searchParams.get("mode") || (location.pathname === "/discover" ? preferences.defaultDiscoverMode || "trending" : "home"),
+        postType: searchParams.get("postType") || preferences.defaultFeedPostType || "all"
+      }),
+    [location.pathname, preferences.defaultDiscoverMode, preferences.defaultFeedPostType, searchParams]
   );
 
   useEffect(() => {
@@ -129,7 +130,7 @@ export default function DiscoverPage() {
   }
 
   function activateDiscoverMode(mode) {
-    updateFilters({ view: "discover", mode });
+    updateFilters({ mode });
   }
 
   function resetToHomeFeed() {
@@ -244,7 +245,7 @@ export default function DiscoverPage() {
       ? {
           title: "Discover - Yimage",
           description: "Discover trending images, creators, and posts on Yimage.",
-          canonicalPath: "/?view=discover",
+          canonicalPath: "/discover",
           type: "website"
         }
       : {

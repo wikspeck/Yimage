@@ -1,7 +1,6 @@
 import { CssBaseline, CssVarsProvider } from "@mui/joy";
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import Header from "./components/Header";
-import Footer from "./components/Footer";
 import CookieConsentBanner from "./components/CookieConsentBanner";
 import AppErrorBoundary from "./components/AppErrorBoundary";
 import AuthModal from "./components/AuthModal";
@@ -63,9 +62,12 @@ function AppLayout() {
       onOpenSignup={() => openSignup(currentPath)}
       onCreate={() => (user ? navigate("/create") : openLogin("/create"))}
       onHome={() => navigate("/")}
-      onDiscover={() => navigate("/?view=discover")}
+      onDiscover={() => navigate("/discover")}
       onSearch={() => navigate("/search")}
       onSettings={() => navigate("/settings")}
+      onGuidelines={() => navigate("/guidelines")}
+      onDmca={() => navigate("/dmca")}
+      onCookies={() => navigate("/cookies")}
       onProfile={() => (user ? navigate(`/u/${user.username}`) : openLogin("/profile"))}
     />
   );
@@ -82,7 +84,7 @@ function AppRoutes() {
               <AppErrorBoundary>
                 <Routes>
                   <Route path="/" element={<DiscoverPage />} />
-                  <Route path="/discover" element={<Navigate to="/" replace />} />
+                  <Route path="/discover" element={<DiscoverPage />} />
                   <Route path="/search" element={<SearchPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route
@@ -119,7 +121,6 @@ function AppRoutes() {
                 </Routes>
               </AppErrorBoundary>
             </main>
-            <Footer />
             <CookieConsentBanner />
             <AuthModal />
           </div>

@@ -1,4 +1,5 @@
-import { Box, Button, Sheet, Stack, Typography } from "@mui/joy";
+import { Box, Button, Modal, ModalClose, Sheet, Stack, Typography } from "@mui/joy";
+import { useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -20,20 +21,52 @@ function NavItem({ active, label, iconSrc, selectedIconSrc, onClick }) {
             aria-hidden="true"
           />
         </span>
-        <span className="nav-item-label">{label}</span>
       </span>
     </button>
   );
 }
 
-export default function Header({ onOpenLogin, onOpenSignup, onCreate, onHome, onDiscover, onProfile, onSearch, onSettings }) {
+function MenuButton({ onClick }) {
+  return (
+    <button type="button" className="nav-menu-button" onClick={onClick} aria-label="Open menu">
+      <span />
+      <span />
+      <span />
+    </button>
+  );
+}
+
+function MenuRow({ label, onClick }) {
+  return (
+    <button type="button" className="nav-menu-row" onClick={onClick}>
+      <span>{label}</span>
+      <span className="nav-menu-arrow" aria-hidden="true">
+        {">"}
+      </span>
+    </button>
+  );
+}
+
+export default function Header({
+  onOpenLogin,
+  onOpenSignup,
+  onCreate,
+  onHome,
+  onDiscover,
+  onProfile,
+  onSearch,
+  onSettings,
+  onGuidelines,
+  onDmca,
+  onCookies
+}) {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const params = new URLSearchParams(location.search);
+  const [menuOpen, setMenuOpen] = useState(false);
 
-  const isDiscover = location.pathname === "/" && params.get("view") === "discover";
+  const isDiscover = location.pathname === "/discover";
   const isSearch = location.pathname === "/search";
-  const isHome = location.pathname === "/" && !isDiscover && !isSearch;
+  const isHome = location.pathname === "/";
   const isProfile = location.pathname === "/profile" || location.pathname.startsWith("/u/");
   const isCreate = location.pathname.startsWith("/create");
 
@@ -69,9 +102,6 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onHome, on
           <Stack direction="row" spacing={1} alignItems="center">
             {user ? (
               <>
-                <Button variant="plain" color="neutral" onClick={onSettings} sx={{ borderRadius: "999px", color: "#ffffff" }}>
-                  Settings
-                </Button>
                 <Button variant="plain" color="neutral" onClick={logout} sx={{ borderRadius: "999px", color: "#ffffff" }}>
                   Log out
                 </Button>
@@ -130,10 +160,26 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onHome, on
           <div className="nav-divider" />
 
           <button type="button" className={`nav-compose-button${isCreate ? " is-active" : ""}`} onClick={onCreate} aria-label="Create post">
-            <span>Create</span>
+            <span className="nav-compose-plus" aria-hidden="true">+</span>
           </button>
+
+          <MenuButton onClick={() => setMenuOpen(true)} />
         </div>
       </aside>
+
+      <Modal open={menuOpen} onClose={() => setMenuOpen(false)} className="nav-menu-modal">
+        <Sheet variant="outlined" className="nav-menu-sheet">
+          <Stack spacing={0.5}>
+            <Stack direction="row" justifyContent="flex-end">
+              <ModalClose />
+            </Stack>
+            <MenuRow label="Settings" onClick={() => { setMenuOpen(false); onSettings?.(); }} />
+            <MenuRow label="Community Guidelines" onClick={() => { setMenuOpen(false); onGuidelines?.(); }} />
+            <MenuRow label="DMCA" onClick={() => { setMenuOpen(false); onDmca?.(); }} />
+            <MenuRow label="Cookie Policy" onClick={() => { setMenuOpen(false); onCookies?.(); }} />
+          </Stack>
+        </Sheet>
+      </Modal>
     </>
   );
 }
