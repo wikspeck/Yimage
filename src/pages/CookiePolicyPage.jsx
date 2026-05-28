@@ -1,7 +1,15 @@
 import { Card, Stack, Typography } from "@mui/joy";
 import BackButton from "../components/BackButton";
+import { useSeo } from "../hooks/useSeo";
 
 export default function CookiePolicyPage() {
+  useSeo({
+    title: "Cookie Policy - Yimage",
+    description: "Information about cookies and session usage on Yimage.",
+    canonicalPath: "/cookies",
+    type: "article"
+  });
+
   return (
     <div className="page-shell">
       <Stack spacing={3}>

@@ -1,7 +1,15 @@
 import { Card, Stack, Typography } from "@mui/joy";
 import BackButton from "../components/BackButton";
+import { useSeo } from "../hooks/useSeo";
 
 export default function DmcaPage() {
+  useSeo({
+    title: "DMCA - Yimage",
+    description: "Copyright and DMCA reporting information for content posted on Yimage.",
+    canonicalPath: "/dmca",
+    type: "article"
+  });
+
   return (
     <div className="page-shell">
       <Stack spacing={3}>

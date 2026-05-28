@@ -8,6 +8,7 @@ import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
 import { useAuthModal } from "../context/AuthModalContext";
 import { usePreferences } from "../context/PreferencesContext";
+import { useSeo } from "../hooks/useSeo";
 
 const RESULT_FILTERS = ["All", "Posts", "Users", "Hashtags"];
 const POST_TYPE_FILTERS = [
@@ -193,6 +194,14 @@ export default function SearchPage() {
   const showPosts = resultType === "All" || resultType === "Posts";
   const showUsers = resultType === "All" || resultType === "Users";
   const showHashtags = resultType === "All" || resultType === "Hashtags";
+  const canonicalQuery = query ? `/search?query=${encodeURIComponent(query)}${resultType !== "All" ? `&type=${encodeURIComponent(resultType)}` : ""}${selectedPostType !== "all" ? `&postType=${encodeURIComponent(selectedPostType)}` : ""}` : "/search";
+
+  useSeo({
+    title: "Search - Yimage",
+    description: "Search posts, creators, hashtags, and images on Yimage.",
+    canonicalPath: canonicalQuery,
+    type: "website"
+  });
 
   return (
     <Box className="page-shell">

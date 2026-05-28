@@ -1,7 +1,15 @@
 import { Card, Stack, Typography } from "@mui/joy";
 import BackButton from "../components/BackButton";
+import { useSeo } from "../hooks/useSeo";
 
 export default function CommunityGuidelinesPage() {
+  useSeo({
+    title: "Community Guidelines - Yimage",
+    description: "Read the community rules and platform safety guidelines for posting on Yimage.",
+    canonicalPath: "/guidelines",
+    type: "article"
+  });
+
   return (
     <div className="page-shell">
       <Stack spacing={3}>

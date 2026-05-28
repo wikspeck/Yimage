@@ -1,8 +1,16 @@
 import { Card, Option, Select, Stack, Switch, Typography } from "@mui/joy";
 import { usePreferences } from "../context/PreferencesContext";
+import { useSeo } from "../hooks/useSeo";
 
 export default function SettingsPage() {
   const { preferences, updatePreference } = usePreferences();
+
+  useSeo({
+    title: "Settings - Yimage",
+    description: "Manage appearance, feed, and accessibility preferences on Yimage.",
+    canonicalPath: "/settings",
+    type: "website"
+  });
 
   return (
     <div className="page-shell">

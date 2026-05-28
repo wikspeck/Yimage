@@ -8,6 +8,7 @@ import ReportDialog from "../components/ReportDialog";
 import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
 import { useAuthModal } from "../context/AuthModalContext";
+import { useSeo } from "../hooks/useSeo";
 import { formatFullDate } from "../utils/formatters";
 
 export default function ProfilePage() {
@@ -233,6 +234,13 @@ export default function ProfilePage() {
 
   const visiblePosts = activeFeed === "reposts" ? reposts : posts;
   const socialItems = socialSheet === "followers" ? followers : socialSheet === "following" ? following : [];
+
+  useSeo({
+    title: `${profile.username} - Yimage`,
+    description: `View posts, reposts, and uploaded images from ${profile.username} on Yimage.`,
+    canonicalPath: `/u/${encodeURIComponent(profile.username)}`,
+    type: "profile"
+  });
 
   return (
     <div className="page-shell profile-page-shell">

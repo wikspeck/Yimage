@@ -8,6 +8,7 @@ import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
 import { useAuthModal } from "../context/AuthModalContext";
 import { usePreferences } from "../context/PreferencesContext";
+import { useSeo } from "../hooks/useSeo";
 
 const DISCOVER_MODES = [
   { key: "trending", title: "Trending" },
@@ -236,6 +237,37 @@ export default function DiscoverPage() {
 
   const heroTitle = selectedView === "discover" ? "Discover" : "Home";
   const visibleModes = selectedView === "discover" ? DISCOVER_MODES : [DISCOVER_MODES[2]];
+  const isDiscoverView = selectedView === "discover";
+
+  useSeo(
+    isDiscoverView
+      ? {
+          title: "Discover - Yimage",
+          description: "Discover trending images, creators, and posts on Yimage.",
+          canonicalPath: "/?view=discover",
+          type: "website"
+        }
+      : {
+          title: "Yimage - Social Image Sharing Platform",
+          description: "Fast and modern social image sharing platform for discovering, uploading, and sharing images.",
+          canonicalPath: "/",
+          type: "website",
+          jsonLd: {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            name: "Yimage",
+            alternateName: "Yimage Social Image Sharing Platform",
+            url: "https://yimage.org/",
+            description: "Fast and modern social image sharing platform for discovering, uploading, and sharing images.",
+            publisher: {
+              "@type": "Organization",
+              name: "Yimage",
+              url: "https://yimage.org/",
+              logo: "https://yimage.org/yimage-logo-app.png"
+            }
+          }
+        }
+  );
 
   return (
     <Box className="page-shell">
@@ -243,9 +275,16 @@ export default function DiscoverPage() {
         <Card variant="outlined" className="content-card feed-hero-card">
           <Stack spacing={2}>
             <Stack direction="row" justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={2} flexWrap="wrap">
-              <Typography level="h1" sx={{ letterSpacing: "-0.07em", fontSize: { xs: "2.2rem", md: "3.1rem" }, lineHeight: 0.95 }}>
-                {heroTitle}
-              </Typography>
+              <Stack spacing={0.5}>
+                <Typography level="h1" sx={{ letterSpacing: "-0.07em", fontSize: { xs: "2.2rem", md: "3.1rem" }, lineHeight: 0.95 }}>
+                  {heroTitle}
+                </Typography>
+                {!isDiscoverView ? (
+                  <Typography level="body-sm" textColor="neutral.400">
+                    Yimage Social Image Sharing Platform
+                  </Typography>
+                ) : null}
+              </Stack>
 
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                 {selectedView === "discover" ? (
