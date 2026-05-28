@@ -26,7 +26,7 @@ export default class AppErrorBoundary extends Component {
           <Card variant="outlined" className="content-card">
             <Stack spacing={2} alignItems="flex-start">
               <Typography level="h2">Something went wrong loading this page.</Typography>
-              <Button sx={{ borderRadius: "999px" }} onClick={() => { window.location.assign("/"); }}>
+              <Button className="app-primary-button" sx={{ borderRadius: "999px" }} onClick={() => { window.location.assign("/"); }}>
                 Go Home
               </Button>
             </Stack>

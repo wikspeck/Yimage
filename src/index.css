@@ -1618,7 +1618,7 @@ body::-webkit-scrollbar-thumb,
 }
 
 .app-nav-shell {
-  top: 86px;
+  top: 98px;
   bottom: 84px;
   width: 94px;
   z-index: 45;
@@ -1627,7 +1627,7 @@ body::-webkit-scrollbar-thumb,
 .app-nav-panel {
   justify-content: center;
   gap: 18px;
-  padding-top: 28px;
+  padding-top: 32px;
   padding-bottom: 96px;
 }
 

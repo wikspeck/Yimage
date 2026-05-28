@@ -36,6 +36,14 @@ export default function ProfilePage() {
   const [socialSheet, setSocialSheet] = useState("");
   const [socialQuery, setSocialQuery] = useState("");
   const isOwnProfile = Boolean(user && profile && user.username === profile.username);
+  const seoUsername = profile?.username || username || "profile";
+
+  useSeo({
+    title: `${seoUsername} - Yimage`,
+    description: `View posts, reposts, and uploaded images from ${seoUsername} on Yimage.`,
+    canonicalPath: username ? `/u/${encodeURIComponent(username)}` : "/profile",
+    type: "profile"
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -234,13 +242,6 @@ export default function ProfilePage() {
 
   const visiblePosts = activeFeed === "reposts" ? reposts : posts;
   const socialItems = socialSheet === "followers" ? followers : socialSheet === "following" ? following : [];
-
-  useSeo({
-    title: `${profile.username} - Yimage`,
-    description: `View posts, reposts, and uploaded images from ${profile.username} on Yimage.`,
-    canonicalPath: `/u/${encodeURIComponent(profile.username)}`,
-    type: "profile"
-  });
 
   return (
     <div className="page-shell profile-page-shell">
