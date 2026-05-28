@@ -1061,12 +1061,14 @@ body::-webkit-scrollbar-thumb,
 .nav-menu-modal {
   display: flex;
   align-items: flex-end;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.42);
+  justify-content: flex-start;
+  padding-left: 108px;
+  padding-bottom: 24px;
+  background: rgba(0, 0, 0, 0.28);
 }
 
 .nav-menu-sheet {
-  width: min(100%, 320px);
+  width: min(100%, 290px);
   padding: 12px;
   border-radius: 24px;
   background: #070707 !important;
@@ -1698,7 +1700,7 @@ body::-webkit-scrollbar-thumb,
 }
 
 .app-nav-shell {
-  top: 112px;
+  top: 120px;
   bottom: 24px;
   width: 98px;
   z-index: 45;
@@ -1706,8 +1708,8 @@ body::-webkit-scrollbar-thumb,
 
 .app-nav-panel {
   justify-content: center;
-  gap: 24px;
-  padding-top: 36px;
+  gap: 26px;
+  padding-top: 40px;
   padding-bottom: 28px;
 }
 
@@ -2018,6 +2020,7 @@ body::-webkit-scrollbar-thumb,
   }
 
   .nav-menu-modal {
+    justify-content: center;
     align-items: flex-end;
     padding: 12px;
   }
