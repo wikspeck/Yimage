@@ -1615,8 +1615,9 @@ body::-webkit-scrollbar-thumb,
 
 .app-nav-shell {
   top: 70px;
-  bottom: 0;
+  bottom: 84px;
   width: 94px;
+  z-index: 45;
 }
 
 .app-nav-panel {
@@ -1634,6 +1635,9 @@ body::-webkit-scrollbar-thumb,
   width: 100%;
   text-align: center;
   justify-self: stretch;
+  position: relative;
+  z-index: 70;
+  background: #000000;
 }
 
 .page-shell {
