@@ -1025,12 +1025,12 @@ body::-webkit-scrollbar-thumb,
 }
 
 .nav-compose-plus {
-  font-size: 1.82rem;
-  line-height: 1;
-  font-weight: 400;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 22px;
+  height: 22px;
+  color: #050505;
 }
 
 .nav-menu-button {
@@ -1069,7 +1069,7 @@ body::-webkit-scrollbar-thumb,
   justify-content: flex-start;
   padding-left: 108px;
   padding-bottom: 24px;
-  background: rgba(0, 0, 0, 0.28);
+  background: transparent;
 }
 
 .nav-menu-sheet {

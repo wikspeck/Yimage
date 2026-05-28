@@ -47,6 +47,20 @@ function MenuRow({ label, onClick }) {
   );
 }
 
+function PlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+      <path
+        d="M12 5v14M5 12h14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export default function Header({
   onOpenLogin,
   onOpenSignup,
@@ -163,18 +177,32 @@ export default function Header({
           <div className="nav-divider" />
 
           <button type="button" className={`nav-compose-button${isCreate ? " is-active" : ""}`} onClick={onCreate} aria-label="Create post">
-            <span className="nav-compose-plus" aria-hidden="true">+</span>
+            <span className="nav-compose-plus" aria-hidden="true">
+              <PlusIcon />
+            </span>
           </button>
 
           <MenuButton onClick={() => setMenuOpen(true)} />
         </div>
       </aside>
 
-      <Modal open={menuOpen} onClose={() => setMenuOpen(false)} className="nav-menu-modal">
+      <Modal
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        className="nav-menu-modal"
+        slotProps={{
+          backdrop: {
+            sx: {
+              backdropFilter: "none",
+              backgroundColor: "rgba(0, 0, 0, 0.08)"
+            }
+          }
+        }}
+      >
         <Sheet variant="outlined" className="nav-menu-sheet">
           <Stack spacing={0.5}>
             <Stack direction="row" justifyContent="flex-end">
-              <ModalClose />
+              <ModalClose sx={{ position: "static", transform: "none", m: 0, p: 0.5 }} />
             </Stack>
             <MenuRow label="Settings" onClick={() => { setMenuOpen(false); onSettings?.(); }} />
             <MenuRow label="Community Guidelines" onClick={() => { setMenuOpen(false); onGuidelines?.(); }} />
