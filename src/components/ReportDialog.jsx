@@ -94,7 +94,7 @@ export default function ReportDialog({ open, onClose, targetType, targetId, titl
             </>
           ) : null}
           <TurnstileWidget onTokenChange={setTurnstileToken} resetKey={turnstileResetKey} />
-          <Button type="submit" loading={isSubmitting} disabled={!turnstileToken} sx={{ borderRadius: "14px" }}>
+          <Button type="submit" loading={isSubmitting} disabled={!turnstileToken} className="app-primary-button" sx={{ borderRadius: "14px" }}>
             Submit report
           </Button>
         </Stack>

@@ -23,7 +23,7 @@ export default function ShareDialog({ open, onClose, url, title = "Share", onCop
             Share this post
           </Typography>
           <Stack spacing={1}>
-            <Button onClick={handleCopy} sx={{ borderRadius: "14px" }}>
+            <Button onClick={handleCopy} className="app-primary-button" sx={{ borderRadius: "14px" }}>
               Copy Link
             </Button>
             <Button variant="soft" color="neutral" onClick={handleWhatsApp} sx={{ borderRadius: "14px" }}>

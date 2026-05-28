@@ -17,11 +17,11 @@ export default function AuthPromptCard({ onLogin, onSignup, message = "Log in to
           {message}
         </Typography>
         <Stack direction="row" spacing={1}>
-          <Button variant="solid" color="primary" onClick={onLogin} sx={{ borderRadius: "999px" }}>
+          <Button variant="solid" color="neutral" onClick={onLogin} className="app-primary-button" sx={{ borderRadius: "999px" }}>
             Log in
           </Button>
           <Button variant="soft" color="neutral" onClick={onSignup} sx={{ borderRadius: "999px" }}>
-            Sign up
+            Join
           </Button>
         </Stack>
       </Stack>

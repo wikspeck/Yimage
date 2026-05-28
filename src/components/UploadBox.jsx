@@ -358,6 +358,7 @@ export default function UploadBox({ onPostCreated }) {
               size="lg"
               onClick={handleUpload}
               disabled={!selectedFiles.length || (postType === "normal" && !title.trim()) || isUploading || !turnstileToken}
+              className="app-primary-button"
               sx={{ borderRadius: "999px", px: 3 }}
             >
               {isUploading ? <CircularProgress size="sm" color="neutral" /> : "Publish post"}
@@ -394,7 +395,7 @@ export default function UploadBox({ onPostCreated }) {
               sx={{ borderRadius: "18px" }}
             />
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "stretch", sm: "center" }}>
-              <Button loading={isSubmittingAppeal} onClick={handleAppealSubmit} sx={{ borderRadius: "999px" }}>
+              <Button loading={isSubmittingAppeal} onClick={handleAppealSubmit} className="app-primary-button" sx={{ borderRadius: "999px" }}>
                 Appeal
               </Button>
               <Button

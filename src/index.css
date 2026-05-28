@@ -962,6 +962,10 @@ body::-webkit-scrollbar-thumb,
   box-shadow: none;
 }
 
+.nav-item.is-active:hover .nav-item-inner {
+  background: rgba(255, 255, 255, 0.08);
+}
+
 .nav-icon-shell {
   width: 44px;
   height: 44px;
@@ -1614,7 +1618,7 @@ body::-webkit-scrollbar-thumb,
 }
 
 .app-nav-shell {
-  top: 70px;
+  top: 86px;
   bottom: 84px;
   width: 94px;
   z-index: 45;
@@ -1623,7 +1627,7 @@ body::-webkit-scrollbar-thumb,
 .app-nav-panel {
   justify-content: center;
   gap: 18px;
-  padding-top: 22px;
+  padding-top: 28px;
   padding-bottom: 96px;
 }
 
@@ -1778,6 +1782,59 @@ body::-webkit-scrollbar-thumb,
   align-items: flex-end;
   justify-content: center;
   background: rgba(0, 0, 0, 0.48);
+}
+
+.auth-modal-backdrop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(10px);
+}
+
+.auth-modal-sheet {
+  width: min(100%, 460px);
+  padding: 16px 18px 20px;
+  border-radius: 28px;
+  background: #070707 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42);
+  animation: authModalEnter 180ms ease;
+}
+
+.auth-modal-switch {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+}
+
+.app-primary-button {
+  background: #ffffff !important;
+  color: #050505 !important;
+  border-color: #ffffff !important;
+}
+
+.app-primary-button:hover {
+  background: #e8e8e8 !important;
+  color: #050505 !important;
+}
+
+@keyframes authModalEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .comments-sheet {
@@ -1936,5 +1993,15 @@ body::-webkit-scrollbar-thumb,
     height: min(84vh, 760px);
     border-top-left-radius: 24px;
     border-top-right-radius: 24px;
+  }
+
+  .auth-modal-backdrop {
+    align-items: flex-end;
+    padding: 12px;
+  }
+
+  .auth-modal-sheet {
+    width: 100%;
+    border-radius: 24px;
   }
 }

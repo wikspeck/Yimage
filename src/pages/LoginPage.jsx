@@ -53,7 +53,7 @@ export default function LoginPage() {
             <Input placeholder="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} sx={{ borderRadius: "18px" }} />
             <TurnstileWidget onTokenChange={setTurnstileToken} resetKey={turnstileResetKey} />
 
-            <Button type="submit" loading={isSubmitting} disabled={!turnstileToken} sx={{ borderRadius: "999px" }}>
+            <Button type="submit" loading={isSubmitting} disabled={!turnstileToken} className="app-primary-button" sx={{ borderRadius: "999px" }}>
               Log in
             </Button>
 

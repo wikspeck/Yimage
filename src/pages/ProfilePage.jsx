@@ -7,11 +7,13 @@ import PostCard from "../components/PostCard";
 import ReportDialog from "../components/ReportDialog";
 import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
+import { useAuthModal } from "../context/AuthModalContext";
 import { formatFullDate } from "../utils/formatters";
 
 export default function ProfilePage() {
   const { username: routeUsername } = useParams();
   const { user, updateProfile, uploadProfileAvatar } = useAuth();
+  const { openLogin, openSignup } = useAuthModal();
   const navigate = useNavigate();
   const avatarInputRef = useRef(null);
   const username = routeUsername || user?.username;
@@ -307,7 +309,7 @@ export default function ProfilePage() {
 
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
               {!isOwnProfile ? (
-                <Button variant="soft" color="neutral" onClick={handleFollow} sx={{ borderRadius: "14px", alignSelf: "flex-start" }}>
+                <Button variant="solid" color="neutral" onClick={handleFollow} className="app-primary-button" sx={{ borderRadius: "14px", alignSelf: "flex-start" }}>
                   {profile.isFollowing ? "Unfollow" : "Follow"}
                 </Button>
               ) : null}
@@ -348,7 +350,7 @@ export default function ProfilePage() {
                 placeholder="Avatar URL or /path"
                 sx={{ borderRadius: "14px" }}
               />
-              <Button type="submit" sx={{ borderRadius: "14px", alignSelf: "flex-start" }}>
+              <Button type="submit" className="app-primary-button" sx={{ borderRadius: "14px", alignSelf: "flex-start" }}>
                 Save profile
               </Button>
             </Stack>
@@ -385,7 +387,7 @@ export default function ProfilePage() {
                     onDelete={() => handleDeletePost(post)}
                     onHashtagClick={(tag) => navigate(`/?hashtag=${encodeURIComponent(tag)}`)}
                     onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
-                    onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
+                    onRequireLogin={(mode = "login") => (mode === "signup" ? openSignup(`/${post.id}`) : openLogin(`/${post.id}`))}
                   />
                 ))}
               </Stack>

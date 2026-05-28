@@ -6,6 +6,7 @@ import PostCard from "../components/PostCard";
 import ShareDialog from "../components/ShareDialog";
 import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
+import { useAuthModal } from "../context/AuthModalContext";
 import { usePreferences } from "../context/PreferencesContext";
 
 const DISCOVER_MODES = [
@@ -22,6 +23,7 @@ const POST_TYPE_FILTERS = [
 
 export default function DiscoverPage() {
   const { user } = useAuth();
+  const { openLogin, openSignup } = useAuthModal();
   const { preferences } = usePreferences();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -336,7 +338,7 @@ export default function DiscoverPage() {
               onDelete={() => handleDelete(post)}
               onHashtagClick={(tag) => updateFilters({ hashtag: tag, query: "" })}
               onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
-              onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
+              onRequireLogin={(mode = "login") => (mode === "signup" ? openSignup(`/${post.id}`) : openLogin(`/${post.id}`))}
             />
           ))}
         </Stack>

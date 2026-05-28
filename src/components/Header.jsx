@@ -72,9 +72,6 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onHome, on
                 <Button variant="plain" color="neutral" onClick={onSettings} sx={{ borderRadius: "999px", color: "#ffffff" }}>
                   Settings
                 </Button>
-                <Button variant="plain" color="neutral" onClick={onProfile} sx={{ borderRadius: "999px", color: "#ffffff" }}>
-                  Account
-                </Button>
                 <Button variant="plain" color="neutral" onClick={logout} sx={{ borderRadius: "999px", color: "#ffffff" }}>
                   Log out
                 </Button>
@@ -85,10 +82,11 @@ export default function Header({ onOpenLogin, onOpenSignup, onCreate, onHome, on
                   Log in
                 </Button>
                 <Button
-                  variant="plain"
+                  variant="solid"
                   color="neutral"
                   onClick={onOpenSignup}
-                  sx={{ borderRadius: "999px", color: "#ffffff", border: "1px solid rgba(255,255,255,0.08)" }}
+                  className="app-primary-button"
+                  sx={{ borderRadius: "999px" }}
                 >
                   Join
                 </Button>

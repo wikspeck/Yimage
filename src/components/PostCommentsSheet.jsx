@@ -168,7 +168,7 @@ export default function PostCommentsSheet({ open, onClose, post, user, onRequire
                   <Typography level="body-sm" textColor="neutral.500">
                     @{user.username}
                   </Typography>
-                  <Button type="submit" loading={isSubmitting} disabled={!commentText.trim() || !commentTurnstileToken} sx={{ borderRadius: "999px" }}>
+                  <Button type="submit" loading={isSubmitting} disabled={!commentText.trim() || !commentTurnstileToken} className="app-primary-button" sx={{ borderRadius: "999px" }}>
                     Send
                   </Button>
                 </Stack>
@@ -177,7 +177,7 @@ export default function PostCommentsSheet({ open, onClose, post, user, onRequire
           ) : (
             <AuthPromptCard
               onLogin={onRequireLogin}
-              onSignup={onRequireLogin}
+              onSignup={() => onRequireLogin?.("signup")}
               message="Log in to join the comments."
             />
           )}

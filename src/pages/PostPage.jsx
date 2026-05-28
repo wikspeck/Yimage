@@ -9,11 +9,13 @@ import ReportDialog from "../components/ReportDialog";
 import ShareDialog from "../components/ShareDialog";
 import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
+import { useAuthModal } from "../context/AuthModalContext";
 import { formatFullDate, formatRelativeTime } from "../utils/formatters";
 
 export default function PostPage() {
   const { postId } = useParams();
   const { user } = useAuth();
+  const { openLogin, openSignup } = useAuthModal();
   const navigate = useNavigate();
   const [post, setPost] = useState(null);
   const [error, setError] = useState("");
@@ -315,7 +317,7 @@ export default function PostPage() {
                 onDelete={handleDeletePost}
                 canDelete={Boolean(user && (user.id === post.userId || user.isAdmin))}
                 onComment={() => setCommentsOpen(true)}
-                onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
+                onRequireLogin={(mode = "login") => (mode === "signup" ? openSignup(`/${post.id}`) : openLogin(`/${post.id}`))}
               />
             </div>
 
@@ -342,7 +344,7 @@ export default function PostPage() {
                         placeholder="Explain why you think this post should be restored."
                         sx={{ borderRadius: "18px" }}
                       />
-                      <Button loading={isSubmittingAppeal} onClick={handleAppealSubmit} sx={{ borderRadius: "999px", alignSelf: "flex-start" }}>
+                      <Button loading={isSubmittingAppeal} onClick={handleAppealSubmit} className="app-primary-button" sx={{ borderRadius: "999px", alignSelf: "flex-start" }}>
                         Appeal
                       </Button>
                     </>
@@ -368,7 +370,7 @@ export default function PostPage() {
           onClose={() => setCommentsOpen(false)}
           post={post}
           user={user}
-          onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
+          onRequireLogin={(mode = "login") => (mode === "signup" ? openSignup(`/${post.id}`) : openLogin(`/${post.id}`))}
           onCommentCountChange={(delta) => setPost((current) => ({ ...current, commentsCount: current.commentsCount + delta }))}
         />
         <ShareDialog

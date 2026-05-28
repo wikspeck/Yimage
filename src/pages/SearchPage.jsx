@@ -6,6 +6,7 @@ import PostCard from "../components/PostCard";
 import ShareDialog from "../components/ShareDialog";
 import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
+import { useAuthModal } from "../context/AuthModalContext";
 import { usePreferences } from "../context/PreferencesContext";
 
 const RESULT_FILTERS = ["All", "Posts", "Users", "Hashtags"];
@@ -17,6 +18,7 @@ const POST_TYPE_FILTERS = [
 
 export default function SearchPage() {
   const { user } = useAuth();
+  const { openLogin, openSignup } = useAuthModal();
   const { preferences } = usePreferences();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -213,7 +215,7 @@ export default function SearchPage() {
                 className="feed-search-input"
                 sx={{ flex: 1, borderRadius: "999px" }}
               />
-              <Button variant="solid" color="neutral" onClick={() => updateParams({ query: searchText })} sx={{ borderRadius: "999px" }}>
+              <Button variant="solid" color="neutral" onClick={() => updateParams({ query: searchText })} className="app-primary-button" sx={{ borderRadius: "999px" }}>
                 Search
               </Button>
             </Stack>
@@ -336,7 +338,7 @@ export default function SearchPage() {
                 onDelete={() => handleDelete(post)}
                 onHashtagClick={(tag) => updateParams({ query: `#${tag}`, type: "Hashtags" })}
                 onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
-                onRequireLogin={() => navigate(`/login?next=/${post.id}`)}
+                onRequireLogin={(mode = "login") => (mode === "signup" ? openSignup(`/${post.id}`) : openLogin(`/${post.id}`))}
               />
             ))}
           </Stack>
