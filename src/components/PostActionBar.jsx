@@ -27,11 +27,13 @@ function Icon({ children, size = 18, boxed = false }) {
   );
 }
 
-function UpIcon() {
+function HeartIcon({ filled = false }) {
   return (
-    <Icon>
-      <path d="M12 19V5" />
-      <path d="M6.5 10.5 12 5l5.5 5.5" />
+    <Icon size={17}>
+      <path
+        d="M12 19.2 5.85 13.2a4.28 4.28 0 0 1 0-6.08 4.48 4.48 0 0 1 6.15 0L12 7.12l.01-.01a4.48 4.48 0 0 1 6.14 0 4.28 4.28 0 0 1 0 6.08Z"
+        fill={filled ? "currentColor" : "none"}
+      />
     </Icon>
   );
 }
@@ -48,10 +50,10 @@ function DownIcon() {
 function RepostIcon() {
   return (
     <Icon>
-      <path d="M7 7h10l-2.5-2.5" />
-      <path d="M17 7l-2.5 2.5" />
-      <path d="M17 17H7l2.5 2.5" />
-      <path d="M7 17l2.5-2.5" />
+      <path d="M8 7.25h7.2c1.85 0 3.3 1.45 3.3 3.3v.15" />
+      <path d="M15.8 4.9 19 8.1l-3.2 3.2" />
+      <path d="M16 16.75H8.8a3.3 3.3 0 0 1-3.3-3.3v-.15" />
+      <path d="M8.2 19.1 5 15.9l3.2-3.2" />
     </Icon>
   );
 }
@@ -146,7 +148,7 @@ export default function PostActionBar({
             className={getButtonClassName(isUpvoted, "social-action-button vote-icon-button")}
             aria-label="Like"
           >
-            <UpIcon />
+            <HeartIcon filled={isUpvoted} />
           </Button>
           <Typography level="title-sm" className={`vote-count${isUpvoted ? " is-active" : ""}`}>
             {score}
@@ -170,7 +172,7 @@ export default function PostActionBar({
             variant="plain"
             color="neutral"
             onClick={() => onComment?.()}
-            className="icon-button social-action-button"
+            className="icon-button social-action-button comment-button"
             aria-label="Comments"
           >
             <CommentIcon />
@@ -214,7 +216,7 @@ export default function PostActionBar({
             variant="plain"
             color="neutral"
             onClick={() => onReport?.()}
-            className="icon-button social-action-button"
+            className="icon-button social-action-button report-button"
             aria-label="Report"
           >
             <ReportIcon />
