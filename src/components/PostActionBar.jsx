@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button, Stack, Typography } from "@mui/joy";
+import { getDownloadUrl } from "../api/yimageApi";
 
 const ACTION_ICONS = {
   heart: {
@@ -17,6 +18,10 @@ const ACTION_ICONS = {
   repost: {
     default: "/action-repost.svg",
     active: "/action-repost-selected.svg"
+  },
+  download: {
+    default: "/action-download.svg",
+    active: "/action-download-selected.svg"
   },
   report: {
     default: "/action-report.svg",
@@ -47,6 +52,7 @@ export default function PostActionBar({
   isShareActive = false
 }) {
   const [shareFlashActive, setShareFlashActive] = useState(false);
+  const [downloadFlashActive, setDownloadFlashActive] = useState(false);
   const likeCount = post.score ?? post.likeCount ?? 0;
   const commentsCount = post.commentsCount ?? 0;
   const repostCount = post.repostCount ?? 0;
@@ -62,6 +68,15 @@ export default function PostActionBar({
     const timeout = window.setTimeout(() => setShareFlashActive(false), 1200);
     return () => window.clearTimeout(timeout);
   }, [isShareActive, shareFlashActive]);
+
+  useEffect(() => {
+    if (!downloadFlashActive) {
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => setDownloadFlashActive(false), 1200);
+    return () => window.clearTimeout(timeout);
+  }, [downloadFlashActive]);
 
   function getActionClassName(action, active) {
     return `post-action-button action-${action}${active ? " is-active" : ""}`;
@@ -92,6 +107,10 @@ export default function PostActionBar({
 
   function handleReport() {
     onReport?.();
+  }
+
+  function handleDownload() {
+    setDownloadFlashActive(true);
   }
 
   return (
@@ -149,6 +168,19 @@ export default function PostActionBar({
           <Typography component="span" level="body-sm" className="post-action-count">
             {repostCount}
           </Typography>
+        </Button>
+
+        <Button
+          size="sm"
+          component="a"
+          href={getDownloadUrl(post.id)}
+          variant="plain"
+          color="neutral"
+          onClick={handleDownload}
+          className={getActionClassName("download", downloadFlashActive)}
+          aria-label="Download"
+        >
+          <ActionIcon action="download" active={downloadFlashActive} />
         </Button>
 
         <Button

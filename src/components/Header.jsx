@@ -107,7 +107,7 @@ export default function Header({
                   Yimage
                 </Typography>
                 <Typography level="body-xs" className="brand-version">
-                  0.1.0
+                  0.1.1
                 </Typography>
               </Stack>
             </Box>

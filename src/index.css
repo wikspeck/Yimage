@@ -2071,6 +2071,7 @@ body::-webkit-scrollbar-thumb,
 }
 
 .action-share,
+.action-download,
 .action-report {
   min-width: 42px !important;
 }
