@@ -1004,10 +1004,10 @@ body::-webkit-scrollbar-thumb,
   appearance: none;
   border: 0;
   border-radius: 999px;
-  width: 54px;
-  height: 54px;
-  min-height: 54px;
-  min-width: 54px;
+  width: 58px;
+  height: 58px;
+  min-height: 58px;
+  min-width: 58px;
   padding: 0;
   background: #ffffff;
   color: #000000;
@@ -1028,8 +1028,8 @@ body::-webkit-scrollbar-thumb,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   color: #050505;
 }
 
@@ -1038,8 +1038,8 @@ body::-webkit-scrollbar-thumb,
   border: 0;
   background: transparent;
   color: #7b7b7b;
-  width: 46px;
-  height: 46px;
+  width: 50px;
+  height: 50px;
   border-radius: 999px;
   display: inline-flex;
   flex-direction: column;
@@ -1052,8 +1052,8 @@ body::-webkit-scrollbar-thumb,
 }
 
 .nav-menu-button span {
-  width: 18px;
-  height: 1.8px;
+  width: 20px;
+  height: 2px;
   border-radius: 999px;
   background: currentColor;
 }
@@ -1769,17 +1769,17 @@ body::-webkit-scrollbar-thumb,
 }
 
 .app-nav-shell {
-  top: 120px;
-  bottom: 24px;
-  width: 98px;
+  top: 138px;
+  bottom: 32px;
+  width: 108px;
   z-index: 45;
 }
 
 .app-nav-panel {
   justify-content: center;
-  gap: 26px;
-  padding-top: 40px;
-  padding-bottom: 18px;
+  gap: 30px;
+  padding-top: 48px;
+  padding-bottom: 24px;
 }
 
 .nav-item-inner {
@@ -1798,6 +1798,7 @@ body::-webkit-scrollbar-thumb,
   width: fit-content;
   max-width: min(100%, 700px);
   align-self: flex-start;
+  margin-inline: auto;
 }
 
 .post-card-normal {
