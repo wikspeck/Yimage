@@ -381,7 +381,7 @@ export default function ProfilePage() {
             <div className="profile-divider" />
 
             {visiblePosts.length ? (
-              <Stack spacing={2}>
+              <Stack spacing={2} className="profile-post-list">
                 {visiblePosts.map((post) => (
                   <PostCard
                     key={post.id}

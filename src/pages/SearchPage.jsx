@@ -330,7 +330,7 @@ export default function SearchPage() {
         ) : null}
 
         {showPosts && posts.length ? (
-          <Stack spacing={2}>
+          <Stack spacing={2} className="feed-post-list">
             <Typography level="title-lg">Posts</Typography>
             {posts.map((post) => (
               <PostCard

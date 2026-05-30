@@ -362,7 +362,7 @@ export default function DiscoverPage() {
           </Card>
         ) : null}
 
-        <Stack spacing={2}>
+        <Stack spacing={2} className="feed-post-list">
           {posts.map((post) => (
             <PostCard
               key={post.id}
