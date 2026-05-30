@@ -310,7 +310,6 @@ export default function PostPage() {
                 isLoggedIn={Boolean(user)}
                 isBusy={isBusy}
                 onUpvote={() => handleVote("up")}
-                onDownvote={() => handleVote("down")}
                 onRepost={handleRepost}
                 onShare={handleShare}
                 onReport={() => setReportOpen(true)}
@@ -318,6 +317,9 @@ export default function PostPage() {
                 canDelete={Boolean(user && (user.id === post.userId || user.isAdmin))}
                 onComment={() => setCommentsOpen(true)}
                 onRequireLogin={(mode = "login") => (mode === "signup" ? openSignup(`/${post.id}`) : openLogin(`/${post.id}`))}
+                isCommentsOpen={commentsOpen}
+                isReportOpen={reportOpen}
+                isShareActive={shareOpen}
               />
             </div>
 

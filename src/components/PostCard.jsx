@@ -36,7 +36,8 @@ export default function PostCard({
   onToggleFollow,
   canDelete,
   onDelete,
-  onRequireLogin
+  onRequireLogin,
+  isShareActive = false
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -198,7 +199,6 @@ export default function PostCard({
             isLoggedIn={isLoggedIn}
             isBusy={isBusy}
             onUpvote={onUpvote}
-            onDownvote={onDownvote}
             onRepost={onRepost}
             onShare={onShare}
             onReport={() => setReportOpen(true)}
@@ -206,6 +206,9 @@ export default function PostCard({
             canDelete={canDelete}
             onComment={() => setCommentsOpen(true)}
             onRequireLogin={onRequireLogin}
+            isCommentsOpen={commentsOpen}
+            isReportOpen={reportOpen}
+            isShareActive={isShareActive}
           />
         </Stack>
       </Card>

@@ -2020,6 +2020,71 @@ body::-webkit-scrollbar-thumb,
   gap: 8px;
 }
 
+.post-actions-row-icons {
+  justify-content: flex-start;
+}
+
+.post-action-button {
+  min-width: 42px !important;
+  min-height: 42px !important;
+  padding: 0 8px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.78) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  box-shadow: none !important;
+  transition: transform 180ms ease, background-color 180ms ease, opacity 180ms ease !important;
+}
+
+.post-action-button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.post-action-button.is-active {
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: #0a0a0a !important;
+}
+
+.post-action-icon-image {
+  width: 18px;
+  height: 18px;
+  display: block;
+  flex-shrink: 0;
+}
+
+.post-action-count {
+  font-size: 0.84rem !important;
+  font-weight: 700 !important;
+  color: inherit !important;
+  line-height: 1 !important;
+}
+
+.action-heart,
+.action-comment,
+.action-repost {
+  padding-right: 10px !important;
+}
+
+.action-share,
+.action-report {
+  min-width: 42px !important;
+}
+
+.action-delete {
+  min-width: auto !important;
+  padding: 0 12px !important;
+  color: #ff7d7d !important;
+}
+
+.action-delete:hover {
+  background: rgba(255, 107, 107, 0.12) !important;
+}
+
 .comment-card .MuiStack-root[direction="row"],
 .comments-sheet .comment-card .MuiStack-root[direction="row"] {
   gap: 8px;
@@ -2126,7 +2191,8 @@ body::-webkit-scrollbar-thumb,
 
   .social-action-button,
   .icon-button,
-  .download-button {
+  .download-button,
+  .post-action-button {
     min-width: 42px !important;
     min-height: 42px !important;
     padding: 0 11px !important;

@@ -348,6 +348,7 @@ export default function SearchPage() {
                 onHashtagClick={(tag) => updateParams({ query: `#${tag}`, type: "Hashtags" })}
                 onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
                 onRequireLogin={(mode = "login") => (mode === "signup" ? openSignup(`/${post.id}`) : openLogin(`/${post.id}`))}
+                isShareActive={sharePostId === post.id}
               />
             ))}
           </Stack>

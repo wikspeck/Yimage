@@ -379,6 +379,7 @@ export default function DiscoverPage() {
               onHashtagClick={(tag) => updateFilters({ hashtag: tag, query: "" })}
               onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
               onRequireLogin={(mode = "login") => (mode === "signup" ? openSignup(`/${post.id}`) : openLogin(`/${post.id}`))}
+              isShareActive={sharePostId === post.id}
             />
           ))}
         </Stack>

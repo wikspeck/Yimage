@@ -389,7 +389,6 @@ export default function ProfilePage() {
                     isLoggedIn={Boolean(user)}
                     isBusy={false}
                     onUpvote={() => navigate(`/${post.id}`)}
-                    onDownvote={() => navigate(`/${post.id}`)}
                     onRepost={() => navigate(`/${post.id}`)}
                     onShare={() => handleSharePost(post.id)}
                     canDelete={Boolean(user && (user.id === post.userId || user.isAdmin))}
