@@ -1051,11 +1051,11 @@ body::-webkit-scrollbar-thumb,
   transition: background-color 180ms ease, transform 180ms ease;
 }
 
-.nav-menu-button span {
-  width: 20px;
-  height: 2px;
-  border-radius: 999px;
-  background: currentColor;
+.nav-menu-icon-image {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  display: block;
 }
 
 .nav-menu-button:hover {
@@ -1557,6 +1557,7 @@ body::-webkit-scrollbar-thumb,
 .app-main {
   min-height: calc(100vh - 146px);
   padding-left: 112px;
+  padding-right: 112px;
   padding-bottom: 12px;
 }
 
@@ -1728,6 +1729,7 @@ body::-webkit-scrollbar-thumb,
   .app-main {
     min-height: auto;
     padding-left: 0;
+    padding-right: 0;
     padding-bottom: 92px;
   }
 
@@ -2108,6 +2110,7 @@ body::-webkit-scrollbar-thumb,
 
   .app-main {
     padding-top: 6px;
+    padding-right: 0;
     padding-bottom: 120px;
   }
 

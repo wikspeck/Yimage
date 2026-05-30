@@ -26,12 +26,15 @@ function NavItem({ active, label, iconSrc, selectedIconSrc, onClick }) {
   );
 }
 
-function MenuButton({ onClick }) {
+function MenuButton({ onClick, active = false }) {
   return (
     <button type="button" className="nav-menu-button" onClick={onClick} aria-label="Open menu">
-      <span />
-      <span />
-      <span />
+      <img
+        src={active ? "/nav-options-selected.svg" : "/nav-options.svg"}
+        alt=""
+        className="nav-menu-icon-image"
+        aria-hidden="true"
+      />
     </button>
   );
 }
@@ -182,7 +185,7 @@ export default function Header({
             </span>
           </button>
 
-          <MenuButton onClick={() => setMenuOpen(true)} />
+          <MenuButton onClick={() => setMenuOpen(true)} active={menuOpen} />
         </div>
       </aside>
 
