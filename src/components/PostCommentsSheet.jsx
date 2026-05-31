@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Button, Card, Modal, ModalClose, Sheet, Stack, Textarea, Typography } from "@mui/joy";
-import { createComment, getPostComments, replyToComment, voteOnComment } from "../api/yimageApi";
+import { createComment, deleteComment, getPostComments, replyToComment, voteOnComment } from "../api/yimageApi";
 import CommentThread from "./CommentThread";
 import AuthPromptCard from "./AuthPromptCard";
 import TurnstileWidget from "./TurnstileWidget";
@@ -31,6 +31,29 @@ function appendReply(comments, reply) {
     }
     return comment;
   });
+}
+
+function removeComment(comments, commentId) {
+  let removedCount = 0;
+
+  function walk(items) {
+    const nextItems = [];
+    for (const item of items) {
+      if (item.id === commentId) {
+        removedCount += 1 + countComments(item.replies || []);
+        continue;
+      }
+
+      const nextReplies = walk(item.replies || []);
+      nextItems.push({ ...item, replies: nextReplies });
+    }
+    return nextItems;
+  }
+
+  return {
+    comments: walk(comments),
+    removedCount
+  };
 }
 
 export default function PostCommentsSheet({ open, onClose, post, user, onRequireLogin, onCommentCountChange, onCommentCreated, onCommentsLoaded }) {
@@ -109,12 +132,27 @@ export default function PostCommentsSheet({ open, onClose, post, user, onRequire
     onCommentCountChange?.(1);
   }
 
-  async function handleVote(commentId, vote) {
+  async function handleLike(commentId) {
     try {
-      const updated = await voteOnComment(commentId, vote);
+      const updated = await voteOnComment(commentId, "like");
       setComments((current) => replaceComment(current, updated));
     } catch (voteError) {
       setError(voteError.message || "Something went wrong loading this section.");
+    }
+  }
+
+  async function handleDelete(commentId) {
+    try {
+      const result = await deleteComment(commentId);
+      setComments((current) => {
+        const next = removeComment(current, commentId);
+        if (next.removedCount) {
+          onCommentCountChange?.(-next.removedCount);
+        }
+        return next.comments;
+      });
+    } catch (deleteError) {
+      setError(deleteError.message || "Something went wrong loading this section.");
     }
   }
 
@@ -144,9 +182,11 @@ export default function PostCommentsSheet({ open, onClose, post, user, onRequire
                     key={comment.id}
                     comment={comment}
                     isLoggedIn={Boolean(user)}
+                    currentUser={user}
                     onRequireLogin={onRequireLogin}
                     onReply={handleReply}
-                    onVote={handleVote}
+                    onLike={handleLike}
+                    onDelete={handleDelete}
                   />
                 ))}
               </Stack>

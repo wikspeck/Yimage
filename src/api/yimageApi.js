@@ -235,6 +235,12 @@ export async function voteOnComment(id, vote) {
   return data.comment;
 }
 
+export async function deleteComment(id) {
+  return request(`/api/comments/${id}/delete`, {
+    method: "POST"
+  });
+}
+
 export async function getUserProfile(username) {
   const data = await request(`/api/users/${encodeURIComponent(username)}`);
   return data;

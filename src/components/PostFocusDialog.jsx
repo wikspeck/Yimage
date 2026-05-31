@@ -51,7 +51,7 @@ export default function PostFocusDialog({ open, onClose, post, images, activeIma
               Copy link
             </Button>
             <Button size="lg" variant="plain" color="neutral" onClick={onOpenPost} sx={{ borderRadius: "999px" }}>
-              Open post
+              Open Post
             </Button>
           </Stack>
         </Stack>

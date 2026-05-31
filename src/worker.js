@@ -164,12 +164,27 @@ function getCookie(request, name) {
   return match ? decodeURIComponent(match.split("=").slice(1).join("=")) : "";
 }
 
-function buildSessionCookie(token, maxAgeSeconds = SESSION_TTL_SECONDS) {
-  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
+function isSecureRequest(request) {
+  const forwardedProto = normalizeText(request.headers.get("X-Forwarded-Proto")).toLowerCase();
+  if (forwardedProto) {
+    return forwardedProto === "https";
+  }
+
+  try {
+    return new URL(request.url).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
-function clearSessionCookie() {
-  return `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
+function buildSessionCookie(request, token, maxAgeSeconds = SESSION_TTL_SECONDS) {
+  const secure = isSecureRequest(request) ? "; Secure" : "";
+  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly${secure}; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
+}
+
+function clearSessionCookie(request) {
+  const secure = isSecureRequest(request) ? "; Secure" : "";
+  return `${SESSION_COOKIE}=; Path=/; HttpOnly${secure}; SameSite=Lax; Max-Age=0`;
 }
 
 function normalizeText(value) {
@@ -1454,7 +1469,7 @@ async function handleSignup(request, env) {
     {
       status: 201,
       headers: {
-        "Set-Cookie": buildSessionCookie(token)
+        "Set-Cookie": buildSessionCookie(request, token)
       }
     }
   );
@@ -1503,7 +1518,7 @@ async function handleLogin(request, env) {
     { user: toPublicUser(user) },
     {
       headers: {
-        "Set-Cookie": buildSessionCookie(token)
+        "Set-Cookie": buildSessionCookie(request, token)
       }
     }
   );
@@ -1520,7 +1535,7 @@ async function handleLogout(request, env) {
     {},
     {
       headers: {
-        "Set-Cookie": clearSessionCookie()
+        "Set-Cookie": clearSessionCookie(request)
       }
     }
   );
@@ -2255,7 +2270,8 @@ async function handleCommentCreate(request, env, postId) {
 async function handleCommentVote(request, env, commentId) {
   const user = await requireUser(request, env);
   const body = await parseJsonBody(request);
-  const nextVote = body.vote === "up" || body.vote === "down" ? body.vote : null;
+  const requestedVote = normalizeText(body.vote).toLowerCase();
+  const nextVote = requestedVote === "like" ? "up" : requestedVote === "up" || requestedVote === "down" ? requestedVote : null;
   if (!nextVote) {
     return fail("Vote must be up or down.");
   }
@@ -2299,6 +2315,53 @@ async function handleCommentVote(request, env, commentId) {
   comment.authorAvatarUrl = author?.authorAvatarUrl || "";
 
   return success({ comment: toCommentResponse(comment, finalVote) });
+}
+
+async function handleCommentDelete(request, env, commentId) {
+  const user = await requireUser(request, env);
+  const target = await env.DB.prepare("SELECT id, post_id AS postId, author_id AS authorId FROM comments WHERE id = ? LIMIT 1")
+    .bind(commentId)
+    .first();
+
+  if (!target) {
+    return fail("Comment not found.", 404);
+  }
+
+  if (target.authorId !== user.id && !user.isAdmin) {
+    return fail("You do not have permission to delete this comment.", 403);
+  }
+
+  const rows = await env.DB.prepare("SELECT id, parent_id AS parentId FROM comments WHERE post_id = ?")
+    .bind(target.postId)
+    .all();
+
+  const childrenByParent = new Map();
+  for (const row of rows.results || []) {
+    const key = row.parentId || "";
+    const current = childrenByParent.get(key) || [];
+    current.push(row.id);
+    childrenByParent.set(key, current);
+  }
+
+  const idsToDelete = [];
+  const stack = [commentId];
+  while (stack.length) {
+    const currentId = stack.pop();
+    idsToDelete.push(currentId);
+    for (const childId of childrenByParent.get(currentId) || []) {
+      stack.push(childId);
+    }
+  }
+
+  const placeholders = idsToDelete.map(() => "?").join(", ");
+  await env.DB.prepare(`DELETE FROM comments WHERE id IN (${placeholders})`)
+    .bind(...idsToDelete)
+    .run();
+  await env.DB.prepare("UPDATE posts SET comments_count = MAX(0, COALESCE(comments_count, 0) - ?) WHERE id = ?")
+    .bind(idsToDelete.length, target.postId)
+    .run();
+
+  return success({ deletedIds: idsToDelete, deletedCount: idsToDelete.length });
 }
 
 async function handleCategoriesList(env) {
@@ -3075,6 +3138,9 @@ export default {
         }
         if (url.pathname.startsWith("/api/comments/") && url.pathname.endsWith("/vote") && request.method === "POST") {
           return await handleCommentVote(request, env, url.pathname.split("/")[3]);
+        }
+        if (url.pathname.startsWith("/api/comments/") && url.pathname.endsWith("/delete") && request.method === "POST") {
+          return await handleCommentDelete(request, env, url.pathname.split("/")[3]);
         }
         if (url.pathname.startsWith("/api/users/") && url.pathname.endsWith("/follow") && request.method === "POST") {
           return await handleToggleFollow(request, env, decodeURIComponent(url.pathname.split("/")[3]));

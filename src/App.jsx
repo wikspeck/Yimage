@@ -19,6 +19,10 @@ import ModerationPage from "./pages/ModerationPage";
 import CommunityGuidelinesPage from "./pages/CommunityGuidelinesPage";
 import DmcaPage from "./pages/DmcaPage";
 import CookiePolicyPage from "./pages/CookiePolicyPage";
+import ImpressumPage from "./pages/ImpressumPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import TermsPage from "./pages/TermsPage";
+import ContactPage from "./pages/ContactPage";
 
 function RequireAuth({ children }) {
   const { user, isLoading } = useAuth();
@@ -100,6 +104,10 @@ function AppRoutes() {
                   <Route path="/guidelines" element={<CommunityGuidelinesPage />} />
                   <Route path="/dmca" element={<DmcaPage />} />
                   <Route path="/cookies" element={<CookiePolicyPage />} />
+                  <Route path="/privacy" element={<PrivacyPage />} />
+                  <Route path="/terms" element={<TermsPage />} />
+                  <Route path="/contact" element={<ContactPage />} />
+                  <Route path="/impressum" element={<ImpressumPage />} />
                   <Route
                     path="/profile"
                     element={
