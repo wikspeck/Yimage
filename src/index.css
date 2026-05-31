@@ -936,11 +936,10 @@ body::-webkit-scrollbar-thumb,
 
 .top-brand-bar {
   margin: 0;
-  padding: 12px 0 14px;
+  padding: 8px 0 6px;
   border: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0;
-  background: #000000;
+  background: transparent;
   box-shadow: none;
   backdrop-filter: none;
 }
@@ -1583,7 +1582,7 @@ body::-webkit-scrollbar-thumb,
 }
 
 .top-brand-bar {
-  min-height: 70px;
+  min-height: 44px;
   display: flex;
   align-items: center;
 }
@@ -1602,7 +1601,7 @@ body::-webkit-scrollbar-thumb,
 }
 
 .app-nav-shell {
-  top: 82px;
+  top: 56px;
   bottom: 74px;
 }
 
@@ -2156,6 +2155,11 @@ body::-webkit-scrollbar-thumb,
   min-width: 46px !important;
 }
 
+.action-download .post-action-icon-image {
+  width: 22px;
+  height: 22px;
+}
+
 .action-delete {
   min-width: auto !important;
   padding: 0 12px !important;
@@ -2175,7 +2179,7 @@ body::-webkit-scrollbar-thumb,
   .top-brand-bar {
     padding-left: 12px;
     padding-right: 12px;
-    min-height: 56px;
+    min-height: 40px;
   }
 
   .app-main {
