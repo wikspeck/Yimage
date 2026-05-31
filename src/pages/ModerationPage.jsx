@@ -1,21 +1,24 @@
 import { useEffect, useState } from "react";
-import { Alert, Button, Card, CircularProgress, Input, Stack, Typography } from "@mui/joy";
+import { Button, Card, CircularProgress, Stack, Typography } from "@mui/joy";
 import BackButton from "../components/BackButton";
-import { applyModerationAction, getModerationReports, reviewModerationAppeal } from "../api/yimageApi";
+import ToastNotice from "../components/ToastNotice";
+import { applyModerationAction, getModerationReports } from "../api/yimageApi";
 
 export default function ModerationPage() {
   const [data, setData] = useState(null);
-  const [error, setError] = useState("");
-  const [noteByTarget, setNoteByTarget] = useState({});
   const [busyKey, setBusyKey] = useState("");
+  const [toast, setToast] = useState({ open: false, message: "", color: "neutral" });
+
+  function showToast(message, color = "neutral") {
+    setToast({ open: true, message, color });
+  }
 
   async function loadData() {
-    setError("");
     try {
       const nextData = await getModerationReports();
       setData(nextData);
-    } catch (loadError) {
-      setError(loadError.message || "Could not load moderation data.");
+    } catch (error) {
+      showToast(error.message || "Could not load moderation queue.", "danger");
     }
   }
 
@@ -26,224 +29,100 @@ export default function ModerationPage() {
   async function handleAction(report, action) {
     const key = `${report.targetType}:${report.targetId}:${action}`;
     setBusyKey(key);
-    setError("");
 
     try {
       await applyModerationAction({
         targetType: report.targetType,
         targetId: report.targetId,
-        action,
-        notes: noteByTarget[`${report.targetType}:${report.targetId}`] || ""
+        action
       });
       await loadData();
-    } catch (actionError) {
-      setError(actionError.message || "Could not apply moderation action.");
+      showToast(action === "restore" ? "Post kept." : "Post removed.", action === "restore" ? "success" : "danger");
+    } catch (error) {
+      showToast(error.message || "Could not apply moderation action.", "danger");
     } finally {
       setBusyKey("");
     }
   }
 
-  async function handleAppealDecision(appeal, decision) {
-    const key = `appeal:${appeal.id}:${decision}`;
-    setBusyKey(key);
-    setError("");
-
-    try {
-      await reviewModerationAppeal(appeal.id, decision);
-      await loadData();
-    } catch (actionError) {
-      setError(actionError.message || "Could not review this appeal.");
-    } finally {
-      setBusyKey("");
-    }
-  }
+  const postReports = (data?.reports || []).filter((report) => report.targetType === "post");
 
   if (!data) {
     return (
       <div className="page-shell">
         <Stack spacing={2}>
           <BackButton fallbackTo="/" label="Back" />
-          {error ? <Alert color="danger" variant="soft">{error}</Alert> : null}
           <Card variant="outlined" className="content-card">
             <Stack direction="row" spacing={1.5} alignItems="center">
               <CircularProgress size="sm" />
-              <Typography level="body-md">Loading moderation queue...</Typography>
+              <Typography level="body-md">Loading reports...</Typography>
             </Stack>
           </Card>
+          <ToastNotice open={toast.open} message={toast.message} color={toast.color} onClose={() => setToast((current) => ({ ...current, open: false }))} />
         </Stack>
       </div>
     );
   }
 
   return (
-    <div className="page-shell page-shell-wide">
+    <div className="page-shell">
       <Stack spacing={3}>
         <BackButton fallbackTo="/" label="Back" />
-        {error ? <Alert color="danger" variant="soft">{error}</Alert> : null}
 
         <Card variant="outlined" className="content-card">
-          <Stack spacing={1}>
-            <Typography level="h1">Moderation</Typography>
+          <Stack spacing={0.75}>
+            <Typography level="h1">Reports</Typography>
             <Typography level="body-md" textColor="neutral.400">
-              Review reports, warn users, hide content, restore content, or suspend accounts.
-            </Typography>
-            <Typography level="body-sm" textColor="neutral.500">
-              {data.totals.warnings} warnings • {data.totals.activeSuspensions} active suspensions
+              Review reported posts and quickly keep or remove them.
             </Typography>
           </Stack>
         </Card>
 
-        <Stack spacing={2}>
-          {(data.reports || []).map((report) => {
-            const targetKey = `${report.targetType}:${report.targetId}`;
-
-            return (
-              <Card key={`${targetKey}:${report.reason}`} variant="outlined" className="content-card">
+        {postReports.length ? (
+          <Stack spacing={2}>
+            {postReports.map((report) => (
+              <Card key={`${report.targetType}:${report.targetId}`} variant="outlined" className="content-card">
                 <Stack spacing={1.25}>
-                  <Typography level="title-md">
-                    {report.targetType} {report.targetId}
+                  <Typography level="title-lg">{report.postTitle || report.targetId}</Typography>
+                  <Typography level="body-sm" textColor="neutral.500">
+                    {report.authorUsername ? `@${report.authorUsername} • ` : ""}{report.reportCount} reports
                   </Typography>
                   <Typography level="body-sm" textColor="neutral.400">
-                    {report.reportCount} reports • reasons: {report.reasons}
+                    Reason: {report.reasons || report.reason || "report"}
                   </Typography>
-                  <Input
-                    value={noteByTarget[targetKey] || ""}
-                    onChange={(event) => setNoteByTarget((current) => ({ ...current, [targetKey]: event.target.value }))}
-                    placeholder="Moderator note"
-                    sx={{ borderRadius: "14px" }}
-                  />
-                  <Stack direction={{ xs: "column", md: "row" }} spacing={1} useFlexGap flexWrap="wrap">
-                    <Button loading={busyKey === `${targetKey}:under_review`} onClick={() => handleAction(report, "under_review")} sx={{ borderRadius: "14px" }}>
-                      Under review
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
+                    <Button
+                      size="lg"
+                      loading={busyKey === `${report.targetType}:${report.targetId}:restore`}
+                      onClick={() => handleAction(report, "restore")}
+                      sx={{ borderRadius: "16px", minWidth: 140 }}
+                    >
+                      Checkmark
                     </Button>
-                    <Button loading={busyKey === `${targetKey}:hide`} variant="soft" color="danger" onClick={() => handleAction(report, "hide")} sx={{ borderRadius: "14px" }}>
-                      Hide
+                    <Button
+                      size="lg"
+                      color="danger"
+                      variant="soft"
+                      loading={busyKey === `${report.targetType}:${report.targetId}:remove`}
+                      onClick={() => handleAction(report, "remove")}
+                      sx={{ borderRadius: "16px", minWidth: 140 }}
+                    >
+                      X
                     </Button>
-                    <Button loading={busyKey === `${targetKey}:restore`} variant="soft" color="neutral" onClick={() => handleAction(report, "restore")} sx={{ borderRadius: "14px" }}>
-                      Restore
-                    </Button>
-                    <Button loading={busyKey === `${targetKey}:remove`} variant="soft" color="danger" onClick={() => handleAction(report, "remove")} sx={{ borderRadius: "14px" }}>
-                      Remove
-                    </Button>
-                    {report.targetType === "user" ? (
-                      <>
-                        <Button loading={busyKey === `${targetKey}:warn`} variant="plain" color="warning" onClick={() => handleAction(report, "warn")} sx={{ borderRadius: "14px" }}>
-                          Warn
-                        </Button>
-                        <Button loading={busyKey === `${targetKey}:suspend`} variant="soft" color="danger" onClick={() => handleAction(report, "suspend")} sx={{ borderRadius: "14px" }}>
-                          Suspend
-                        </Button>
-                      </>
-                    ) : null}
                   </Stack>
-                </Stack>
-              </Card>
-            );
-          })}
-        </Stack>
-
-        {data.aiFindings?.length ? (
-          <Stack spacing={2}>
-            <Card variant="outlined" className="content-card">
-              <Stack spacing={0.75}>
-                <Typography level="title-lg">AI moderation findings</Typography>
-                <Typography level="body-sm" textColor="neutral.400">
-                  Unsafe text and image findings from Workers AI are sent here for human review. Moderator decisions still win.
-                </Typography>
-              </Stack>
-            </Card>
-
-            {data.aiFindings.map((finding) => {
-              const targetKey = `${finding.contentType}:${finding.contentId}`;
-
-              return (
-                <Card key={`${targetKey}:${finding.createdAt}`} variant="outlined" className="content-card">
-                  <Stack spacing={1.25}>
-                    <Typography level="title-md">
-                      {finding.contentType} {finding.contentId}
-                    </Typography>
-                    <Typography level="body-sm" textColor="neutral.400">
-                      Risk {finding.riskScore} • {finding.moderationStatus} • {finding.source} • {finding.model}
-                    </Typography>
-                    {finding.labels?.length ? (
-                      <Typography level="body-sm" textColor="neutral.300">
-                        Labels: {finding.labels.join(", ")}
-                      </Typography>
-                    ) : null}
-                    {finding.aiReason ? (
-                      <Typography level="body-sm" textColor="neutral.300">
-                        {finding.aiReason}
-                      </Typography>
-                    ) : null}
-                    <Input
-                      value={noteByTarget[targetKey] || ""}
-                      onChange={(event) => setNoteByTarget((current) => ({ ...current, [targetKey]: event.target.value }))}
-                      placeholder="Moderator note"
-                      sx={{ borderRadius: "14px" }}
-                    />
-                    <Stack direction={{ xs: "column", md: "row" }} spacing={1} useFlexGap flexWrap="wrap">
-                      <Button loading={busyKey === `${targetKey}:under_review`} onClick={() => handleAction({ targetType: finding.contentType, targetId: finding.contentId }, "under_review")} sx={{ borderRadius: "14px" }}>
-                        Keep under review
-                      </Button>
-                      <Button loading={busyKey === `${targetKey}:restore`} variant="soft" color="neutral" onClick={() => handleAction({ targetType: finding.contentType, targetId: finding.contentId }, "restore")} sx={{ borderRadius: "14px" }}>
-                        Restore
-                      </Button>
-                      <Button loading={busyKey === `${targetKey}:hide`} variant="soft" color="danger" onClick={() => handleAction({ targetType: finding.contentType, targetId: finding.contentId }, "hide")} sx={{ borderRadius: "14px" }}>
-                        Hide
-                      </Button>
-                      <Button loading={busyKey === `${targetKey}:remove`} variant="soft" color="danger" onClick={() => handleAction({ targetType: finding.contentType, targetId: finding.contentId }, "remove")} sx={{ borderRadius: "14px" }}>
-                        Remove
-                      </Button>
-                    </Stack>
-                  </Stack>
-                </Card>
-              );
-            })}
-          </Stack>
-        ) : null}
-
-        {data.appeals?.length ? (
-          <Stack spacing={2}>
-            <Card variant="outlined" className="content-card">
-              <Stack spacing={0.75}>
-                <Typography level="title-lg">Appeals</Typography>
-                <Typography level="body-sm" textColor="neutral.400">
-                  Review user appeals for AI-hidden or under-review content.
-                </Typography>
-              </Stack>
-            </Card>
-
-            {data.appeals.map((appeal) => (
-              <Card key={appeal.id} variant="outlined" className="content-card">
-                <Stack spacing={1.25}>
-                  <Typography level="title-md">
-                    {appeal.contentType} {appeal.contentId}
-                  </Typography>
-                  <Typography level="body-sm" textColor="neutral.400">
-                    @{appeal.username || "unknown"} • {appeal.status}
-                  </Typography>
-                  <Typography level="body-sm" textColor="neutral.300">
-                    {appeal.message}
-                  </Typography>
-                  {appeal.status === "pending" ? (
-                    <Stack direction={{ xs: "column", md: "row" }} spacing={1} useFlexGap flexWrap="wrap">
-                      <Button loading={busyKey === `appeal:${appeal.id}:approve`} onClick={() => handleAppealDecision(appeal, "approve")} sx={{ borderRadius: "14px" }}>
-                        Approve appeal
-                      </Button>
-                      <Button loading={busyKey === `appeal:${appeal.id}:reject`} variant="soft" color="danger" onClick={() => handleAppealDecision(appeal, "reject")} sx={{ borderRadius: "14px" }}>
-                        Reject appeal
-                      </Button>
-                    </Stack>
-                  ) : (
-                    <Typography level="body-sm" textColor="neutral.500">
-                      Reviewed {appeal.reviewedAt || "recently"}
-                    </Typography>
-                  )}
                 </Stack>
               </Card>
             ))}
           </Stack>
-        ) : null}
+        ) : (
+          <Card variant="outlined" className="content-card">
+            <Typography level="body-md" textColor="neutral.400">
+              No open post reports right now.
+            </Typography>
+          </Card>
+        )}
+
+        <ToastNotice open={toast.open} message={toast.message} color={toast.color} onClose={() => setToast((current) => ({ ...current, open: false }))} />
       </Stack>
     </div>
   );

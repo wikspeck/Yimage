@@ -72,6 +72,7 @@ export default function Header({
   onDiscover,
   onProfile,
   onSearch,
+  onModeration,
   onSettings,
   onGuidelines,
   onDmca,
@@ -85,6 +86,7 @@ export default function Header({
   const isSearch = location.pathname === "/search";
   const isHome = location.pathname === "/";
   const isProfile = location.pathname === "/profile" || location.pathname.startsWith("/u/");
+  const isModeration = location.pathname === "/moderation";
   const isCreate = location.pathname.startsWith("/create");
 
   return (
@@ -176,6 +178,15 @@ export default function Header({
             selectedIconSrc="/nav-profile-selected.svg"
             onClick={onProfile}
           />
+          {user?.username === "mod_yimage" ? (
+            <NavItem
+              active={isModeration}
+              label="Moderation"
+              iconSrc="/nav-options.svg"
+              selectedIconSrc="/nav-options-selected.svg"
+              onClick={onModeration}
+            />
+          ) : null}
 
           <div className="nav-divider" />
 

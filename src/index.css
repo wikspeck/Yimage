@@ -324,28 +324,32 @@ a {
 }
 
 .comment-like-pill {
-  min-width: 36px !important;
-  min-height: 36px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
   padding: 0 !important;
   border-radius: 999px !important;
-  background: #000000 !important;
-  border: 1px solid rgba(255, 255, 255, 0.16) !important;
-  color: #ffffff !important;
+  background: transparent !important;
+  border: 0 !important;
+  color: rgba(255, 255, 255, 0.78) !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   flex-shrink: 0 !important;
 }
 
-.comment-like-pill-active {
-  background: rgba(255, 255, 255, 0.12) !important;
+.comment-like-pill:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
   color: #ffffff !important;
-  border-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+.comment-like-pill-active {
+  background: transparent !important;
+  color: #ffffff !important;
 }
 
 .comment-like-icon-image {
-  width: 15px;
-  height: 15px;
+  width: 16px;
+  height: 16px;
   display: block;
   flex-shrink: 0;
 }

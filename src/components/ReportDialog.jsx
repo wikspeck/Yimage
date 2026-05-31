@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Button, Modal, ModalClose, ModalDialog, Option, Select, Stack, Textarea, Typography, Input } from "@mui/joy";
+import { Button, Modal, ModalClose, ModalDialog, Option, Select, Stack, Textarea, Typography, Input } from "@mui/joy";
 import { createReport } from "../api/yimageApi";
 import TurnstileWidget from "./TurnstileWidget";
 
@@ -14,7 +14,7 @@ const REPORT_OPTIONS = [
   "other"
 ];
 
-export default function ReportDialog({ open, onClose, targetType, targetId, title = "Report content", onSubmitted }) {
+export default function ReportDialog({ open, onClose, targetType, targetId, title = "Report content", onSubmitted, onFeedback }) {
   const [reason, setReason] = useState("spam");
   const [details, setDetails] = useState("");
   const [claimantName, setClaimantName] = useState("");
@@ -22,14 +22,10 @@ export default function ReportDialog({ open, onClose, targetType, targetId, titl
   const [copyrightDescription, setCopyrightDescription] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setError("");
-    setNotice("");
     setIsSubmitting(true);
 
     try {
@@ -43,7 +39,7 @@ export default function ReportDialog({ open, onClose, targetType, targetId, titl
         claimantEmail,
         copyrightDescription
       });
-      setNotice(result.message || "Report submitted.");
+      onFeedback?.(result.message || "Report submitted.", "success");
       onSubmitted?.(result);
       setTimeout(() => {
         onClose?.();
@@ -51,9 +47,9 @@ export default function ReportDialog({ open, onClose, targetType, targetId, titl
         setClaimantName("");
         setClaimantEmail("");
         setCopyrightDescription("");
-      }, 600);
+      }, 150);
     } catch (submitError) {
-      setError(submitError.message || "Could not submit report.");
+      onFeedback?.(submitError.message || "Could not submit report.", "danger");
     } finally {
       setIsSubmitting(false);
       setTurnstileResetKey((current) => current + 1);
@@ -66,8 +62,6 @@ export default function ReportDialog({ open, onClose, targetType, targetId, titl
         <ModalClose />
         <Stack component="form" spacing={1.5} onSubmit={handleSubmit}>
           <Typography level="title-lg">{title}</Typography>
-          {error ? <Alert color="danger" variant="soft">{error}</Alert> : null}
-          {notice ? <Alert color="success" variant="soft">{notice}</Alert> : null}
           <Select value={reason} onChange={(_, value) => setReason(value || "spam")} sx={{ borderRadius: "14px" }}>
             {REPORT_OPTIONS.map((option) => (
               <Option key={option} value={option}>{option}</Option>

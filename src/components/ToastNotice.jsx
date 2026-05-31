@@ -9,7 +9,7 @@ export default function ToastNotice({ open, message, color = "neutral", onClose 
       color={color}
       variant="solid"
       anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      sx={{ mb: 1.5, borderRadius: "14px" }}
+      sx={{ mb: 1.5, borderRadius: "14px", boxShadow: "0 14px 36px rgba(0, 0, 0, 0.28)" }}
     >
       {message}
     </Snackbar>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Box, Card, CircularProgress, Option, Select, Stack, Typography } from "@mui/joy";
+import { Box, Card, CircularProgress, Option, Select, Stack, Typography } from "@mui/joy";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { deletePost, getCategories, getPosts, repostPost, toggleFollow, voteOnPost } from "../api/yimageApi";
 import PostCard from "../components/PostCard";
@@ -35,12 +35,18 @@ export default function DiscoverPage() {
   const [postsError, setPostsError] = useState("");
   const [notice, setNotice] = useState("");
   const [toastMessage, setToastMessage] = useState("");
+  const [toastColor, setToastColor] = useState("neutral");
   const [busyPostId, setBusyPostId] = useState("");
   const [sharePostId, setSharePostId] = useState("");
   const selectedCategory = searchParams.get("category") || "";
   const selectedView = location.pathname === "/discover" ? "discover" : "home";
   const selectedMode = searchParams.get("mode") || (selectedView === "discover" ? preferences.defaultDiscoverMode || "trending" : "home");
   const selectedPostType = searchParams.get("postType") || preferences.defaultFeedPostType || "all";
+
+  function showToast(message, color = "neutral") {
+    setToastMessage(message);
+    setToastColor(color);
+  }
 
   const activeFilters = useMemo(
     () => ({
@@ -100,7 +106,7 @@ export default function DiscoverPage() {
         }
       } catch (error) {
         if (isMounted) {
-          setPostsError(error.message || "Could not load posts.");
+          showToast(error.message || "Could not load posts.", "danger");
         }
       } finally {
         if (isMounted) {
@@ -150,7 +156,7 @@ export default function DiscoverPage() {
       const result = await voteOnPost(postId, vote);
       setPosts((current) => current.map((post) => (post.id === postId ? result.post : post)));
     } catch (error) {
-      setPostsError(error.message || "Could not update vote.");
+      showToast(error.message || "Could not update vote.", "danger");
     } finally {
       setBusyPostId("");
     }
@@ -164,9 +170,9 @@ export default function DiscoverPage() {
     try {
       const result = await repostPost(postId);
       setPosts((current) => current.map((post) => (post.id === postId ? result.post : post)));
-      setNotice(result.message || "Repost updated.");
+      showToast(result.message || "Repost updated.", "success");
     } catch (error) {
-      setPostsError(error.message || "Could not repost this post.");
+      showToast(error.message || "Could not repost this post.", "danger");
     } finally {
       setBusyPostId("");
     }
@@ -187,7 +193,7 @@ export default function DiscoverPage() {
       setSharePostId(postId);
     } catch (error) {
       if (error?.name !== "AbortError") {
-        setPostsError("Could not share this post.");
+        showToast("Could not share this post.", "danger");
       }
     }
   }
@@ -206,7 +212,7 @@ export default function DiscoverPage() {
         )
       );
     } catch (error) {
-      setPostsError(error.message || "Could not update follow status.");
+      showToast(error.message || "Could not update follow status.", "danger");
     }
   }
 
@@ -228,9 +234,9 @@ export default function DiscoverPage() {
     try {
       await deletePost(post.id);
       setPosts((current) => current.filter((item) => item.id !== post.id));
-      setNotice("Post deleted.");
+      showToast("Post deleted.", "success");
     } catch (error) {
-      setPostsError(error.message || "Could not delete this post.");
+      showToast(error.message || "Could not delete this post.", "danger");
     } finally {
       setBusyPostId("");
     }
@@ -342,9 +348,6 @@ export default function DiscoverPage() {
           </Stack>
         </Card>
 
-        {postsError ? <Alert color="danger" variant="soft">{postsError}</Alert> : null}
-        {notice ? <Alert color="neutral" variant="soft">{notice}</Alert> : null}
-
         {isLoadingPosts ? (
           <Card variant="outlined" className="content-card">
             <Stack direction="row" spacing={1.5} alignItems="center">
@@ -391,7 +394,7 @@ export default function DiscoverPage() {
         title="Share post"
         onCopied={setToastMessage}
       />
-      <ToastNotice open={Boolean(toastMessage)} message={toastMessage} onClose={() => setToastMessage("")} />
+      <ToastNotice open={Boolean(toastMessage)} message={toastMessage} color={toastColor} onClose={() => setToastMessage("")} />
     </Box>
   );
 }

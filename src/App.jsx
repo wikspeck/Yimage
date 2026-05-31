@@ -67,6 +67,7 @@ function AppLayout() {
       onHome={() => navigate("/")}
       onDiscover={() => navigate("/discover")}
       onSearch={() => navigate("/search")}
+      onModeration={() => navigate("/moderation")}
       onSettings={() => navigate("/settings")}
       onGuidelines={() => navigate("/guidelines")}
       onDmca={() => navigate("/dmca")}

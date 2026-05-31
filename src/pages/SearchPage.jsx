@@ -30,11 +30,17 @@ export default function SearchPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [toastMessage, setToastMessage] = useState("");
+  const [toastColor, setToastColor] = useState("neutral");
   const [busyPostId, setBusyPostId] = useState("");
   const [sharePostId, setSharePostId] = useState("");
   const [searchText, setSearchText] = useState(searchParams.get("query") || "");
   const [resultType, setResultType] = useState(searchParams.get("type") || "All");
   const selectedPostType = searchParams.get("postType") || preferences.defaultFeedPostType || "all";
+
+  function showToast(message, color = "neutral") {
+    setToastMessage(message);
+    setToastColor(color);
+  }
 
   const query = useMemo(() => searchParams.get("query") || "", [searchParams]);
 
@@ -106,7 +112,7 @@ export default function SearchPage() {
       const result = await voteOnPost(postId, vote);
       setPosts((current) => current.map((post) => (post.id === postId ? result.post : post)));
     } catch (voteError) {
-      setError(voteError.message || "Could not update vote.");
+      showToast(voteError.message || "Could not update vote.", "danger");
     } finally {
       setBusyPostId("");
     }
@@ -120,9 +126,9 @@ export default function SearchPage() {
     try {
       const result = await repostPost(postId);
       setPosts((current) => current.map((post) => (post.id === postId ? result.post : post)));
-      setNotice(result.message || "Repost updated.");
+      showToast(result.message || "Repost updated.", "success");
     } catch (repostError) {
-      setError(repostError.message || "Could not repost this post.");
+      showToast(repostError.message || "Could not repost this post.", "danger");
     } finally {
       setBusyPostId("");
     }
@@ -143,7 +149,7 @@ export default function SearchPage() {
       setSharePostId(postId);
     } catch (shareError) {
       if (shareError?.name !== "AbortError") {
-        setError("Could not share this post.");
+        showToast("Could not share this post.", "danger");
       }
     }
   }
@@ -162,7 +168,7 @@ export default function SearchPage() {
         )
       );
     } catch (followError) {
-      setError(followError.message || "Could not update follow status.");
+      showToast(followError.message || "Could not update follow status.", "danger");
     }
   }
 
@@ -183,9 +189,9 @@ export default function SearchPage() {
     try {
       await deletePost(post.id);
       setPosts((current) => current.filter((item) => item.id !== post.id));
-      setNotice("Post deleted.");
+      showToast("Post deleted.", "success");
     } catch (deleteError) {
-      setError(deleteError.message || "Could not delete this post.");
+      showToast(deleteError.message || "Could not delete this post.", "danger");
     } finally {
       setBusyPostId("");
     }
@@ -258,8 +264,6 @@ export default function SearchPage() {
         </Card>
 
         {error ? <Alert color="danger" variant="soft">{error}</Alert> : null}
-        {notice ? <Alert color="neutral" variant="soft">{notice}</Alert> : null}
-
         {isLoading ? (
           <Card variant="outlined" className="content-card">
             <Stack direction="row" spacing={1.5} alignItems="center">
@@ -361,7 +365,7 @@ export default function SearchPage() {
         title="Share post"
         onCopied={setToastMessage}
       />
-      <ToastNotice open={Boolean(toastMessage)} message={toastMessage} onClose={() => setToastMessage("")} />
+      <ToastNotice open={Boolean(toastMessage)} message={toastMessage} color={toastColor} onClose={() => setToastMessage("")} />
     </Box>
   );
 }

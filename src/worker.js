@@ -18,6 +18,7 @@ const MAX_COMMENT_LENGTH = 400;
 const MAX_BIO_LENGTH = 280;
 const SESSION_COOKIE = "yimage_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+const OWNER_MODERATOR_USERNAME = "mod_yimage";
 const POST_ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const PBKDF2_ITERATIONS = 100000;
 const REPORT_REASONS = new Set([
@@ -392,6 +393,7 @@ function toPublicUser(user) {
   const avatarUrl = user.avatarUrl && user.avatarUrl.startsWith("avatars/")
     ? `/api/users/${user.username}/avatar`
     : user.avatarUrl || "";
+  const isModerator = String(user.username || "") === OWNER_MODERATOR_USERNAME;
 
   return {
     id: user.id,
@@ -402,7 +404,7 @@ function toPublicUser(user) {
     bio: user.bio || "",
     avatarUrl,
     followingCount: Number(user.followingCount || 0),
-    isAdmin: Boolean(user.isAdmin),
+    isAdmin: Boolean(user.isAdmin) || isModerator,
     moderationStatus: user.moderationStatus || MODERATION_STATES.ACTIVE
   };
 }
@@ -659,7 +661,7 @@ async function requireUser(request, env) {
 
 async function requireModerator(request, env) {
   const user = await requireUser(request, env);
-  if (!user.isAdmin) {
+  if (user.username !== OWNER_MODERATOR_USERNAME) {
     throw fail("Moderator access required.", 403);
   }
   return user;
@@ -2136,7 +2138,7 @@ async function handleDeletePost(request, env, postId) {
     return fail("Post not found.", 404);
   }
 
-  const canDelete = user.id === post.userId || Boolean(user.isAdmin);
+  const canDelete = user.id === post.userId || user.username === OWNER_MODERATOR_USERNAME;
   if (!canDelete) {
     return fail("Forbidden.", 403);
   }
@@ -2145,7 +2147,7 @@ async function handleDeletePost(request, env, postId) {
     .bind(MODERATION_STATES.REMOVED, postId)
     .run();
 
-  if (user.isAdmin) {
+  if (user.username === OWNER_MODERATOR_USERNAME) {
     await env.DB.prepare(
       "INSERT INTO moderation_actions (id, moderator_id, target_type, target_id, action, notes, created_at) VALUES (?, ?, 'post', ?, 'remove', ?, ?)"
     )
@@ -2327,7 +2329,7 @@ async function handleCommentDelete(request, env, commentId) {
     return fail("Comment not found.", 404);
   }
 
-  if (target.authorId !== user.id && !user.isAdmin) {
+  if (target.authorId !== user.id && user.username !== OWNER_MODERATOR_USERNAME) {
     return fail("You do not have permission to delete this comment.", 403);
   }
 
@@ -2500,10 +2502,15 @@ async function handleModerationOverview(request, env) {
         reports.reason,
         COUNT(*) AS reportCount,
         MAX(reports.created_at) AS latestReportAt,
-        GROUP_CONCAT(DISTINCT reports.reason) AS reasons
+        GROUP_CONCAT(DISTINCT reports.reason) AS reasons,
+        COALESCE(posts.title, '') AS postTitle,
+        COALESCE(posts.image_url, '') AS postImageUrl,
+        COALESCE(users.username, '') AS authorUsername
       FROM reports
+      LEFT JOIN posts ON posts.id = reports.target_id AND reports.target_type = 'post'
+      LEFT JOIN users ON users.id = posts.author_id
       WHERE reports.status = 'open'
-      GROUP BY reports.target_type, reports.target_id, reports.reason
+      GROUP BY reports.target_type, reports.target_id
       ORDER BY latestReportAt DESC
       LIMIT 200
     `
