@@ -245,16 +245,20 @@ export default function ProfilePage() {
   const socialItems = socialSheet === "followers" ? followers : socialSheet === "following" ? following : [];
 
   function getPostStatusBadge(post) {
-    if (!canSeeModerationLabels || post.moderationStatus === "under_review") {
-      return "";
+    if (!canSeeModerationLabels) {
+      return [];
     }
+    const badges = [];
     if (post.aiReported) {
-      return "Reported by AI";
+      badges.push("Reported by AI");
     }
-    if (Number(post.reportCount || 0) > 0) {
-      return `Reported: ${post.reportCount}/${post.reportThreshold || 100}`;
+    if (Number(post.reportCount || 0) > 0 && post.moderationStatus !== "under_review") {
+      badges.push(`Reported: ${post.reportCount}/${post.reportThreshold || 100}`);
     }
-    return "";
+    if (post.appealStatus) {
+      badges.push(`Appeal ${post.appealStatus}`);
+    }
+    return badges;
   }
 
   return (

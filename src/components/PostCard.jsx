@@ -57,6 +57,7 @@ export default function PostCard({
   const title = post.title?.trim();
   const description = post.description?.trim();
   const displayPost = useMemo(() => ({ ...post, commentsCount: commentCount }), [commentCount, post]);
+  const statusBadges = Array.isArray(statusBadge) ? statusBadge.filter(Boolean) : [statusBadge].filter(Boolean);
 
   useEffect(() => {
     setCommentCount(post.commentsCount ?? 0);
@@ -83,9 +84,13 @@ export default function PostCard({
               {reviewBanner}
             </div>
           ) : null}
-          {statusBadge ? (
-            <div className="post-status-badge">
-              {statusBadge}
+          {statusBadges.length ? (
+            <div className="post-status-badge-row">
+              {statusBadges.map((badge) => (
+                <span key={badge} className="post-status-badge">
+                  {badge}
+                </span>
+              ))}
             </div>
           ) : null}
           <Stack direction="row" justifyContent="space-between" spacing={1.25} alignItems="flex-start">

@@ -88,6 +88,7 @@ export default function Header({
   const isProfile = location.pathname === "/profile" || location.pathname.startsWith("/u/");
   const isModeration = location.pathname === "/moderation";
   const isCreate = location.pathname.startsWith("/create");
+  const isModerator = user?.username === "mod_yimage";
 
   return (
     <>
@@ -171,19 +172,21 @@ export default function Header({
             selectedIconSrc="/nav-search-selected.svg"
             onClick={onSearch}
           />
-          <NavItem
-            active={isProfile}
-            label="Profile"
-            iconSrc="/nav-profile.svg"
-            selectedIconSrc="/nav-profile-selected.svg"
-            onClick={onProfile}
-          />
-          {user?.username === "mod_yimage" ? (
+          {!isModerator ? (
+            <NavItem
+              active={isProfile}
+              label="Profile"
+              iconSrc="/nav-profile.svg"
+              selectedIconSrc="/nav-profile-selected.svg"
+              onClick={onProfile}
+            />
+          ) : null}
+          {isModerator ? (
             <NavItem
               active={isModeration}
-              label="Moderation"
-              iconSrc="/action-report.svg"
-              selectedIconSrc="/action-report-selected.svg"
+              label="Manage"
+              iconSrc="/nav-manage.svg"
+              selectedIconSrc="/nav-manage-selected.svg"
               onClick={onModeration}
             />
           ) : null}

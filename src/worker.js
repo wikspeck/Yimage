@@ -470,6 +470,7 @@ function toPostResponse(post, viewerVote = null, viewerHasReposted = false, repo
     aiReportReason: post.aiReportReason || "",
     aiReportCategories: parseJsonArray(post.aiReportCategories),
     aiCheckedAt: post.aiCheckedAt || "",
+    appealStatus: post.appealStatus || "",
     category: post.categorySlug
       ? {
           id: post.categoryId,
@@ -1277,6 +1278,7 @@ async function runAiImageModeration(env, { postId, imageBytes, mimeType, title =
 }
 
 async function getPostRecord(env, postId, includeModerated = false) {
+  await ensureModerationSchema(env);
   const row = await env.DB.prepare(
     `
       SELECT
@@ -1314,6 +1316,14 @@ async function getPostRecord(env, postId, includeModerated = false) {
             AND reports.target_id = posts.id
             AND reports.status = 'open'
         ) AS latestReportAt,
+        (
+          SELECT moderation_appeals.status
+          FROM moderation_appeals
+          WHERE moderation_appeals.content_type = 'post'
+            AND moderation_appeals.content_id = posts.id
+          ORDER BY moderation_appeals.created_at DESC
+          LIMIT 1
+        ) AS appealStatus,
         posts.category_id AS categoryId,
         categories.slug AS categorySlug,
         categories.label AS categoryLabel
@@ -1436,6 +1446,7 @@ async function syncPostHashtags(env, postId, hashtags) {
 }
 
 async function listPosts(env, userId, options = {}) {
+  await ensureModerationSchema(env);
   const searchQuery = normalizeText(options.query).toLowerCase();
   const creatorQuery = searchQuery.replace(/^@+/, "");
   const category = normalizeText(options.category).toLowerCase();
@@ -3004,6 +3015,35 @@ async function handleModerationOverview(request, env) {
 
   const warningsRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_warnings").first();
   const suspensionsRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_suspensions WHERE lifted_at IS NULL").first();
+  const accountRows = await env.DB.prepare(
+    `
+      SELECT
+        users.id,
+        users.username,
+        users.created_at AS createdAt,
+        COALESCE(users.display_name, '') AS displayName,
+        COALESCE(users.avatar_url, '') AS avatarUrl,
+        COALESCE(users.moderation_status, 'visible') AS moderationStatus,
+        COUNT(DISTINCT reports.id) AS reportCount,
+        COUNT(DISTINCT user_warnings.id) AS warningCount,
+        COUNT(DISTINCT user_suspensions.id) AS suspensionCount,
+        MAX(reports.created_at) AS latestReportAt,
+        GROUP_CONCAT(DISTINCT reports.reason) AS reasons
+      FROM users
+      LEFT JOIN reports
+        ON reports.target_type = 'user'
+       AND reports.target_id IN (users.id, users.username)
+       AND reports.status = 'open'
+      LEFT JOIN user_warnings ON user_warnings.user_id = users.id
+      LEFT JOIN user_suspensions ON user_suspensions.user_id = users.id AND user_suspensions.lifted_at IS NULL
+      WHERE COALESCE(users.moderation_status, 'visible') NOT IN ('visible', 'active')
+         OR reports.id IS NOT NULL
+         OR user_suspensions.id IS NOT NULL
+      GROUP BY users.id
+      ORDER BY latestReportAt DESC, users.created_at DESC
+      LIMIT 100
+    `
+  ).all();
 
   return success({
     reports: (rows.results || []).map((row) => ({
@@ -3026,6 +3066,20 @@ async function handleModerationOverview(request, env) {
       labels: parseJsonArray(row.labels)
     })),
     appeals: appealRows.results || [],
+    accounts: (accountRows.results || []).map((row) => ({
+      id: row.id,
+      username: row.username,
+      displayName: row.displayName || row.username,
+      avatarUrl: row.avatarUrl && row.avatarUrl.startsWith("avatars/")
+        ? `/api/users/${row.username}/avatar`
+        : row.avatarUrl || "",
+      moderationStatus: normalizeModerationStatus(row.moderationStatus),
+      reportCount: Number(row.reportCount || 0),
+      warningCount: Number(row.warningCount || 0),
+      suspensionCount: Number(row.suspensionCount || 0),
+      latestReportAt: row.latestReportAt || "",
+      reasons: row.reasons || ""
+    })),
     totals: {
       warnings: Number(warningsRow?.count || 0),
       activeSuspensions: Number(suspensionsRow?.count || 0)
@@ -3158,6 +3212,7 @@ async function handleModerationAction(request, env) {
 }
 
 async function handleGetProfile(request, env, username) {
+  await ensureModerationSchema(env);
   const normalizedUsername = normalizeUsername(username);
   const viewer = await getCurrentUser(request, env);
   const url = new URL(request.url);
@@ -3241,6 +3296,14 @@ async function handleGetProfile(request, env, username) {
             AND reports.target_id = posts.id
             AND reports.status = 'open'
         ) AS latestReportAt,
+        (
+          SELECT moderation_appeals.status
+          FROM moderation_appeals
+          WHERE moderation_appeals.content_type = 'post'
+            AND moderation_appeals.content_id = posts.id
+          ORDER BY moderation_appeals.created_at DESC
+          LIMIT 1
+        ) AS appealStatus,
         posts.category_id AS categoryId,
         categories.slug AS categorySlug,
         categories.label AS categoryLabel
@@ -3386,12 +3449,11 @@ async function handleGetProfile(request, env, username) {
 
   return success({
     profile: {
-      id: profileUser.id,
-      username: profileUser.username,
-      createdAt: profileUser.createdAt,
-      displayName: profileUser.displayName || profileUser.username,
-      bio: profileUser.bio || "",
-      avatarUrl: profileUser.avatarUrl || "",
+      ...toPublicUser({
+        ...profileUser,
+        displayName: profileUser.displayName || profileUser.username,
+        followingCount: counts?.followingCount || 0
+      }),
       postsCount: Number(counts?.postsCount || 0),
       followersCount: Number(counts?.followersCount || 0),
       followingCount: Number(counts?.followingCount || 0),
@@ -3462,12 +3524,16 @@ async function handleToggleFollow(request, env, username) {
 
   return success({
     profile: {
-      id: targetUser.id,
-      username: targetUser.username,
-      createdAt: targetUser.createdAt,
-      displayName: targetProfile?.displayName || targetUser.username,
-      bio: targetProfile?.bio || "",
-      avatarUrl: targetProfile?.avatarUrl || "",
+      ...toPublicUser({
+        ...targetProfile,
+        id: targetUser.id,
+        username: targetUser.username,
+        createdAt: targetUser.createdAt,
+        displayName: targetProfile?.displayName || targetUser.username,
+        bio: targetProfile?.bio || "",
+        avatarUrl: targetProfile?.avatarUrl || "",
+        followingCount: counts?.followingCount || 0
+      }),
       postsCount: Number(counts?.postsCount || 0),
       followersCount: Number(counts?.followersCount || 0),
       followingCount: Number(counts?.followingCount || 0),

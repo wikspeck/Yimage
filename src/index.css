@@ -2111,9 +2111,15 @@ body::-webkit-scrollbar-thumb,
   font-weight: 700;
 }
 
-.post-status-badge {
+.post-status-badge-row {
   display: inline-flex;
   align-self: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.post-status-badge {
+  display: inline-flex;
   border-radius: 999px;
   padding: 6px 10px;
   background: rgba(255, 191, 71, 0.14);
