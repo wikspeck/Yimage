@@ -6,6 +6,7 @@ import { applyModerationAction, getModerationReports } from "../api/yimageApi";
 
 export default function ModerationPage() {
   const [data, setData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [busyKey, setBusyKey] = useState("");
   const [toast, setToast] = useState({ open: false, message: "", color: "neutral" });
 
@@ -14,11 +15,17 @@ export default function ModerationPage() {
   }
 
   async function loadData() {
+    setIsLoading(true);
+
     try {
       const nextData = await getModerationReports();
       setData(nextData);
     } catch (error) {
+      console.error("Failed to load moderation reports.", error);
+      setData({ reports: [], aiFindings: [], appeals: [], totals: { warnings: 0, activeSuspensions: 0 } });
       showToast(error.message || "Could not load moderation queue.", "danger");
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -47,7 +54,7 @@ export default function ModerationPage() {
 
   const postReports = (data?.reports || []).filter((report) => report.targetType === "post");
 
-  if (!data) {
+  if (isLoading && !data) {
     return (
       <div className="page-shell">
         <Stack spacing={2}>
@@ -85,7 +92,7 @@ export default function ModerationPage() {
                 <Stack spacing={1.25}>
                   <Typography level="title-lg">{report.postTitle || report.targetId}</Typography>
                   <Typography level="body-sm" textColor="neutral.500">
-                    {report.authorUsername ? `@${report.authorUsername} • ` : ""}{report.reportCount} reports
+                    {report.authorUsername ? `@${report.authorUsername} | ` : ""}{report.reportCount} reports
                   </Typography>
                   <Typography level="body-sm" textColor="neutral.400">
                     Reason: {report.reasons || report.reason || "report"}
@@ -117,7 +124,7 @@ export default function ModerationPage() {
         ) : (
           <Card variant="outlined" className="content-card">
             <Typography level="body-md" textColor="neutral.400">
-              No open post reports right now.
+              No reports to review.
             </Typography>
           </Card>
         )}

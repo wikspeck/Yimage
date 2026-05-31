@@ -32,7 +32,8 @@ const REPORT_REASONS = new Set([
   "other"
 ]);
 const MODERATION_STATES = {
-  ACTIVE: "active",
+  VISIBLE: "visible",
+  ACTIVE_LEGACY: "active",
   UNDER_REVIEW: "under_review",
   HIDDEN: "hidden",
   REMOVED: "removed",
@@ -360,6 +361,19 @@ function toIsoDate(value = Date.now()) {
   return new Date(value).toISOString();
 }
 
+function normalizeModerationStatus(status) {
+  const value = normalizeText(status).toLowerCase();
+  if (!value || value === MODERATION_STATES.ACTIVE_LEGACY) {
+    return MODERATION_STATES.VISIBLE;
+  }
+  return value;
+}
+
+function isVisibleModerationStatus(status) {
+  const value = normalizeModerationStatus(status);
+  return value === MODERATION_STATES.VISIBLE;
+}
+
 function createId(prefix = "") {
   return `${prefix}${crypto.randomUUID().replace(/-/g, "")}`;
 }
@@ -405,7 +419,7 @@ function toPublicUser(user) {
     avatarUrl,
     followingCount: Number(user.followingCount || 0),
     isAdmin: Boolean(user.isAdmin) || isModerator,
-    moderationStatus: user.moderationStatus || MODERATION_STATES.ACTIVE
+    moderationStatus: normalizeModerationStatus(user.moderationStatus || MODERATION_STATES.VISIBLE)
   };
 }
 
@@ -447,7 +461,7 @@ function toPostResponse(post, viewerVote = null, viewerHasReposted = false, repo
     commentsCount: Number(post.commentsCount || 0),
     views: Number(post.views || 0),
     repostCount: Number(post.repostCount || 0),
-    moderationStatus: post.moderationStatus || MODERATION_STATES.ACTIVE,
+    moderationStatus: normalizeModerationStatus(post.moderationStatus || MODERATION_STATES.VISIBLE),
     category: post.categorySlug
       ? {
           id: post.categoryId,
@@ -665,6 +679,137 @@ async function requireModerator(request, env) {
     throw fail("Moderator access required.", 403);
   }
   return user;
+}
+
+async function ensureTableColumns(env, tableName, expectedColumns) {
+  const pragma = await env.DB.prepare(`PRAGMA table_info(${tableName})`).all();
+  const existingColumns = new Set((pragma.results || []).map((column) => String(column.name || "").toLowerCase()));
+
+  for (const column of expectedColumns) {
+    if (!existingColumns.has(column.name.toLowerCase())) {
+      await env.DB.prepare(`ALTER TABLE ${tableName} ADD COLUMN ${column.definition}`).run();
+    }
+  }
+}
+
+async function ensureModerationSchema(env) {
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS reports (
+      id TEXT PRIMARY KEY,
+      reporter_id TEXT,
+      reporter_username TEXT NOT NULL DEFAULT '',
+      target_type TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      target_owner_id TEXT,
+      target_owner_username TEXT NOT NULL DEFAULT '',
+      reason TEXT NOT NULL,
+      details TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      status TEXT NOT NULL DEFAULT 'open',
+      reviewed_at TEXT,
+      reviewed_by TEXT,
+      FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE SET NULL
+    )`
+  ).run();
+
+  await ensureTableColumns(env, "reports", [
+    { name: "reporter_username", definition: "reporter_username TEXT NOT NULL DEFAULT ''" },
+    { name: "target_owner_id", definition: "target_owner_id TEXT" },
+    { name: "target_owner_username", definition: "target_owner_username TEXT NOT NULL DEFAULT ''" },
+    { name: "reviewed_at", definition: "reviewed_at TEXT" },
+    { name: "reviewed_by", definition: "reviewed_by TEXT" }
+  ]);
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS moderation_actions (
+      id TEXT PRIMARY KEY,
+      moderator_id TEXT NOT NULL,
+      target_type TEXT NOT NULL,
+      target_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (moderator_id) REFERENCES users(id) ON DELETE CASCADE
+    )`
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS copyright_reports (
+      id TEXT PRIMARY KEY,
+      report_id TEXT NOT NULL UNIQUE,
+      claimant_name TEXT NOT NULL DEFAULT '',
+      claimant_email TEXT NOT NULL DEFAULT '',
+      copyright_description TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (report_id) REFERENCES reports(id) ON DELETE CASCADE
+    )`
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS user_warnings (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      moderator_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (moderator_id) REFERENCES users(id) ON DELETE CASCADE
+    )`
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS user_suspensions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      moderator_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      lifted_at TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (moderator_id) REFERENCES users(id) ON DELETE CASCADE
+    )`
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS moderation_appeals (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      content_id TEXT NOT NULL,
+      content_type TEXT NOT NULL,
+      message TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL,
+      reviewed_at TEXT,
+      reviewed_by TEXT
+    )`
+  ).run();
+
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS ai_moderation_results (
+      id TEXT PRIMARY KEY,
+      content_id TEXT NOT NULL,
+      content_type TEXT NOT NULL,
+      risk_score INTEGER NOT NULL DEFAULT 0,
+      labels TEXT NOT NULL DEFAULT '[]',
+      ai_reason TEXT NOT NULL DEFAULT '',
+      moderation_status TEXT NOT NULL DEFAULT 'under_review',
+      model TEXT NOT NULL DEFAULT '@cf/meta/llama-guard-3-8b',
+      created_at TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'text'
+    )`
+  ).run();
+
+  await ensureTableColumns(env, "ai_moderation_results", [
+    { name: "source", definition: "source TEXT NOT NULL DEFAULT 'text'" }
+  ]);
+
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_reports_target ON reports(target_type, target_id, status)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_reports_status_created_at ON reports(status, created_at DESC)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ai_moderation_results_content ON ai_moderation_results(content_type, content_id, created_at DESC)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_moderation_appeals_status ON moderation_appeals(status, created_at DESC)").run();
 }
 
 async function getPostHashtagsMap(env, postIds) {
@@ -1036,7 +1181,7 @@ async function runAiImageModeration(env, { postId, imageBytes, mimeType, title =
     if (!moderation.isUnsafe || Number(moderation.riskScore || 0) < 20) {
       return {
         ...moderation,
-        moderationStatus: MODERATION_STATES.ACTIVE
+        moderationStatus: MODERATION_STATES.VISIBLE
       };
     }
 
@@ -1466,7 +1611,7 @@ async function handleSignup(request, env) {
 
   return success(
     {
-      user: toPublicUser(createdUser || { id: userId, username, email, createdAt, displayName: username, bio: "", avatarUrl: "", isAdmin: 0, moderationStatus: "active" })
+      user: toPublicUser(createdUser || { id: userId, username, email, createdAt, displayName: username, bio: "", avatarUrl: "", isAdmin: 0, moderationStatus: MODERATION_STATES.VISIBLE })
     },
     {
       status: 201,
@@ -1842,7 +1987,7 @@ async function handleCreatePost(request, env) {
     title: finalTitle,
     description: finalDescription
   });
-  const moderationStatus = imageModeration?.moderationStatus || MODERATION_STATES.ACTIVE;
+  const moderationStatus = normalizeModerationStatus(imageModeration?.moderationStatus || MODERATION_STATES.VISIBLE);
 
   await env.DB.prepare(
     `
@@ -1913,7 +2058,7 @@ async function handleCreatePost(request, env) {
   });
   const post = await getPostRecord(env, postId, true);
 
-  const moderationNotice = imageModeration && imageModeration.moderationStatus !== MODERATION_STATES.ACTIVE
+  const moderationNotice = imageModeration && !isVisibleModerationStatus(imageModeration.moderationStatus)
     ? "Your post was hidden by automatic safety moderation. You can appeal this decision."
     : textModeration?.isUnsafe
       ? "Your post is being reviewed by automatic safety moderation."
@@ -1923,7 +2068,7 @@ async function handleCreatePost(request, env) {
     {
       post: toPostResponse(post),
       moderationNotice,
-      canAppeal: Boolean(imageModeration && imageModeration.moderationStatus !== MODERATION_STATES.ACTIVE),
+      canAppeal: Boolean(imageModeration && !isVisibleModerationStatus(imageModeration.moderationStatus)),
       aiFinding: imageModeration
         ? {
             riskScore: Number(imageModeration.riskScore || 0),
@@ -1974,7 +2119,7 @@ async function handleGetPost(request, env, postId) {
   const repostsRemainingToday = await getRepostsRemainingToday(env, user?.id);
   let moderationReview = null;
 
-  if (user && (user.id === post.userId || user.isAdmin) && post.moderationStatus !== MODERATION_STATES.ACTIVE) {
+  if (user && (user.id === post.userId || user.isAdmin) && !isVisibleModerationStatus(post.moderationStatus)) {
     const latestAiFinding = await env.DB.prepare(
       `
         SELECT
@@ -2372,7 +2517,8 @@ async function handleCategoriesList(env) {
 }
 
 async function handleCreateReport(request, env) {
-  const reporter = await getCurrentUser(request, env);
+  await ensureModerationSchema(env);
+  const reporter = await requireUser(request, env);
   const body = await parseJsonBody(request);
   const turnstileFailure = await verifyTurnstileToken(env, request, body.turnstileToken);
   if (turnstileFailure) {
@@ -2393,30 +2539,80 @@ async function handleCreateReport(request, env) {
     return fail("Invalid report reason.");
   }
 
+  let targetOwnerId = "";
+  let targetOwnerUsername = "";
+
   if (targetType === "post") {
-    const post = await env.DB.prepare("SELECT id FROM posts WHERE id = ? LIMIT 1").bind(targetId).first();
+    const post = await env.DB.prepare(
+      `SELECT
+        posts.id,
+        posts.author_id AS ownerId,
+        COALESCE(users.username, '') AS ownerUsername
+      FROM posts
+      LEFT JOIN users ON users.id = posts.author_id
+      WHERE posts.id = ?
+      LIMIT 1`
+    ).bind(targetId).first();
     if (!post) {
       return fail("Post not found.", 404);
     }
+    targetOwnerId = post.ownerId || "";
+    targetOwnerUsername = post.ownerUsername || "";
   }
   if (targetType === "comment") {
-    const comment = await env.DB.prepare("SELECT id FROM comments WHERE id = ? LIMIT 1").bind(targetId).first();
+    const comment = await env.DB.prepare(
+      `SELECT
+        comments.id,
+        comments.author_id AS ownerId,
+        COALESCE(users.username, '') AS ownerUsername
+      FROM comments
+      LEFT JOIN users ON users.id = comments.author_id
+      WHERE comments.id = ?
+      LIMIT 1`
+    ).bind(targetId).first();
     if (!comment) {
       return fail("Comment not found.", 404);
     }
+    targetOwnerId = comment.ownerId || "";
+    targetOwnerUsername = comment.ownerUsername || "";
   }
   if (targetType === "user") {
-    const reportedUser = await env.DB.prepare("SELECT id FROM users WHERE id = ? OR username = ? LIMIT 1").bind(targetId, targetId).first();
+    const reportedUser = await env.DB.prepare("SELECT id, username FROM users WHERE id = ? OR username = ? LIMIT 1").bind(targetId, targetId).first();
     if (!reportedUser) {
       return fail("User not found.", 404);
     }
+    targetOwnerId = reportedUser.id || "";
+    targetOwnerUsername = reportedUser.username || "";
   }
 
   const reportId = createId("report_");
   await env.DB.prepare(
-    "INSERT INTO reports (id, reporter_id, target_type, target_id, reason, details, created_at, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'open')"
+    `INSERT INTO reports (
+      id,
+      reporter_id,
+      reporter_username,
+      target_type,
+      target_id,
+      target_owner_id,
+      target_owner_username,
+      reason,
+      details,
+      created_at,
+      status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')`
   )
-    .bind(reportId, reporter?.id || null, targetType, targetId, reason, details, toIsoDate())
+    .bind(
+      reportId,
+      reporter.id,
+      reporter.username,
+      targetType,
+      targetId,
+      targetOwnerId || null,
+      targetOwnerUsername,
+      reason,
+      details,
+      toIsoDate()
+    )
     .run();
 
   if (reason === "copyright violation") {
@@ -2446,13 +2642,28 @@ async function handleCreateReport(request, env) {
   });
   if (targetType === "post") {
     await env.DB.prepare(
-      "UPDATE posts SET moderation_status = CASE WHEN COALESCE(moderation_status, 'active') = 'active' THEN 'under_review' ELSE moderation_status END WHERE id = ?"
+      `UPDATE posts
+       SET moderation_status = CASE
+         WHEN COALESCE(moderation_status, 'visible') IN ('visible', 'active') THEN 'under_review'
+         ELSE moderation_status
+       END
+       WHERE id = ?`
     )
       .bind(targetId)
       .run();
   }
 
-  return success({ message: "Report submitted." }, { status: 201 });
+  return success({
+    message: "Report submitted.",
+    report: {
+      id: reportId,
+      targetType,
+      targetId,
+      status: "open",
+      reason,
+      createdAt: toIsoDate()
+    }
+  }, { status: 201 });
 }
 
 async function handleCreateAppeal(request, env) {
@@ -2501,18 +2712,28 @@ async function handleCreateAppeal(request, env) {
 
 async function handleModerationOverview(request, env) {
   await requireModerator(request, env);
+  await ensureModerationSchema(env);
+
   const rows = await env.DB.prepare(
     `
       SELECT
+        reports.id,
         reports.target_type AS targetType,
         reports.target_id AS targetId,
         reports.reason,
+        reports.details,
+        reports.status,
+        reports.created_at AS createdAt,
+        reports.reviewed_at AS reviewedAt,
+        COALESCE(reports.reporter_id, '') AS reporterId,
+        COALESCE(reports.reporter_username, COALESCE(reporters.username, '')) AS reporterUsername,
+        COALESCE(reports.target_owner_id, posts.author_id, '') AS targetOwnerId,
+        COALESCE(reports.target_owner_username, COALESCE(post_authors.username, '')) AS targetOwnerUsername,
         COUNT(*) AS reportCount,
         MAX(reports.created_at) AS latestReportAt,
         GROUP_CONCAT(DISTINCT reports.reason) AS reasons,
         COALESCE(posts.title, '') AS postTitle,
-        COALESCE(post_authors.username, '') AS authorUsername,
-        COALESCE(reporters.username, '') AS reporterUsername
+        COALESCE(posts.moderation_status, 'visible') AS moderationStatus
       FROM reports
       LEFT JOIN posts ON posts.id = reports.target_id AND reports.target_type = 'post'
       LEFT JOIN users AS post_authors ON post_authors.id = posts.author_id
@@ -2566,9 +2787,13 @@ async function handleModerationOverview(request, env) {
   const suspensionsRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM user_suspensions WHERE lifted_at IS NULL").first();
 
   return success({
-    reports: rows.results || [],
+    reports: (rows.results || []).map((row) => ({
+      ...row,
+      moderationStatus: normalizeModerationStatus(row.moderationStatus)
+    })),
     aiFindings: (aiRows.results || []).map((row) => ({
       ...row,
+      moderationStatus: normalizeModerationStatus(row.moderationStatus),
       labels: parseJsonArray(row.labels)
     })),
     appeals: appealRows.results || [],
@@ -2607,7 +2832,7 @@ async function handleAppealReview(request, env, appealId) {
 
   if (appeal.contentType === "post") {
     await env.DB.prepare("UPDATE posts SET moderation_status = ? WHERE id = ?")
-      .bind(decision === "approve" ? MODERATION_STATES.ACTIVE : MODERATION_STATES.HIDDEN, appeal.contentId)
+      .bind(decision === "approve" ? MODERATION_STATES.VISIBLE : MODERATION_STATES.HIDDEN, appeal.contentId)
       .run();
   }
 
@@ -2630,6 +2855,7 @@ async function handleAppealReview(request, env, appealId) {
 
 async function handleModerationAction(request, env) {
   const moderator = await requireModerator(request, env);
+  await ensureModerationSchema(env);
   const body = await parseJsonBody(request);
   const targetType = normalizeText(body.targetType);
   const targetId = normalizeText(body.targetId);
@@ -2650,14 +2876,14 @@ async function handleModerationAction(request, env) {
     .run();
 
   if (targetType === "post") {
-    const nextStatus = action === "hide" ? MODERATION_STATES.HIDDEN : action === "restore" ? MODERATION_STATES.ACTIVE : action === "remove" ? MODERATION_STATES.REMOVED : action === "under_review" ? MODERATION_STATES.UNDER_REVIEW : null;
+    const nextStatus = action === "hide" ? MODERATION_STATES.HIDDEN : action === "restore" ? MODERATION_STATES.VISIBLE : action === "remove" ? MODERATION_STATES.REMOVED : action === "under_review" ? MODERATION_STATES.UNDER_REVIEW : null;
     if (nextStatus) {
       await env.DB.prepare("UPDATE posts SET moderation_status = ? WHERE id = ?").bind(nextStatus, targetId).run();
     }
   }
 
   if (targetType === "comment") {
-    const nextStatus = action === "hide" ? MODERATION_STATES.HIDDEN : action === "restore" ? MODERATION_STATES.ACTIVE : action === "remove" ? MODERATION_STATES.REMOVED : action === "under_review" ? MODERATION_STATES.UNDER_REVIEW : null;
+    const nextStatus = action === "hide" ? MODERATION_STATES.HIDDEN : action === "restore" ? MODERATION_STATES.VISIBLE : action === "remove" ? MODERATION_STATES.REMOVED : action === "under_review" ? MODERATION_STATES.UNDER_REVIEW : null;
     if (nextStatus) {
       await env.DB.prepare("UPDATE comments SET moderation_status = ? WHERE id = ?").bind(nextStatus, targetId).run();
     }
@@ -2676,7 +2902,7 @@ async function handleModerationAction(request, env) {
       await env.DB.prepare("UPDATE users SET moderation_status = ? WHERE id = ?").bind(MODERATION_STATES.SUSPENDED, targetId).run();
     }
     if (action === "restore") {
-      await env.DB.prepare("UPDATE users SET moderation_status = ? WHERE id = ?").bind(MODERATION_STATES.ACTIVE, targetId).run();
+      await env.DB.prepare("UPDATE users SET moderation_status = ? WHERE id = ?").bind(MODERATION_STATES.VISIBLE, targetId).run();
       await env.DB.prepare("UPDATE user_suspensions SET lifted_at = ? WHERE user_id = ? AND lifted_at IS NULL").bind(toIsoDate(), targetId).run();
     }
     if (action === "under_review") {
@@ -2684,8 +2910,9 @@ async function handleModerationAction(request, env) {
     }
   }
 
-  await env.DB.prepare("UPDATE reports SET status = 'reviewed' WHERE target_type = ? AND target_id = ? AND status = 'open'")
-    .bind(targetType, targetId)
+  const nextReportStatus = action === "remove" ? "removed" : action === "restore" ? "dismissed" : "reviewed";
+  await env.DB.prepare("UPDATE reports SET status = ?, reviewed_at = ?, reviewed_by = ? WHERE target_type = ? AND target_id = ? AND status = 'open'")
+    .bind(nextReportStatus, toIsoDate(), moderator.id, targetType, targetId)
     .run();
 
   return success({ message: "Moderation action applied." });
@@ -3181,7 +3408,8 @@ export default {
         console.error("Unhandled Worker error", {
           method: request.method,
           pathname: url.pathname,
-          error: thrown instanceof Error ? thrown.message : String(thrown)
+          error: thrown instanceof Error ? thrown.message : String(thrown),
+          stack: thrown instanceof Error ? thrown.stack : ""
         });
         return fail("Something went wrong loading this section.", 500);
       }
