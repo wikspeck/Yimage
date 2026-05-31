@@ -4,6 +4,18 @@ import BackButton from "../components/BackButton";
 import ToastNotice from "../components/ToastNotice";
 import { applyModerationAction, getModerationReports } from "../api/yimageApi";
 
+function formatTimestamp(value) {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return value;
+  }
+}
+
 export default function ModerationPage() {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -80,7 +92,7 @@ export default function ModerationPage() {
           <Stack spacing={0.75}>
             <Typography level="h1">Reports</Typography>
             <Typography level="body-md" textColor="neutral.400">
-              Review reported posts and quickly keep or remove them.
+              Review reported posts with image previews, counts, and current moderation status.
             </Typography>
           </Stack>
         </Card>
@@ -89,14 +101,53 @@ export default function ModerationPage() {
           <Stack spacing={2}>
             {postReports.map((report) => (
               <Card key={`${report.targetType}:${report.targetId}`} variant="outlined" className="content-card">
-                <Stack spacing={1.25}>
-                  <Typography level="title-lg">{report.postTitle || report.targetId}</Typography>
-                  <Typography level="body-sm" textColor="neutral.500">
-                    {report.authorUsername ? `@${report.authorUsername} | ` : ""}{report.reportCount} reports
-                  </Typography>
-                  <Typography level="body-sm" textColor="neutral.400">
-                    Reason: {report.reasons || report.reason || "report"}
-                  </Typography>
+                <Stack spacing={1.4}>
+                  {report.imageKey ? (
+                    <div className="post-media-frame is-normal">
+                      <div className="post-preview-media is-normal">
+                        <div className="post-preview-canvas is-normal">
+                          <img
+                            src={report.previewImageUrl}
+                            alt={report.postTitle || report.targetId}
+                            className="post-preview-image"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <Stack spacing={0.55}>
+                    <Typography level="title-lg">{report.postTitle || "Untitled post"}</Typography>
+                    {report.postDescription ? (
+                      <Typography level="body-sm" textColor="neutral.300">
+                        {report.postDescription.length > 220 ? `${report.postDescription.slice(0, 220)}...` : report.postDescription}
+                      </Typography>
+                    ) : null}
+                  </Stack>
+
+                  <Stack spacing={0.45}>
+                    <Typography level="body-sm" textColor="neutral.500">
+                      Author: {report.authorUsername ? `@${report.authorUsername}` : report.targetOwnerUsername ? `@${report.targetOwnerUsername}` : "Unknown"}
+                    </Typography>
+                    <Typography level="body-sm" textColor="neutral.500">
+                      Reports: {report.reportCount}/{report.reviewThreshold}
+                    </Typography>
+                    <Typography level="body-sm" textColor="neutral.500">
+                      Reporter{report.reportCount === 1 ? "" : "s"}: {report.reporterUsernames?.length ? report.reporterUsernames.map((name) => `@${name}`).join(", ") : "Not available"}
+                    </Typography>
+                    <Typography level="body-sm" textColor="neutral.500">
+                      Reason: {report.reasons || report.reason || "report"}
+                    </Typography>
+                    <Typography level="body-sm" textColor="neutral.500">
+                      Status: {report.moderationStatus}
+                    </Typography>
+                    {report.latestReportAt ? (
+                      <Typography level="body-sm" textColor="neutral.500">
+                        Latest report: {formatTimestamp(report.latestReportAt)}
+                      </Typography>
+                    ) : null}
+                  </Stack>
+
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={1.2}>
                     <Button
                       size="lg"

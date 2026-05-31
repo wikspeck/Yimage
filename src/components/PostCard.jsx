@@ -38,7 +38,8 @@ export default function PostCard({
   onDelete,
   onRequireLogin,
   isShareActive = false,
-  reviewBanner = ""
+  reviewBanner = "",
+  statusBadge = ""
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -80,6 +81,11 @@ export default function PostCard({
           {reviewBanner ? (
             <div className="post-review-banner">
               {reviewBanner}
+            </div>
+          ) : null}
+          {statusBadge ? (
+            <div className="post-status-badge">
+              {statusBadge}
             </div>
           ) : null}
           <Stack direction="row" justifyContent="space-between" spacing={1.25} alignItems="flex-start">

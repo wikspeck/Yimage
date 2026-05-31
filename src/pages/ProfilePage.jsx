@@ -36,6 +36,7 @@ export default function ProfilePage() {
   const [socialSheet, setSocialSheet] = useState("");
   const [socialQuery, setSocialQuery] = useState("");
   const isOwnProfile = Boolean(user && profile && user.username === profile.username);
+  const canSeeModerationLabels = Boolean(user && profile && (user.username === profile.username || user.username === "mod_yimage"));
   const seoUsername = profile?.username || username || "profile";
 
   useSeo({
@@ -396,7 +397,12 @@ export default function ProfilePage() {
                     onHashtagClick={(tag) => navigate(`/?hashtag=${encodeURIComponent(tag)}`)}
                     onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
                     onRequireLogin={(mode = "login") => (mode === "signup" ? openSignup(`/${post.id}`) : openLogin(`/${post.id}`))}
-                    reviewBanner={isOwnProfile && post.moderationStatus === "under_review" ? "This post is currently being reviewed and is not visible to other users." : ""}
+                    reviewBanner={canSeeModerationLabels && post.moderationStatus === "under_review" ? "This post is currently being reviewed and is not visible to other users." : ""}
+                    statusBadge={
+                      canSeeModerationLabels && post.moderationStatus !== "under_review" && Number(post.reportCount || 0) > 0
+                        ? `Reported: ${post.reportCount}/${post.reportThreshold || 100}`
+                        : ""
+                    }
                   />
                 ))}
               </Stack>

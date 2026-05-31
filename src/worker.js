@@ -31,6 +31,7 @@ const REPORT_REASONS = new Set([
   "copyright violation",
   "other"
 ]);
+const REPORT_REVIEW_THRESHOLD = 100;
 const MODERATION_STATES = {
   VISIBLE: "visible",
   ACTIVE_LEGACY: "active",
@@ -462,6 +463,9 @@ function toPostResponse(post, viewerVote = null, viewerHasReposted = false, repo
     views: Number(post.views || 0),
     repostCount: Number(post.repostCount || 0),
     moderationStatus: normalizeModerationStatus(post.moderationStatus || MODERATION_STATES.VISIBLE),
+    reportCount: Number(post.reportCount || 0),
+    reportThreshold: Number(post.reportThreshold || REPORT_REVIEW_THRESHOLD),
+    latestReportAt: post.latestReportAt || "",
     category: post.categorySlug
       ? {
           id: post.categoryId,
@@ -1229,6 +1233,20 @@ async function getPostRecord(env, postId, includeModerated = false) {
         COALESCE(posts.views, 0) AS views,
         COALESCE(posts.repost_count, 0) AS repostCount,
         COALESCE(posts.moderation_status, 'active') AS moderationStatus,
+        (
+          SELECT COUNT(*)
+          FROM reports
+          WHERE reports.target_type = 'post'
+            AND reports.target_id = posts.id
+            AND reports.status = 'open'
+        ) AS reportCount,
+        (
+          SELECT MAX(reports.created_at)
+          FROM reports
+          WHERE reports.target_type = 'post'
+            AND reports.target_id = posts.id
+            AND reports.status = 'open'
+        ) AS latestReportAt,
         posts.category_id AS categoryId,
         categories.slug AS categorySlug,
         categories.label AS categoryLabel
@@ -2585,7 +2603,38 @@ async function handleCreateReport(request, env) {
     targetOwnerUsername = reportedUser.username || "";
   }
 
+  const existingOpenReport = reporter.id
+    ? await env.DB.prepare(
+      "SELECT id FROM reports WHERE reporter_id = ? AND target_type = ? AND target_id = ? AND status = 'open' LIMIT 1"
+    )
+      .bind(reporter.id, targetType, targetId)
+      .first()
+    : null;
+
+  if (existingOpenReport) {
+    const countRow = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM reports WHERE target_type = ? AND target_id = ? AND status = 'open'"
+    )
+      .bind(targetType, targetId)
+      .first();
+
+    return success({
+      message: "You already reported this item.",
+      alreadyReported: true,
+      report: {
+        id: existingOpenReport.id,
+        targetType,
+        targetId,
+        status: "open",
+        reason
+      },
+      reportCount: Number(countRow?.count || 0),
+      reviewThreshold: REPORT_REVIEW_THRESHOLD
+    });
+  }
+
   const reportId = createId("report_");
+  const createdAt = toIsoDate();
   await env.DB.prepare(
     `INSERT INTO reports (
       id,
@@ -2611,7 +2660,7 @@ async function handleCreateReport(request, env) {
       targetOwnerUsername,
       reason,
       details,
-      toIsoDate()
+      createdAt
     )
     .run();
 
@@ -2625,7 +2674,7 @@ async function handleCreateReport(request, env) {
         normalizeText(body.claimantName).slice(0, 120),
         normalizeEmail(body.claimantEmail).slice(0, 160),
         normalizeText(body.copyrightDescription).slice(0, 1000),
-        toIsoDate()
+        createdAt
       )
       .run();
   }
@@ -2641,16 +2690,38 @@ async function handleCreateReport(request, env) {
     details: details || "User report"
   });
   if (targetType === "post") {
+    const countRow = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM reports WHERE target_type = 'post' AND target_id = ? AND status = 'open'"
+    )
+      .bind(targetId)
+      .first();
+    const reportCount = Number(countRow?.count || 0);
+
     await env.DB.prepare(
       `UPDATE posts
        SET moderation_status = CASE
-         WHEN COALESCE(moderation_status, 'visible') IN ('visible', 'active') THEN 'under_review'
+         WHEN ? >= ? AND COALESCE(moderation_status, 'visible') IN ('visible', 'active') THEN 'under_review'
          ELSE moderation_status
        END
        WHERE id = ?`
     )
-      .bind(targetId)
+      .bind(reportCount, REPORT_REVIEW_THRESHOLD, targetId)
       .run();
+
+    return success({
+      message: "Report submitted.",
+      report: {
+        id: reportId,
+        targetType,
+        targetId,
+        status: "open",
+        reason,
+        createdAt
+      },
+      reportCount,
+      reviewThreshold: REPORT_REVIEW_THRESHOLD,
+      reachedReviewThreshold: reportCount >= REPORT_REVIEW_THRESHOLD
+    }, { status: 201 });
   }
 
   return success({
@@ -2661,7 +2732,7 @@ async function handleCreateReport(request, env) {
       targetId,
       status: "open",
       reason,
-      createdAt: toIsoDate()
+      createdAt
     }
   }, { status: 201 });
 }
@@ -2717,33 +2788,42 @@ async function handleModerationOverview(request, env) {
   const rows = await env.DB.prepare(
     `
       SELECT
-        reports.id,
         reports.target_type AS targetType,
         reports.target_id AS targetId,
-        reports.reason,
-        reports.details,
-        reports.status,
-        reports.created_at AS createdAt,
-        reports.reviewed_at AS reviewedAt,
-        COALESCE(reports.reporter_id, '') AS reporterId,
-        COALESCE(reports.reporter_username, COALESCE(reporters.username, '')) AS reporterUsername,
-        COALESCE(reports.target_owner_id, posts.author_id, '') AS targetOwnerId,
-        COALESCE(reports.target_owner_username, COALESCE(post_authors.username, '')) AS targetOwnerUsername,
         COUNT(*) AS reportCount,
         MAX(reports.created_at) AS latestReportAt,
         GROUP_CONCAT(DISTINCT reports.reason) AS reasons,
+        GROUP_CONCAT(DISTINCT NULLIF(COALESCE(reports.reporter_username, reporters.username, ''), '')) AS reporterUsernames,
+        MAX(COALESCE(reports.details, '')) AS details,
         COALESCE(posts.title, '') AS postTitle,
-        COALESCE(posts.moderation_status, 'visible') AS moderationStatus
+        COALESCE(posts.description, '') AS postDescription,
+        COALESCE(posts.image_key, '') AS imageKey,
+        COALESCE(posts.moderation_status, 'visible') AS moderationStatus,
+        COALESCE(post_authors.username, '') AS authorUsername,
+        COALESCE(posts.author_id, '') AS targetOwnerId,
+        COALESCE(post_authors.username, '') AS targetOwnerUsername,
+        '/api/image/' || posts.id AS previewImageUrl
       FROM reports
       LEFT JOIN posts ON posts.id = reports.target_id AND reports.target_type = 'post'
       LEFT JOIN users AS post_authors ON post_authors.id = posts.author_id
       LEFT JOIN users AS reporters ON reporters.id = reports.reporter_id
       WHERE reports.status = 'open'
+        AND (
+          reports.target_type != 'post'
+          OR COALESCE(posts.moderation_status, 'visible') = 'under_review'
+          OR (
+            SELECT COUNT(*)
+            FROM reports AS queue_reports
+            WHERE queue_reports.target_type = reports.target_type
+              AND queue_reports.target_id = reports.target_id
+              AND queue_reports.status = 'open'
+          ) >= ?
+        )
       GROUP BY reports.target_type, reports.target_id
       ORDER BY latestReportAt DESC
       LIMIT 200
     `
-  ).all();
+  ).bind(REPORT_REVIEW_THRESHOLD).all();
 
   const aiRows = await env.DB.prepare(
     `
@@ -2789,7 +2869,13 @@ async function handleModerationOverview(request, env) {
   return success({
     reports: (rows.results || []).map((row) => ({
       ...row,
-      moderationStatus: normalizeModerationStatus(row.moderationStatus)
+      moderationStatus: normalizeModerationStatus(row.moderationStatus),
+      reportCount: Number(row.reportCount || 0),
+      reviewThreshold: REPORT_REVIEW_THRESHOLD,
+      reporterUsernames: String(row.reporterUsernames || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
     })),
     aiFindings: (aiRows.results || []).map((row) => ({
       ...row,
@@ -2983,6 +3069,21 @@ async function handleGetProfile(request, env, username) {
         COALESCE(posts.comments_count, 0) AS commentsCount,
         COALESCE(posts.views, 0) AS views,
         COALESCE(posts.repost_count, 0) AS repostCount,
+        COALESCE(posts.moderation_status, 'active') AS moderationStatus,
+        (
+          SELECT COUNT(*)
+          FROM reports
+          WHERE reports.target_type = 'post'
+            AND reports.target_id = posts.id
+            AND reports.status = 'open'
+        ) AS reportCount,
+        (
+          SELECT MAX(reports.created_at)
+          FROM reports
+          WHERE reports.target_type = 'post'
+            AND reports.target_id = posts.id
+            AND reports.status = 'open'
+        ) AS latestReportAt,
         posts.category_id AS categoryId,
         categories.slug AS categorySlug,
         categories.label AS categoryLabel
@@ -3030,6 +3131,21 @@ async function handleGetProfile(request, env, username) {
         COALESCE(posts.comments_count, 0) AS commentsCount,
         COALESCE(posts.views, 0) AS views,
         COALESCE(posts.repost_count, 0) AS repostCount,
+        COALESCE(posts.moderation_status, 'active') AS moderationStatus,
+        (
+          SELECT COUNT(*)
+          FROM reports
+          WHERE reports.target_type = 'post'
+            AND reports.target_id = posts.id
+            AND reports.status = 'open'
+        ) AS reportCount,
+        (
+          SELECT MAX(reports.created_at)
+          FROM reports
+          WHERE reports.target_type = 'post'
+            AND reports.target_id = posts.id
+            AND reports.status = 'open'
+        ) AS latestReportAt,
         posts.category_id AS categoryId,
         categories.slug AS categorySlug,
         categories.label AS categoryLabel
