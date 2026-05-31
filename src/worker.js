@@ -31,7 +31,7 @@ const REPORT_REASONS = new Set([
   "copyright violation",
   "other"
 ]);
-const REPORT_REVIEW_THRESHOLD = 100;
+const HUMAN_REPORT_REVIEW_THRESHOLD = 100;
 const MODERATION_STATES = {
   VISIBLE: "visible",
   ACTIVE_LEGACY: "active",
@@ -40,7 +40,7 @@ const MODERATION_STATES = {
   REMOVED: "removed",
   SUSPENDED: "suspended"
 };
-const OFFENSIVE_TERMS = ["nazi", "hitler", "kkk", "slur", "terrorist"];
+const OFFENSIVE_TERMS = ["fuck", "fucking", "nazi", "hitler", "kkk", "slur", "terrorist"];
 const HARASSMENT_TERMS = ["kill yourself", "die", "stupid bitch"];
 const SEXUAL_TERMS = ["porn", "nude", "nsfw", "explicit"];
 const VIOLENCE_TERMS = ["gore", "beheading", "murder"];
@@ -464,8 +464,12 @@ function toPostResponse(post, viewerVote = null, viewerHasReposted = false, repo
     repostCount: Number(post.repostCount || 0),
     moderationStatus: normalizeModerationStatus(post.moderationStatus || MODERATION_STATES.VISIBLE),
     reportCount: Number(post.reportCount || 0),
-    reportThreshold: Number(post.reportThreshold || REPORT_REVIEW_THRESHOLD),
+    reportThreshold: Number(post.reportThreshold || HUMAN_REPORT_REVIEW_THRESHOLD),
     latestReportAt: post.latestReportAt || "",
+    aiReported: Boolean(post.aiReported),
+    aiReportReason: post.aiReportReason || "",
+    aiReportCategories: parseJsonArray(post.aiReportCategories),
+    aiCheckedAt: post.aiCheckedAt || "",
     category: post.categorySlug
       ? {
           id: post.categoryId,
@@ -697,6 +701,13 @@ async function ensureTableColumns(env, tableName, expectedColumns) {
 }
 
 async function ensureModerationSchema(env) {
+  await ensureTableColumns(env, "posts", [
+    { name: "ai_reported", definition: "ai_reported INTEGER NOT NULL DEFAULT 0" },
+    { name: "ai_report_reason", definition: "ai_report_reason TEXT NOT NULL DEFAULT ''" },
+    { name: "ai_report_categories", definition: "ai_report_categories TEXT NOT NULL DEFAULT '[]'" },
+    { name: "ai_checked_at", definition: "ai_checked_at TEXT" }
+  ]);
+
   await env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS reports (
       id TEXT PRIMARY KEY,
@@ -801,12 +812,20 @@ async function ensureModerationSchema(env) {
       moderation_status TEXT NOT NULL DEFAULT 'under_review',
       model TEXT NOT NULL DEFAULT '@cf/meta/llama-guard-3-8b',
       created_at TEXT NOT NULL,
-      source TEXT NOT NULL DEFAULT 'text'
+      source TEXT NOT NULL DEFAULT 'text',
+      status TEXT NOT NULL DEFAULT 'open',
+      confidence REAL,
+      reviewed_at TEXT,
+      reviewed_by TEXT
     )`
   ).run();
 
   await ensureTableColumns(env, "ai_moderation_results", [
-    { name: "source", definition: "source TEXT NOT NULL DEFAULT 'text'" }
+    { name: "source", definition: "source TEXT NOT NULL DEFAULT 'text'" },
+    { name: "status", definition: "status TEXT NOT NULL DEFAULT 'open'" },
+    { name: "confidence", definition: "confidence REAL" },
+    { name: "reviewed_at", definition: "reviewed_at TEXT" },
+    { name: "reviewed_by", definition: "reviewed_by TEXT" }
   ]);
 
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_reports_target ON reports(target_type, target_id, status)").run();
@@ -979,9 +998,9 @@ function parseJsonArray(value) {
   }
 }
 
-async function storeAiModerationResult(env, { contentId, contentType, riskScore, labels, aiReason, moderationStatus, source = "text" }) {
+async function storeAiModerationResult(env, { contentId, contentType, riskScore, labels, aiReason, moderationStatus, source = "text", status = "open", confidence = null }) {
   await env.DB.prepare(
-    "INSERT INTO ai_moderation_results (id, content_id, content_type, risk_score, labels, ai_reason, moderation_status, model, source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO ai_moderation_results (id, content_id, content_type, risk_score, labels, ai_reason, moderation_status, model, source, status, confidence, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   )
     .bind(
       createId("ai_"),
@@ -993,15 +1012,47 @@ async function storeAiModerationResult(env, { contentId, contentType, riskScore,
       moderationStatus,
       AI_MODERATION_MODEL,
       source,
+      status,
+      confidence,
       toIsoDate()
     )
+    .run();
+}
+
+async function flagPostByAi(env, { postId, reason, categories = [], confidence = null, source = "text", riskScore = 10 }) {
+  await ensureModerationSchema(env);
+  const normalizedCategories = categories.map((item) => normalizeText(item)).filter(Boolean);
+  const normalizedReason = normalizeText(reason) || "Automatic moderation flagged this post.";
+
+  await storeAiModerationResult(env, {
+    contentId: postId,
+    contentType: "post",
+    riskScore,
+    labels: normalizedCategories,
+    aiReason: normalizedReason,
+    moderationStatus: MODERATION_STATES.UNDER_REVIEW,
+    source,
+    status: "open",
+    confidence
+  });
+
+  await env.DB.prepare(
+    `UPDATE posts
+     SET ai_reported = 1,
+         ai_report_reason = ?,
+         ai_report_categories = ?,
+         ai_checked_at = ?,
+         moderation_status = 'under_review'
+     WHERE id = ?`
+  )
+    .bind(normalizedReason, JSON.stringify(normalizedCategories), toIsoDate(), postId)
     .run();
 }
 
 async function markContentUnderReview(env, targetType, targetId) {
   if (targetType === "post") {
     await env.DB.prepare(
-      "UPDATE posts SET moderation_status = CASE WHEN COALESCE(moderation_status, 'active') = 'active' THEN 'under_review' ELSE moderation_status END WHERE id = ?"
+      "UPDATE posts SET moderation_status = CASE WHEN COALESCE(moderation_status, 'visible') IN ('visible', 'active') THEN 'under_review' ELSE moderation_status END WHERE id = ?"
     )
       .bind(targetId)
       .run();
@@ -1009,7 +1060,7 @@ async function markContentUnderReview(env, targetType, targetId) {
 
   if (targetType === "comment") {
     await env.DB.prepare(
-      "UPDATE comments SET moderation_status = CASE WHEN COALESCE(moderation_status, 'active') = 'active' THEN 'under_review' ELSE moderation_status END WHERE id = ?"
+      "UPDATE comments SET moderation_status = CASE WHEN COALESCE(moderation_status, 'visible') IN ('visible', 'active') THEN 'under_review' ELSE moderation_status END WHERE id = ?"
     )
       .bind(targetId)
       .run();
@@ -1017,7 +1068,7 @@ async function markContentUnderReview(env, targetType, targetId) {
 
   if (targetType === "user") {
     await env.DB.prepare(
-      "UPDATE users SET moderation_status = CASE WHEN COALESCE(moderation_status, 'active') = 'active' THEN 'under_review' ELSE moderation_status END WHERE id = ?"
+      "UPDATE users SET moderation_status = CASE WHEN COALESCE(moderation_status, 'visible') IN ('visible', 'active') THEN 'under_review' ELSE moderation_status END WHERE id = ?"
     )
       .bind(targetId)
       .run();
@@ -1035,7 +1086,7 @@ async function applyModerationRisk(env, targetType, targetId, riskScore) {
        SET moderation_risk_score = COALESCE(moderation_risk_score, 0) + ?,
            moderation_status = CASE
              WHEN COALESCE(moderation_risk_score, 0) + ? >= 8 THEN 'hidden'
-             WHEN COALESCE(moderation_risk_score, 0) + ? >= 3 AND moderation_status = 'active' THEN 'under_review'
+             WHEN COALESCE(moderation_risk_score, 0) + ? >= 3 AND COALESCE(moderation_status, 'visible') IN ('visible', 'active') THEN 'under_review'
              ELSE moderation_status
            END
        WHERE id = ?`
@@ -1050,7 +1101,7 @@ async function applyModerationRisk(env, targetType, targetId, riskScore) {
        SET moderation_risk_score = COALESCE(moderation_risk_score, 0) + ?,
            moderation_status = CASE
              WHEN COALESCE(moderation_risk_score, 0) + ? >= 8 THEN 'hidden'
-             WHEN COALESCE(moderation_risk_score, 0) + ? >= 3 AND moderation_status = 'active' THEN 'under_review'
+             WHEN COALESCE(moderation_risk_score, 0) + ? >= 3 AND COALESCE(moderation_status, 'visible') IN ('visible', 'active') THEN 'under_review'
              ELSE moderation_status
            END
        WHERE id = ?`
@@ -1091,6 +1142,21 @@ async function runSafetyAssessment(env, input) {
   return assessment;
 }
 
+function buildKeywordModerationFinding(input) {
+  const assessment = assessSafetyRisk(input);
+  if (!assessment.riskScore) {
+    return null;
+  }
+
+  return {
+    isUnsafe: true,
+    labels: assessment.categories,
+    reason: `Keyword safety filter matched: ${assessment.categories.join(", ") || "unsafe content"}.`,
+    riskScore: Math.max(3, assessment.riskScore),
+    source: "keyword"
+  };
+}
+
 async function runAiTextModeration(env, input) {
   if (!env.AI || typeof env.AI.run !== "function") {
     return null;
@@ -1126,17 +1192,27 @@ async function runAiTextModeration(env, input) {
       return moderation;
     }
 
-    await storeAiModerationResult(env, {
-      contentId: input.targetId,
-      contentType: input.targetType,
-      riskScore: Math.max(3, Number(moderation.riskScore || 0)),
-      labels: moderation.labels,
-      aiReason: moderation.reason,
-      moderationStatus: MODERATION_STATES.UNDER_REVIEW,
-      source: "text"
-    });
-
-    await markContentUnderReview(env, input.targetType, input.targetId);
+    if (input.targetType === "post") {
+      await flagPostByAi(env, {
+        postId: input.targetId,
+        reason: moderation.reason,
+        categories: moderation.labels,
+        confidence: Number(moderation.riskScore || 0) / 10,
+        source: "text",
+        riskScore: Math.max(3, Number(moderation.riskScore || 0))
+      });
+    } else {
+      await storeAiModerationResult(env, {
+        contentId: input.targetId,
+        contentType: input.targetType,
+        riskScore: Math.max(3, Number(moderation.riskScore || 0)),
+        labels: moderation.labels,
+        aiReason: moderation.reason,
+        moderationStatus: MODERATION_STATES.UNDER_REVIEW,
+        source: "text"
+      });
+      await markContentUnderReview(env, input.targetType, input.targetId);
+    }
     return moderation;
   } catch (error) {
     console.error("Workers AI moderation failed.", error);
@@ -1150,6 +1226,7 @@ function bytesToDataUrl(bytes, mimeType) {
 
 async function runAiImageModeration(env, { postId, imageBytes, mimeType, title = "", description = "" }) {
   if (!env.AI || typeof env.AI.run !== "function") {
+    console.warn("Workers AI image moderation skipped because the AI binding is not available.");
     return null;
   }
 
@@ -1189,26 +1266,12 @@ async function runAiImageModeration(env, { postId, imageBytes, mimeType, title =
       };
     }
 
-    const nextStatus = Number(moderation.riskScore || 0) >= 70
-      ? MODERATION_STATES.HIDDEN
-      : MODERATION_STATES.UNDER_REVIEW;
-
-    await storeAiModerationResult(env, {
-      contentId: postId,
-      contentType: "post",
-      riskScore: Number(moderation.riskScore || 0),
-      labels: moderation.labels,
-      aiReason: moderation.reason,
-      moderationStatus: nextStatus,
-      source: "image"
-    });
-
     return {
       ...moderation,
-      moderationStatus: nextStatus
+      moderationStatus: MODERATION_STATES.UNDER_REVIEW
     };
   } catch (error) {
-    console.error("Workers AI image moderation failed.", error);
+    console.warn("Workers AI image moderation skipped or failed. Text moderation and keyword fallback still ran.", error);
     return null;
   }
 }
@@ -1233,6 +1296,10 @@ async function getPostRecord(env, postId, includeModerated = false) {
         COALESCE(posts.views, 0) AS views,
         COALESCE(posts.repost_count, 0) AS repostCount,
         COALESCE(posts.moderation_status, 'active') AS moderationStatus,
+        COALESCE(posts.ai_reported, 0) AS aiReported,
+        COALESCE(posts.ai_report_reason, '') AS aiReportReason,
+        COALESCE(posts.ai_report_categories, '[]') AS aiReportCategories,
+        COALESCE(posts.ai_checked_at, '') AS aiCheckedAt,
         (
           SELECT COUNT(*)
           FROM reports
@@ -1512,6 +1579,10 @@ async function listPosts(env, userId, options = {}) {
         COALESCE(posts.views, 0) AS views,
         COALESCE(posts.repost_count, 0) AS repostCount,
         COALESCE(posts.moderation_status, 'active') AS moderationStatus,
+        COALESCE(posts.ai_reported, 0) AS aiReported,
+        COALESCE(posts.ai_report_reason, '') AS aiReportReason,
+        COALESCE(posts.ai_report_categories, '[]') AS aiReportCategories,
+        COALESCE(posts.ai_checked_at, '') AS aiCheckedAt,
         posts.category_id AS categoryId,
         categories.slug AS categorySlug,
         categories.label AS categoryLabel
@@ -1892,6 +1963,7 @@ async function handleAvatarUpload(request, env) {
 }
 
 async function handleCreatePost(request, env) {
+  await ensureModerationSchema(env);
   const user = await requireUser(request, env);
   const formData = await request.formData();
   const turnstileFailure = await verifyTurnstileToken(env, request, formData.get("turnstileToken"));
@@ -2058,12 +2130,47 @@ async function handleCreatePost(request, env) {
   }
 
   await syncPostHashtags(env, postId, hashtags);
+  if (imageModeration?.isUnsafe) {
+    await flagPostByAi(env, {
+      postId,
+      reason: imageModeration.reason || "Image moderation flagged this post.",
+      categories: imageModeration.labels || ["image_safety"],
+      confidence: Number(imageModeration.riskScore || 0) / 100,
+      source: "image",
+      riskScore: Number(imageModeration.riskScore || 0)
+    });
+  } else {
+    await env.DB.prepare("UPDATE posts SET ai_checked_at = ? WHERE id = ? AND ai_checked_at IS NULL")
+      .bind(toIsoDate(), postId)
+      .run();
+  }
+
+  const keywordModeration = buildKeywordModerationFinding({
+    userId: user.id,
+    targetType: "post",
+    targetId: postId,
+    title: finalTitle,
+    description: finalDescription,
+    text: hashtags.join(" ")
+  });
+  if (keywordModeration?.isUnsafe) {
+    await flagPostByAi(env, {
+      postId,
+      reason: keywordModeration.reason,
+      categories: keywordModeration.labels,
+      confidence: Math.min(1, Number(keywordModeration.riskScore || 0) / 10),
+      source: "keyword",
+      riskScore: keywordModeration.riskScore
+    });
+  }
+
   await runSafetyAssessment(env, {
     userId: user.id,
     targetType: "post",
     targetId: postId,
     title: finalTitle,
-    description: finalDescription
+    description: finalDescription,
+    text: hashtags.join(" ")
   });
   const textModeration = await runAiTextModeration(env, {
     userId: user.id,
@@ -2071,14 +2178,16 @@ async function handleCreatePost(request, env) {
     targetId: postId,
     fields: {
       title: finalTitle,
-      description: finalDescription
+      description: finalDescription,
+      tags: hashtags.join(" ")
     }
   });
   const post = await getPostRecord(env, postId, true);
 
+  const aiFlagged = Boolean(imageModeration?.isUnsafe || keywordModeration?.isUnsafe || textModeration?.isUnsafe);
   const moderationNotice = imageModeration && !isVisibleModerationStatus(imageModeration.moderationStatus)
     ? "Your post was hidden by automatic safety moderation. You can appeal this decision."
-    : textModeration?.isUnsafe
+    : aiFlagged
       ? "Your post is being reviewed by automatic safety moderation."
       : "";
 
@@ -2086,13 +2195,13 @@ async function handleCreatePost(request, env) {
     {
       post: toPostResponse(post),
       moderationNotice,
-      canAppeal: Boolean(imageModeration && !isVisibleModerationStatus(imageModeration.moderationStatus)),
-      aiFinding: imageModeration
+      canAppeal: aiFlagged,
+      aiFinding: imageModeration || keywordModeration || textModeration
         ? {
-            riskScore: Number(imageModeration.riskScore || 0),
-            labels: imageModeration.labels || [],
-            reason: imageModeration.reason || "",
-            moderationStatus: imageModeration.moderationStatus
+            riskScore: Number((imageModeration || keywordModeration || textModeration).riskScore || 0),
+            labels: (imageModeration || keywordModeration || textModeration).labels || [],
+            reason: (imageModeration || keywordModeration || textModeration).reason || "",
+            moderationStatus: MODERATION_STATES.UNDER_REVIEW
           }
         : null
     },
@@ -2629,7 +2738,7 @@ async function handleCreateReport(request, env) {
         reason
       },
       reportCount: Number(countRow?.count || 0),
-      reviewThreshold: REPORT_REVIEW_THRESHOLD
+      reviewThreshold: HUMAN_REPORT_REVIEW_THRESHOLD
     });
   }
 
@@ -2705,7 +2814,7 @@ async function handleCreateReport(request, env) {
        END
        WHERE id = ?`
     )
-      .bind(reportCount, REPORT_REVIEW_THRESHOLD, targetId)
+      .bind(reportCount, HUMAN_REPORT_REVIEW_THRESHOLD, targetId)
       .run();
 
     return success({
@@ -2719,8 +2828,8 @@ async function handleCreateReport(request, env) {
         createdAt
       },
       reportCount,
-      reviewThreshold: REPORT_REVIEW_THRESHOLD,
-      reachedReviewThreshold: reportCount >= REPORT_REVIEW_THRESHOLD
+      reviewThreshold: HUMAN_REPORT_REVIEW_THRESHOLD,
+      reachedReviewThreshold: reportCount >= HUMAN_REPORT_REVIEW_THRESHOLD
     }, { status: 201 });
   }
 
@@ -2787,14 +2896,42 @@ async function handleModerationOverview(request, env) {
 
   const rows = await env.DB.prepare(
     `
+      WITH human_report_summary AS (
+        SELECT
+          reports.target_id AS postId,
+          COUNT(*) AS reportCount,
+          MAX(reports.created_at) AS latestReportAt,
+          GROUP_CONCAT(DISTINCT reports.reason) AS reasons,
+          GROUP_CONCAT(DISTINCT NULLIF(COALESCE(reports.reporter_username, reporters.username, ''), '')) AS reporterUsernames,
+          MAX(COALESCE(reports.details, '')) AS details
+        FROM reports
+        LEFT JOIN users AS reporters ON reporters.id = reports.reporter_id
+        WHERE reports.status = 'open'
+          AND reports.target_type = 'post'
+        GROUP BY reports.target_id
+      ),
+      ai_report_summary AS (
+        SELECT
+          content_id AS postId,
+          COUNT(*) AS aiReportCount,
+          MAX(created_at) AS latestAiReportAt,
+          GROUP_CONCAT(DISTINCT source) AS aiSources,
+          GROUP_CONCAT(DISTINCT labels) AS aiCategoriesRaw,
+          MAX(ai_reason) AS aiReason,
+          MAX(confidence) AS aiConfidence
+        FROM ai_moderation_results
+        WHERE content_type = 'post'
+          AND status = 'open'
+        GROUP BY content_id
+      )
       SELECT
-        reports.target_type AS targetType,
-        reports.target_id AS targetId,
-        COUNT(*) AS reportCount,
-        MAX(reports.created_at) AS latestReportAt,
-        GROUP_CONCAT(DISTINCT reports.reason) AS reasons,
-        GROUP_CONCAT(DISTINCT NULLIF(COALESCE(reports.reporter_username, reporters.username, ''), '')) AS reporterUsernames,
-        MAX(COALESCE(reports.details, '')) AS details,
+        'post' AS targetType,
+        posts.id AS targetId,
+        COALESCE(human_report_summary.reportCount, 0) AS reportCount,
+        human_report_summary.latestReportAt,
+        COALESCE(human_report_summary.reasons, '') AS reasons,
+        COALESCE(human_report_summary.reporterUsernames, '') AS reporterUsernames,
+        COALESCE(human_report_summary.details, '') AS details,
         COALESCE(posts.title, '') AS postTitle,
         COALESCE(posts.description, '') AS postDescription,
         COALESCE(posts.image_key, '') AS imageKey,
@@ -2802,28 +2939,30 @@ async function handleModerationOverview(request, env) {
         COALESCE(post_authors.username, '') AS authorUsername,
         COALESCE(posts.author_id, '') AS targetOwnerId,
         COALESCE(post_authors.username, '') AS targetOwnerUsername,
-        '/api/image/' || posts.id AS previewImageUrl
-      FROM reports
-      LEFT JOIN posts ON posts.id = reports.target_id AND reports.target_type = 'post'
+        COALESCE(posts.ai_reported, 0) AS aiReported,
+        COALESCE(posts.ai_report_reason, ai_report_summary.aiReason, '') AS aiReportReason,
+        COALESCE(posts.ai_report_categories, '[]') AS aiReportCategories,
+        COALESCE(posts.ai_checked_at, ai_report_summary.latestAiReportAt, '') AS aiCheckedAt,
+        COALESCE(ai_report_summary.aiReportCount, 0) AS aiReportCount,
+        COALESCE(ai_report_summary.aiSources, '') AS aiSources,
+        COALESCE(ai_report_summary.aiConfidence, 0) AS aiConfidence,
+        '/api/image/' || posts.id AS previewImageUrl,
+        COALESCE(human_report_summary.latestReportAt, ai_report_summary.latestAiReportAt, posts.created_at) AS latestQueueAt
+      FROM posts
+      LEFT JOIN human_report_summary ON human_report_summary.postId = posts.id
+      LEFT JOIN ai_report_summary ON ai_report_summary.postId = posts.id
       LEFT JOIN users AS post_authors ON post_authors.id = posts.author_id
-      LEFT JOIN users AS reporters ON reporters.id = reports.reporter_id
-      WHERE reports.status = 'open'
+      WHERE COALESCE(posts.moderation_status, 'visible') != 'removed'
         AND (
-          reports.target_type != 'post'
-          OR COALESCE(posts.moderation_status, 'visible') = 'under_review'
-          OR (
-            SELECT COUNT(*)
-            FROM reports AS queue_reports
-            WHERE queue_reports.target_type = reports.target_type
-              AND queue_reports.target_id = reports.target_id
-              AND queue_reports.status = 'open'
-          ) >= ?
+          COALESCE(posts.moderation_status, 'visible') = 'under_review'
+          OR COALESCE(human_report_summary.reportCount, 0) >= ?
+          OR COALESCE(ai_report_summary.aiReportCount, 0) > 0
+          OR COALESCE(posts.ai_reported, 0) = 1
         )
-      GROUP BY reports.target_type, reports.target_id
-      ORDER BY latestReportAt DESC
+      ORDER BY latestQueueAt DESC
       LIMIT 200
     `
-  ).bind(REPORT_REVIEW_THRESHOLD).all();
+  ).bind(HUMAN_REPORT_REVIEW_THRESHOLD).all();
 
   const aiRows = await env.DB.prepare(
     `
@@ -2871,7 +3010,11 @@ async function handleModerationOverview(request, env) {
       ...row,
       moderationStatus: normalizeModerationStatus(row.moderationStatus),
       reportCount: Number(row.reportCount || 0),
-      reviewThreshold: REPORT_REVIEW_THRESHOLD,
+      reviewThreshold: HUMAN_REPORT_REVIEW_THRESHOLD,
+      aiReported: Boolean(row.aiReported || Number(row.aiReportCount || 0) > 0),
+      aiReportCategories: parseJsonArray(row.aiReportCategories),
+      aiReportCount: Number(row.aiReportCount || 0),
+      aiConfidence: Number(row.aiConfidence || 0),
       reporterUsernames: String(row.reporterUsernames || "")
         .split(",")
         .map((item) => item.trim())
@@ -2966,6 +3109,13 @@ async function handleModerationAction(request, env) {
     if (nextStatus) {
       await env.DB.prepare("UPDATE posts SET moderation_status = ? WHERE id = ?").bind(nextStatus, targetId).run();
     }
+    if (action === "restore") {
+      await env.DB.prepare(
+        "UPDATE posts SET ai_reported = 0, ai_report_reason = '', ai_report_categories = '[]' WHERE id = ?"
+      )
+        .bind(targetId)
+        .run();
+    }
   }
 
   if (targetType === "comment") {
@@ -2998,6 +3148,9 @@ async function handleModerationAction(request, env) {
 
   const nextReportStatus = action === "remove" ? "removed" : action === "restore" ? "dismissed" : "reviewed";
   await env.DB.prepare("UPDATE reports SET status = ?, reviewed_at = ?, reviewed_by = ? WHERE target_type = ? AND target_id = ? AND status = 'open'")
+    .bind(nextReportStatus, toIsoDate(), moderator.id, targetType, targetId)
+    .run();
+  await env.DB.prepare("UPDATE ai_moderation_results SET status = ?, reviewed_at = ?, reviewed_by = ? WHERE content_type = ? AND content_id = ? AND status = 'open'")
     .bind(nextReportStatus, toIsoDate(), moderator.id, targetType, targetId)
     .run();
 
@@ -3070,6 +3223,10 @@ async function handleGetProfile(request, env, username) {
         COALESCE(posts.views, 0) AS views,
         COALESCE(posts.repost_count, 0) AS repostCount,
         COALESCE(posts.moderation_status, 'active') AS moderationStatus,
+        COALESCE(posts.ai_reported, 0) AS aiReported,
+        COALESCE(posts.ai_report_reason, '') AS aiReportReason,
+        COALESCE(posts.ai_report_categories, '[]') AS aiReportCategories,
+        COALESCE(posts.ai_checked_at, '') AS aiCheckedAt,
         (
           SELECT COUNT(*)
           FROM reports
@@ -3132,6 +3289,10 @@ async function handleGetProfile(request, env, username) {
         COALESCE(posts.views, 0) AS views,
         COALESCE(posts.repost_count, 0) AS repostCount,
         COALESCE(posts.moderation_status, 'active') AS moderationStatus,
+        COALESCE(posts.ai_reported, 0) AS aiReported,
+        COALESCE(posts.ai_report_reason, '') AS aiReportReason,
+        COALESCE(posts.ai_report_categories, '[]') AS aiReportCategories,
+        COALESCE(posts.ai_checked_at, '') AS aiCheckedAt,
         (
           SELECT COUNT(*)
           FROM reports

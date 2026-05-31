@@ -244,6 +244,19 @@ export default function ProfilePage() {
   const visiblePosts = activeFeed === "reposts" ? reposts : posts;
   const socialItems = socialSheet === "followers" ? followers : socialSheet === "following" ? following : [];
 
+  function getPostStatusBadge(post) {
+    if (!canSeeModerationLabels || post.moderationStatus === "under_review") {
+      return "";
+    }
+    if (post.aiReported) {
+      return "Reported by AI";
+    }
+    if (Number(post.reportCount || 0) > 0) {
+      return `Reported: ${post.reportCount}/${post.reportThreshold || 100}`;
+    }
+    return "";
+  }
+
   return (
     <div className="page-shell profile-page-shell">
       <Stack spacing={3}>
@@ -398,11 +411,7 @@ export default function ProfilePage() {
                     onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
                     onRequireLogin={(mode = "login") => (mode === "signup" ? openSignup(`/${post.id}`) : openLogin(`/${post.id}`))}
                     reviewBanner={canSeeModerationLabels && post.moderationStatus === "under_review" ? "This post is currently being reviewed and is not visible to other users." : ""}
-                    statusBadge={
-                      canSeeModerationLabels && post.moderationStatus !== "under_review" && Number(post.reportCount || 0) > 0
-                        ? `Reported: ${post.reportCount}/${post.reportThreshold || 100}`
-                        : ""
-                    }
+                    statusBadge={getPostStatusBadge(post)}
                   />
                 ))}
               </Stack>

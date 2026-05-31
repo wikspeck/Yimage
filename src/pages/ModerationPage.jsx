@@ -133,6 +133,19 @@ export default function ModerationPage() {
                       Reports: {report.reportCount}/{report.reviewThreshold}
                     </Typography>
                     <Typography level="body-sm" textColor="neutral.500">
+                      AI reported: {report.aiReported ? "Yes" : "No"}
+                    </Typography>
+                    {report.aiReported ? (
+                      <>
+                        <Typography level="body-sm" textColor="neutral.500">
+                          AI reason: {report.aiReportReason || "Automatic moderation flagged this post."}
+                        </Typography>
+                        <Typography level="body-sm" textColor="neutral.500">
+                          AI categories: {report.aiReportCategories?.length ? report.aiReportCategories.join(", ") : "Not available"}
+                        </Typography>
+                      </>
+                    ) : null}
+                    <Typography level="body-sm" textColor="neutral.500">
                       Reporter{report.reportCount === 1 ? "" : "s"}: {report.reporterUsernames?.length ? report.reporterUsernames.map((name) => `@${name}`).join(", ") : "Not available"}
                     </Typography>
                     <Typography level="body-sm" textColor="neutral.500">
