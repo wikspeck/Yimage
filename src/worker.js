@@ -2379,7 +2379,6 @@ async function handleCreateReport(request, env) {
     riskScore: reportRisk,
     details: details || "User report"
   });
-  await applyModerationRisk(env, targetType, targetId, reportRisk);
 
   return success({ message: "Report submitted." }, { status: 201 });
 }

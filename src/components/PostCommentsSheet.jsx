@@ -5,6 +5,10 @@ import CommentThread from "./CommentThread";
 import AuthPromptCard from "./AuthPromptCard";
 import TurnstileWidget from "./TurnstileWidget";
 
+function countComments(items) {
+  return items.reduce((total, comment) => total + 1 + countComments(comment.replies || []), 0);
+}
+
 function replaceComment(comments, updatedComment) {
   return comments.map((comment) => {
     if (comment.id === updatedComment.id) {
@@ -29,7 +33,7 @@ function appendReply(comments, reply) {
   });
 }
 
-export default function PostCommentsSheet({ open, onClose, post, user, onRequireLogin, onCommentCountChange, onCommentCreated }) {
+export default function PostCommentsSheet({ open, onClose, post, user, onRequireLogin, onCommentCountChange, onCommentCreated, onCommentsLoaded }) {
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
   const [commentTurnstileToken, setCommentTurnstileToken] = useState("");
@@ -53,6 +57,7 @@ export default function PostCommentsSheet({ open, onClose, post, user, onRequire
         const nextComments = await getPostComments(post.id);
         if (isMounted) {
           setComments(nextComments);
+          onCommentsLoaded?.(countComments(nextComments));
         }
       } catch (loadError) {
         if (isMounted) {

@@ -390,6 +390,7 @@ export default function PostPage() {
           onRequireLogin={(mode = "login") => (mode === "signup" ? openSignup(`/${post.id}`) : openLogin(`/${post.id}`))}
           onCommentCountChange={(delta) => setPost((current) => ({ ...current, commentsCount: current.commentsCount + delta }))}
           onCommentCreated={() => setHasCommented(true)}
+          onCommentsLoaded={(total) => setPost((current) => ({ ...current, commentsCount: total }))}
         />
         <ShareDialog
           open={shareOpen}

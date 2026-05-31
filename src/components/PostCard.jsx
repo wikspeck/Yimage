@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Avatar, Card, Link, Stack, Typography } from "@mui/joy";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import PostActionBar from "./PostActionBar";
@@ -46,6 +46,7 @@ export default function PostCard({
   const [focusOpen, setFocusOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [commentCount, setCommentCount] = useState(post.commentsCount ?? 0);
   const images = useMemo(() => getPostImages(post), [post]);
   const [hasCommented, setHasCommented] = usePersistentPostActionState("comment", post.id, user);
   const [hasDownloaded, setHasDownloaded] = usePersistentPostActionState("download", post.id, user);
@@ -55,6 +56,11 @@ export default function PostCard({
   const activeImage = hasMedia ? images[Math.min(activeImageIndex, images.length - 1)] : null;
   const title = post.title?.trim();
   const description = post.description?.trim();
+  const displayPost = useMemo(() => ({ ...post, commentsCount: commentCount }), [commentCount, post]);
+
+  useEffect(() => {
+    setCommentCount(post.commentsCount ?? 0);
+  }, [post.commentsCount, post.id]);
 
   function showPreviousImage(event) {
     event?.preventDefault?.();
@@ -199,7 +205,7 @@ export default function PostCard({
           ) : null}
 
           <PostActionBar
-            post={post}
+            post={displayPost}
             isLoggedIn={isLoggedIn}
             isBusy={isBusy}
             onUpvote={onUpvote}
@@ -240,8 +246,11 @@ export default function PostCard({
         post={post}
         user={user}
         onRequireLogin={onRequireLogin}
-        onCommentCountChange={() => {}}
+        onCommentCountChange={(value) => {
+          setCommentCount((current) => typeof value === "number" ? current + value : current);
+        }}
         onCommentCreated={() => setHasCommented(true)}
+        onCommentsLoaded={(total) => setCommentCount(total)}
       />
 
       <ReportDialog
