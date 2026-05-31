@@ -343,6 +343,13 @@ a {
   border-color: rgba(255, 255, 255, 0.22) !important;
 }
 
+.comment-like-icon-image {
+  width: 15px;
+  height: 15px;
+  display: block;
+  flex-shrink: 0;
+}
+
 .turnstile-shell {
   display: flex;
   justify-content: flex-start;
@@ -1954,20 +1961,6 @@ body::-webkit-scrollbar-thumb,
   margin: 0 !important;
 }
 
-.settings-link-button {
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: #ffffff;
-  padding: 0;
-  text-align: left;
-  cursor: pointer;
-  font: inherit;
-}
-
-.settings-link-button:hover {
-  text-decoration: underline;
-}
 
 .comments-sheet-modal {
   display: flex;

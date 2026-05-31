@@ -3,7 +3,6 @@ import { Avatar, Card, Link, Stack, Typography } from "@mui/joy";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import PostActionBar from "./PostActionBar";
 import PostCommentsSheet from "./PostCommentsSheet";
-import PostFocusDialog from "./PostFocusDialog";
 import ReportDialog from "./ReportDialog";
 import { useAuth } from "../context/AuthContext";
 import usePersistentPostActionState from "../hooks/usePersistentPostActionState";
@@ -43,7 +42,6 @@ export default function PostCard({
   const navigate = useNavigate();
   const { user } = useAuth();
   const [reportOpen, setReportOpen] = useState(false);
-  const [focusOpen, setFocusOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [commentCount, setCommentCount] = useState(post.commentsCount ?? 0);
@@ -72,14 +70,6 @@ export default function PostCard({
     event?.preventDefault?.();
     event?.stopPropagation?.();
     setActiveImageIndex((current) => (current === images.length - 1 ? 0 : current + 1));
-  }
-
-  async function handleCopyLink() {
-    try {
-      await navigator.clipboard.writeText(`${window.location.origin}/${post.id}`);
-    } catch {
-      // no-op; focus mode should stay usable even if clipboard fails
-    }
   }
 
   return (
@@ -142,11 +132,11 @@ export default function PostCard({
               className={`post-media-frame ${isImageOnly ? "is-image-only" : "is-normal"}`}
               role="button"
               tabIndex={0}
-              onClick={() => setFocusOpen(true)}
+              onClick={() => navigate(`/${post.id}`)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {
                   event.preventDefault();
-                  setFocusOpen(true);
+                  navigate(`/${post.id}`);
                 }
               }}
             >
@@ -226,19 +216,6 @@ export default function PostCard({
           />
         </Stack>
       </Card>
-
-      <PostFocusDialog
-        open={focusOpen}
-        onClose={() => setFocusOpen(false)}
-        post={post}
-        images={images}
-        activeImageIndex={activeImageIndex}
-        onPrevious={showPreviousImage}
-        onNext={showNextImage}
-        onShare={() => onShare?.()}
-        onCopyLink={handleCopyLink}
-        onOpenPost={() => navigate(`/${post.id}`)}
-      />
 
       <PostCommentsSheet
         open={commentsOpen}

@@ -5,17 +5,7 @@ import ReportDialog from "./ReportDialog";
 import TurnstileWidget from "./TurnstileWidget";
 
 function CommentLikeIcon({ active = false }) {
-  return (
-    <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-      <path
-        d="M12 20.2l-1.1-1C5.1 14 2 11.2 2 7.8 2 5.2 4.1 3 6.8 3c1.7 0 3.3.8 4.2 2.1C11.9 3.8 13.5 3 15.2 3 17.9 3 20 5.2 20 7.8c0 3.4-3.1 6.2-8.9 11.4l-1.1 1z"
-        fill={active ? "currentColor" : "none"}
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  return <img src={active ? "/action-heart-selected.svg" : "/action-heart.svg"} alt="" aria-hidden="true" className="comment-like-icon-image" />;
 }
 
 function CommentNode({ comment, isLoggedIn, currentUser, onRequireLogin, onReply, onLike, onDelete, depth = 0 }) {

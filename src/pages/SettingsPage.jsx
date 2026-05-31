@@ -1,12 +1,10 @@
 import { Card, Link, Option, Select, Stack, Switch, Typography } from "@mui/joy";
 import { Link as RouterLink } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 import { usePreferences } from "../context/PreferencesContext";
 import { useSeo } from "../hooks/useSeo";
 
 export default function SettingsPage() {
   const { preferences, updatePreference } = usePreferences();
-  const { user, logout } = useAuth();
 
   useSeo({
     title: "Settings - Yimage",
@@ -100,18 +98,9 @@ export default function SettingsPage() {
         <Card variant="outlined" className="content-card settings-card">
           <Stack spacing={1.25}>
             <Typography level="title-lg">Links</Typography>
-            <Link component={RouterLink} to={user ? `/u/${user.username}` : "/login"} underline="hover">Account</Link>
-            <Link component={RouterLink} to="/privacy" underline="hover">Privacy</Link>
-            <Link component={RouterLink} to="/terms" underline="hover">Terms of Service</Link>
             <Link component={RouterLink} to="/guidelines" underline="hover">Community Guidelines</Link>
-            <Link component={RouterLink} to="/contact" underline="hover">Contact / Support</Link>
-            <Link component={RouterLink} to="/impressum" underline="hover">Impressum</Link>
-            <Link component={RouterLink} to="/cookies" underline="hover">Cookie Policy</Link>
-            {user ? (
-              <button type="button" className="settings-link-button" onClick={logout}>
-                Log out
-              </button>
-            ) : null}
+            <Link component={RouterLink} to="/dmca" underline="hover">DMCA</Link>
+            <Link component={RouterLink} to="/cookies" underline="hover">Policy</Link>
           </Stack>
         </Card>
       </Stack>

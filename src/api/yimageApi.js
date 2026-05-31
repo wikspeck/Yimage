@@ -1,3 +1,22 @@
+function sanitizeUiMessage(message, fallback) {
+  const value = String(message || "").trim();
+  if (!value) {
+    return fallback;
+  }
+
+  const lower = value.toLowerCase();
+  if (
+    lower.includes("<!doctype") ||
+    lower.includes("<html") ||
+    lower.includes("cloudflare") ||
+    /\/[a-z0-9_\-/]{6,}/i.test(value)
+  ) {
+    return fallback;
+  }
+
+  return value;
+}
+
 async function readResponse(response) {
   const contentType = response.headers.get("content-type") || "";
 
@@ -12,7 +31,7 @@ async function readResponse(response) {
       const fallbackMessage = response.status >= 500
         ? "Something went wrong loading this section."
         : `Request failed with status ${response.status}.`;
-      throw new Error(data.message || fallbackMessage);
+      throw new Error(sanitizeUiMessage(data.message, fallbackMessage));
     }
 
     return data;
@@ -22,7 +41,7 @@ async function readResponse(response) {
   if (response.status >= 500) {
     throw new Error("Something went wrong loading this section.");
   }
-  throw new Error(text.trim() || `The server returned ${response.status} ${response.statusText || "response"}.`);
+  throw new Error(sanitizeUiMessage(text, `The server returned ${response.status} ${response.statusText || "response"}.`));
 }
 
 async function request(url, init = {}) {
