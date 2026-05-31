@@ -70,9 +70,12 @@ function AppLayout() {
       onSearch={() => navigate("/search")}
       onModeration={() => navigate("/moderation")}
       onSettings={() => navigate("/settings")}
-      onGuidelines={() => navigate("/guidelines")}
+      onTerms={() => navigate("/terms")}
+      onPrivacy={() => navigate("/privacy")}
+      onGuidelines={() => navigate("/community-guidelines")}
+      onContact={() => navigate("/contact")}
       onDmca={() => navigate("/dmca")}
-      onCookies={() => navigate("/cookies")}
+      onImpressum={() => navigate("/impressum")}
       onProfile={() => (user ? navigate(`/u/${user.username}`) : openLogin("/profile"))}
     />
   );
@@ -102,7 +105,8 @@ function AppRoutes() {
                   />
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/signup" element={<SignupPage />} />
-                  <Route path="/guidelines" element={<CommunityGuidelinesPage />} />
+                  <Route path="/guidelines" element={<Navigate to="/community-guidelines" replace />} />
+                  <Route path="/community-guidelines" element={<CommunityGuidelinesPage />} />
                   <Route path="/dmca" element={<DmcaPage />} />
                   <Route path="/cookies" element={<CookiePolicyPage />} />
                   <Route path="/privacy" element={<PrivacyPage />} />

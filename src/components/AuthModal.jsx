@@ -67,7 +67,7 @@ function AuthForm({ mode, nextPath, onSwitchMode, onClose }) {
               I have read and agree to the{" "}
               <RouterLink to="/terms" target="_blank" rel="noreferrer" className="auth-inline-link">Terms of Service</RouterLink>
               {" "}and{" "}
-              <RouterLink to="/guidelines" target="_blank" rel="noreferrer" className="auth-inline-link">Community Guidelines</RouterLink>.
+              <RouterLink to="/community-guidelines" target="_blank" rel="noreferrer" className="auth-inline-link">Community Guidelines</RouterLink>.
             </span>
           )}
           sx={{ alignItems: "flex-start" }}

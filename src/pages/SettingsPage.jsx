@@ -4,11 +4,12 @@ import { usePreferences } from "../context/PreferencesContext";
 import { useSeo } from "../hooks/useSeo";
 
 const LEGAL_LINKS = [
+  { to: "/contact", label: "Contact" },
   { to: "/terms", label: "Terms of Service" },
-  { to: "/guidelines", label: "Community Guidelines" },
+  { to: "/privacy", label: "Privacy Policy" },
+  { to: "/community-guidelines", label: "Community Guidelines" },
   { to: "/dmca", label: "Copyright / DMCA" },
-  { to: "/privacy", label: "Privacy Policy (Placeholder)" },
-  { to: "/impressum", label: "Impressum (Placeholder)" }
+  { to: "/impressum", label: "Impressum" }
 ];
 
 export default function SettingsPage() {

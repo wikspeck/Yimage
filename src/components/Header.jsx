@@ -74,9 +74,12 @@ export default function Header({
   onSearch,
   onModeration,
   onSettings,
+  onTerms,
+  onPrivacy,
   onGuidelines,
+  onContact,
   onDmca,
-  onCookies
+  onImpressum
 }) {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -222,9 +225,12 @@ export default function Header({
               <ModalClose sx={{ position: "static", transform: "none", m: 0, p: 0.5 }} />
             </Stack>
             <MenuRow label="Settings" onClick={() => { setMenuOpen(false); onSettings?.(); }} />
+            <MenuRow label="Terms of Service" onClick={() => { setMenuOpen(false); onTerms?.(); }} />
+            <MenuRow label="Privacy Policy" onClick={() => { setMenuOpen(false); onPrivacy?.(); }} />
             <MenuRow label="Community Guidelines" onClick={() => { setMenuOpen(false); onGuidelines?.(); }} />
+            <MenuRow label="Contact" onClick={() => { setMenuOpen(false); onContact?.(); }} />
             <MenuRow label="DMCA" onClick={() => { setMenuOpen(false); onDmca?.(); }} />
-            <MenuRow label="Cookie Policy" onClick={() => { setMenuOpen(false); onCookies?.(); }} />
+            <MenuRow label="Impressum" onClick={() => { setMenuOpen(false); onImpressum?.(); }} />
           </Stack>
         </Sheet>
       </Modal>

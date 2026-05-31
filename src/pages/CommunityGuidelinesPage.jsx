@@ -6,7 +6,7 @@ export default function CommunityGuidelinesPage() {
   useSeo({
     title: "Community Guidelines - Yimage",
     description: "Read the community rules and platform safety guidelines for posting on Yimage.",
-    canonicalPath: "/guidelines",
+    canonicalPath: "/community-guidelines",
     type: "article"
   });
 
@@ -23,6 +23,20 @@ export default function CommunityGuidelinesPage() {
             <Divider />
 
             <Stack spacing={1}>
+              <Typography level="title-lg">No illegal content</Typography>
+              <Typography level="body-md" textColor="neutral.300">
+                Do not post unlawful material, stolen material, criminal services, or content that violates applicable law.
+              </Typography>
+            </Stack>
+
+            <Stack spacing={1}>
+              <Typography level="title-lg">No spam</Typography>
+              <Typography level="body-md" textColor="neutral.300">
+                Do not flood the platform with repetitive promotions, engagement bait, scams, misleading links, or low-quality uploads meant to manipulate visibility.
+              </Typography>
+            </Stack>
+
+            <Stack spacing={1}>
               <Typography level="title-lg">Respect other users</Typography>
               <Typography level="body-md" textColor="neutral.300">
                 Treat other people like real people. Debate and disagreement are fine, but targeted cruelty, intimidation, and repeated hostile behavior are not.
@@ -33,20 +47,6 @@ export default function CommunityGuidelinesPage() {
               <Typography level="title-lg">No harassment</Typography>
               <Typography level="body-md" textColor="neutral.300">
                 Do not threaten, stalk, bully, or encourage abuse toward others. That includes dogpiling, repeated slurs, sexual harassment, and attempts to shame or frighten people off the platform.
-              </Typography>
-            </Stack>
-
-            <Stack spacing={1}>
-              <Typography level="title-lg">No illegal content</Typography>
-              <Typography level="body-md" textColor="neutral.300">
-                Do not post or promote illegal material, criminal services, or content that puts other people at legal or physical risk.
-              </Typography>
-            </Stack>
-
-            <Stack spacing={1}>
-              <Typography level="title-lg">No spam</Typography>
-              <Typography level="body-md" textColor="neutral.300">
-                Do not flood the platform with repetitive posts, scams, fake engagement, misleading promotions, or low-quality content meant only to game visibility.
               </Typography>
             </Stack>
 
@@ -79,6 +79,20 @@ export default function CommunityGuidelinesPage() {
             </Stack>
 
             <Stack spacing={1}>
+              <Typography level="title-lg">No malicious content</Typography>
+              <Typography level="body-md" textColor="neutral.300">
+                Do not upload malware, phishing material, harmful scripts, or content designed to damage devices, trick users, or interfere with platform security.
+              </Typography>
+            </Stack>
+
+            <Stack spacing={1}>
+              <Typography level="title-lg">No unsafe or abusive uploads</Typography>
+              <Typography level="body-md" textColor="neutral.300">
+                Do not upload material that is exploitative, graphically abusive, or clearly unsafe for the platform. Automated systems and moderators may review uploads that create safety concerns.
+              </Typography>
+            </Stack>
+
+            <Stack spacing={1}>
               <Typography level="title-lg">Moderation process</Typography>
               <Typography level="body-md" textColor="neutral.300">
                 Yimage may use reports, moderator review, and automated systems to flag or review content. Some posts may stay public while reports accumulate, while other posts may move into review immediately if they trigger safety systems.
@@ -89,6 +103,13 @@ export default function CommunityGuidelinesPage() {
               <Typography level="title-lg">Reporting system</Typography>
               <Typography level="body-md" textColor="neutral.300">
                 Use reports honestly and only for real concerns. False, abusive, or retaliatory reporting can itself become a moderation issue.
+              </Typography>
+            </Stack>
+
+            <Stack spacing={1}>
+              <Typography level="title-lg">Follow moderator decisions</Typography>
+              <Typography level="body-md" textColor="neutral.300">
+                Users are expected to respect moderation outcomes. Repeated attempts to evade enforcement, repost removed content, or misuse the platform after warnings can lead to stronger action.
               </Typography>
             </Stack>
           </Stack>

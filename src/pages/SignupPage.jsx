@@ -59,7 +59,7 @@ export default function SignupPage() {
               onChange={(event) => setAcceptedTerms(event.target.checked)}
               label={(
                 <span>
-                  I have read and agree to the <Link to="/terms" target="_blank" rel="noreferrer">Terms of Service</Link> and <Link to="/guidelines" target="_blank" rel="noreferrer">Community Guidelines</Link>.
+                  I have read and agree to the <Link to="/terms" target="_blank" rel="noreferrer">Terms of Service</Link> and <Link to="/community-guidelines" target="_blank" rel="noreferrer">Community Guidelines</Link>.
                 </span>
               )}
               sx={{ alignItems: "flex-start" }}

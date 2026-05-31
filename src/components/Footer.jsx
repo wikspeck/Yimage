@@ -9,9 +9,12 @@ export default function Footer() {
     <Sheet variant="plain" className="app-footer">
       <Stack spacing={1} alignItems="center" justifyContent="center">
         <Stack direction="row" spacing={1.5} useFlexGap flexWrap="wrap" justifyContent="center">
-          <Link component={RouterLink} to="/guidelines" underline="hover">Community Guidelines</Link>
+          <Link component={RouterLink} to="/community-guidelines" underline="hover">Community Guidelines</Link>
+          <Link component={RouterLink} to="/terms" underline="hover">Terms</Link>
+          <Link component={RouterLink} to="/privacy" underline="hover">Privacy</Link>
+          <Link component={RouterLink} to="/contact" underline="hover">Contact</Link>
           <Link component={RouterLink} to="/dmca" underline="hover">DMCA</Link>
-          <Link component={RouterLink} to="/cookies" underline="hover">Cookie Policy</Link>
+          <Link component={RouterLink} to="/impressum" underline="hover">Impressum</Link>
           {user?.isAdmin ? <Link component={RouterLink} to="/moderation" underline="hover">Moderation</Link> : null}
         </Stack>
         <Typography level="body-sm" textColor="neutral.500">

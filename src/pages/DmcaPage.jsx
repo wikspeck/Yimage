@@ -1,4 +1,4 @@
-import { Card, Divider, Stack, Typography } from "@mui/joy";
+import { Card, Divider, Link, Stack, Typography } from "@mui/joy";
 import BackButton from "../components/BackButton";
 import { useSeo } from "../hooks/useSeo";
 
@@ -25,14 +25,15 @@ export default function DmcaPage() {
             <Stack spacing={1}>
               <Typography level="title-lg">How to submit a copyright report</Typography>
               <Typography level="body-md" textColor="neutral.300">
-                Copyright owners or authorized agents can use the reporting tools on Yimage and select `copyright violation`. Placeholder note: add the official email address or webform location for formal notices here.
+                Copyright owners or authorized agents should send copyright reports to{" "}
+                <Link href="mailto:contact@yimage.org" underline="hover">contact@yimage.org</Link>.
               </Typography>
             </Stack>
 
             <Stack spacing={1}>
               <Typography level="title-lg">What to include</Typography>
               <Typography level="body-md" textColor="neutral.300">
-                A report should include enough detail for review, such as the copyrighted work involved, the location of the allegedly infringing content, the name and contact information of the reporting party, and a statement that the complaint is made in good faith.
+                A report should include your name, the URL of the content, proof of ownership, a description of the issue, and reliable contact details so Yimage can review and follow up.
               </Typography>
             </Stack>
 

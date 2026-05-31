@@ -1,4 +1,4 @@
-import { Card, Divider, Stack, Typography } from "@mui/joy";
+import { Card, Divider, Link, Stack, Typography } from "@mui/joy";
 import BackButton from "../components/BackButton";
 import { useSeo } from "../hooks/useSeo";
 
@@ -91,7 +91,8 @@ export default function TermsPage() {
             <Stack spacing={1}>
               <Typography level="title-lg">10. Contact and legal notices</Typography>
               <Typography level="body-md" textColor="neutral.300">
-                Placeholder note: add the official legal contact email, service operator details, and any required regional disclosures here. This section should also identify where users can send formal notices, copyright complaints, and support requests.
+                Users can send support, legal, moderation, and copyright-related inquiries to{" "}
+                <Link href="mailto:contact@yimage.org" underline="hover">contact@yimage.org</Link>. Placeholder note: add the final operator details and any required jurisdiction-specific disclosures here before launch.
               </Typography>
             </Stack>
           </Stack>
