@@ -2002,6 +2002,12 @@ body::-webkit-scrollbar-thumb,
   font-weight: 700;
 }
 
+.auth-inline-link {
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
 .app-primary-button {
   background: #ffffff !important;
   color: #050505 !important;

@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Alert, Button, Input, Modal, ModalClose, Sheet, Stack, Typography } from "@mui/joy";
-import { useNavigate } from "react-router-dom";
+import { Alert, Button, Checkbox, Input, Modal, ModalClose, Sheet, Stack, Typography } from "@mui/joy";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import TurnstileWidget from "./TurnstileWidget";
 import { useAuth } from "../context/AuthContext";
 import { useAuthModal } from "../context/AuthModalContext";
@@ -13,6 +13,7 @@ function AuthForm({ mode, nextPath, onSwitchMode, onClose }) {
   const [password, setPassword] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSignup = mode === "signup";
@@ -24,7 +25,7 @@ function AuthForm({ mode, nextPath, onSwitchMode, onClose }) {
 
     try {
       if (isSignup) {
-        await signup({ username, email, password, turnstileToken });
+        await signup({ username, email, password, turnstileToken, acceptedTerms });
       } else {
         await login({ email, password, turnstileToken });
       }
@@ -57,9 +58,24 @@ function AuthForm({ mode, nextPath, onSwitchMode, onClose }) {
       ) : null}
       <Input placeholder="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} sx={{ borderRadius: "18px" }} />
       <Input placeholder="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} sx={{ borderRadius: "18px" }} />
+      {isSignup ? (
+        <Checkbox
+          checked={acceptedTerms}
+          onChange={(event) => setAcceptedTerms(event.target.checked)}
+          label={(
+            <span>
+              I have read and agree to the{" "}
+              <RouterLink to="/terms" target="_blank" rel="noreferrer" className="auth-inline-link">Terms of Service</RouterLink>
+              {" "}and{" "}
+              <RouterLink to="/guidelines" target="_blank" rel="noreferrer" className="auth-inline-link">Community Guidelines</RouterLink>.
+            </span>
+          )}
+          sx={{ alignItems: "flex-start" }}
+        />
+      ) : null}
       <TurnstileWidget onTokenChange={setTurnstileToken} resetKey={turnstileResetKey} />
 
-      <Button type="submit" loading={isSubmitting} disabled={!turnstileToken} className="app-primary-button" sx={{ borderRadius: "999px" }}>
+      <Button type="submit" loading={isSubmitting} disabled={!turnstileToken || (isSignup && !acceptedTerms)} className="app-primary-button" sx={{ borderRadius: "999px" }}>
         {isSignup ? "Create account" : "Log in"}
       </Button>
 

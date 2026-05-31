@@ -182,12 +182,13 @@ function isSecureRequest(request) {
 
 function buildSessionCookie(request, token, maxAgeSeconds = SESSION_TTL_SECONDS) {
   const secure = isSecureRequest(request) ? "; Secure" : "";
-  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly${secure}; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
+  const expires = new Date(Date.now() + maxAgeSeconds * 1000).toUTCString();
+  return `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly${secure}; SameSite=Lax; Max-Age=${maxAgeSeconds}; Expires=${expires}; Priority=High`;
 }
 
 function clearSessionCookie(request) {
   const secure = isSecureRequest(request) ? "; Secure" : "";
-  return `${SESSION_COOKIE}=; Path=/; HttpOnly${secure}; SameSite=Lax; Max-Age=0`;
+  return `${SESSION_COOKIE}=; Path=/; HttpOnly${secure}; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Priority=High`;
 }
 
 function normalizeText(value) {
@@ -702,6 +703,11 @@ async function ensureTableColumns(env, tableName, expectedColumns) {
 }
 
 async function ensureModerationSchema(env) {
+  await ensureTableColumns(env, "users", [
+    { name: "terms_accepted_at", definition: "terms_accepted_at TEXT" },
+    { name: "guidelines_accepted_at", definition: "guidelines_accepted_at TEXT" }
+  ]);
+
   await ensureTableColumns(env, "posts", [
     { name: "ai_reported", definition: "ai_reported INTEGER NOT NULL DEFAULT 0" },
     { name: "ai_report_reason", definition: "ai_report_reason TEXT NOT NULL DEFAULT ''" },
@@ -1639,6 +1645,7 @@ async function createSession(env, userId) {
 }
 
 async function handleSignup(request, env) {
+  await ensureModerationSchema(env);
   const body = await parseJsonBody(request);
   const turnstileFailure = await verifyTurnstileToken(env, request, body.turnstileToken);
   if (turnstileFailure) {
@@ -1647,6 +1654,7 @@ async function handleSignup(request, env) {
   const username = normalizeUsername(body.username);
   const email = normalizeEmail(body.email);
   const password = String(body.password || "");
+  const acceptedTerms = Boolean(body.acceptedTerms);
   const usernameSafety = assessSafetyRisk({ username });
 
   if (!isValidUsername(username)) {
@@ -1661,6 +1669,9 @@ async function handleSignup(request, env) {
   if (password.length < 8) {
     return fail("Password must be at least 8 characters.");
   }
+  if (!acceptedTerms) {
+    return fail("You must agree to the Terms of Service and Community Guidelines.");
+  }
 
   const existingUser = await env.DB.prepare("SELECT id FROM users WHERE username = ? OR email = ? LIMIT 1")
     .bind(username, email)
@@ -1674,8 +1685,8 @@ async function handleSignup(request, env) {
   const createdAt = toIsoDate();
   const passwordHash = await hashPassword(password);
 
-  await env.DB.prepare("INSERT INTO users (id, username, email, password_hash, created_at, display_name, bio, avatar_url) VALUES (?, ?, ?, ?, ?, ?, '', '')")
-    .bind(userId, username, email, passwordHash, createdAt, username)
+  await env.DB.prepare("INSERT INTO users (id, username, email, password_hash, created_at, display_name, bio, avatar_url, terms_accepted_at, guidelines_accepted_at) VALUES (?, ?, ?, ?, ?, ?, '', '', ?, ?)")
+    .bind(userId, username, email, passwordHash, createdAt, username, createdAt, createdAt)
     .run();
   await runAiTextModeration(env, {
     userId,

@@ -22,6 +22,7 @@ import CookiePolicyPage from "./pages/CookiePolicyPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import TermsPage from "./pages/TermsPage";
 import ContactPage from "./pages/ContactPage";
+import ImpressumPage from "./pages/ImpressumPage";
 
 function RequireAuth({ children }) {
   const { user, isLoading } = useAuth();
@@ -105,6 +106,7 @@ function AppRoutes() {
                   <Route path="/dmca" element={<DmcaPage />} />
                   <Route path="/cookies" element={<CookiePolicyPage />} />
                   <Route path="/privacy" element={<PrivacyPage />} />
+                  <Route path="/impressum" element={<ImpressumPage />} />
                   <Route path="/terms" element={<TermsPage />} />
                   <Route path="/contact" element={<ContactPage />} />
                   <Route

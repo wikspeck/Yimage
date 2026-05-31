@@ -3,6 +3,14 @@ import { Link as RouterLink } from "react-router-dom";
 import { usePreferences } from "../context/PreferencesContext";
 import { useSeo } from "../hooks/useSeo";
 
+const LEGAL_LINKS = [
+  { to: "/terms", label: "Terms of Service" },
+  { to: "/guidelines", label: "Community Guidelines" },
+  { to: "/dmca", label: "Copyright / DMCA" },
+  { to: "/privacy", label: "Privacy Policy (Placeholder)" },
+  { to: "/impressum", label: "Impressum (Placeholder)" }
+];
+
 export default function SettingsPage() {
   const { preferences, updatePreference } = usePreferences();
 
@@ -97,10 +105,12 @@ export default function SettingsPage() {
 
         <Card variant="outlined" className="content-card settings-card">
           <Stack spacing={1.25}>
-            <Typography level="title-lg">Links</Typography>
-            <Link component={RouterLink} to="/guidelines" underline="hover">Community Guidelines</Link>
-            <Link component={RouterLink} to="/dmca" underline="hover">DMCA</Link>
-            <Link component={RouterLink} to="/cookies" underline="hover">Policy</Link>
+            <Typography level="title-lg">Legal</Typography>
+            {LEGAL_LINKS.map((item) => (
+              <Link key={item.to} component={RouterLink} to={item.to} underline="hover">
+                {item.label}
+              </Link>
+            ))}
           </Stack>
         </Card>
       </Stack>

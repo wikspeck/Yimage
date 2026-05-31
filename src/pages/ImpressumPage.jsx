@@ -5,7 +5,7 @@ import { useSeo } from "../hooks/useSeo";
 export default function ImpressumPage() {
   useSeo({
     title: "Impressum - Yimage",
-    description: "Legal notice placeholder for Yimage.",
+    description: "Editable placeholder for Yimage legal notice information.",
     canonicalPath: "/impressum",
     type: "article"
   });
@@ -18,13 +18,7 @@ export default function ImpressumPage() {
           <Stack spacing={1.25}>
             <Typography level="h1">Impressum</Typography>
             <Typography level="body-md" textColor="neutral.300">
-              This is a placeholder Impressum page for Yimage. Replace this text with the final legal notice and company details.
-            </Typography>
-            <Typography level="body-md" textColor="neutral.400">
-              Suggested fields:
-            </Typography>
-            <Typography level="body-md" textColor="neutral.400">
-              Name or company, address, email, phone, authorized representative, VAT information, and any required jurisdiction-specific disclosures.
+              Placeholder note: add the legally required operator details, publishing contact information, and regional disclosure language here before making this page public.
             </Typography>
           </Stack>
         </Card>

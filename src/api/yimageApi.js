@@ -133,13 +133,13 @@ export async function loginUser({ email, password, turnstileToken }) {
   return data.user;
 }
 
-export async function signupUser({ username, email, password, turnstileToken }) {
+export async function signupUser({ username, email, password, turnstileToken, acceptedTerms }) {
   const data = await request("/api/auth/signup", {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ username, email, password, turnstileToken })
+    body: JSON.stringify({ username, email, password, turnstileToken, acceptedTerms })
   });
 
   return data.user;

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert, Button, Card, Input, Stack, Typography } from "@mui/joy";
+import { Alert, Button, Card, Checkbox, Input, Stack, Typography } from "@mui/joy";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import TurnstileWidget from "../components/TurnstileWidget";
@@ -12,6 +12,7 @@ export default function SignupPage() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
   const [error, setError] = useState("");
@@ -23,7 +24,7 @@ export default function SignupPage() {
     setIsSubmitting(true);
 
     try {
-      await signup({ username, email, password, turnstileToken });
+      await signup({ username, email, password, turnstileToken, acceptedTerms });
       navigate(searchParams.get("next") || "/");
     } catch (submitError) {
       setError(submitError.message || "Could not create account.");
@@ -53,9 +54,19 @@ export default function SignupPage() {
             <Input placeholder="Username" value={username} onChange={(event) => setUsername(event.target.value)} sx={{ borderRadius: "18px" }} />
             <Input placeholder="Email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} sx={{ borderRadius: "18px" }} />
             <Input placeholder="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} sx={{ borderRadius: "18px" }} />
+            <Checkbox
+              checked={acceptedTerms}
+              onChange={(event) => setAcceptedTerms(event.target.checked)}
+              label={(
+                <span>
+                  I have read and agree to the <Link to="/terms" target="_blank" rel="noreferrer">Terms of Service</Link> and <Link to="/guidelines" target="_blank" rel="noreferrer">Community Guidelines</Link>.
+                </span>
+              )}
+              sx={{ alignItems: "flex-start" }}
+            />
             <TurnstileWidget onTokenChange={setTurnstileToken} resetKey={turnstileResetKey} />
 
-            <Button type="submit" loading={isSubmitting} disabled={!turnstileToken} className="app-primary-button" sx={{ borderRadius: "999px" }}>
+            <Button type="submit" loading={isSubmitting} disabled={!turnstileToken || !acceptedTerms} className="app-primary-button" sx={{ borderRadius: "999px" }}>
               Create account
             </Button>
 
