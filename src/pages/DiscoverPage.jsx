@@ -139,14 +139,6 @@ export default function DiscoverPage() {
     updateFilters({ mode });
   }
 
-  function resetToHomeFeed() {
-    const next = new URLSearchParams();
-    if (preferences.defaultFeedPostType && preferences.defaultFeedPostType !== "all") {
-      next.set("postType", preferences.defaultFeedPostType);
-    }
-    setSearchParams(next);
-  }
-
   async function handleVote(postId, vote) {
     setBusyPostId(postId);
     setPostsError("");
@@ -293,13 +285,7 @@ export default function DiscoverPage() {
                 ) : null}
               </Stack>
 
-              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                {selectedView === "discover" ? (
-                  <button type="button" className="discover-mode-pill search-filter-pill" onClick={resetToHomeFeed}>
-                    <span className="discover-mode-title">Home</span>
-                  </button>
-                ) : null}
-              </Stack>
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" />
             </Stack>
 
             <div className="feed-divider" />

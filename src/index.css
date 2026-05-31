@@ -936,10 +936,10 @@ body::-webkit-scrollbar-thumb,
 
 .top-brand-bar {
   margin: 0;
-  padding: 8px 0 6px;
+  padding: 0;
   border: 0;
   border-radius: 0;
-  background: transparent;
+  background: inherit !important;
   box-shadow: none;
   backdrop-filter: none;
 }
@@ -1582,7 +1582,7 @@ body::-webkit-scrollbar-thumb,
 }
 
 .top-brand-bar {
-  min-height: 44px;
+  min-height: 0;
   display: flex;
   align-items: center;
 }
@@ -2160,6 +2160,11 @@ body::-webkit-scrollbar-thumb,
   height: 22px;
 }
 
+.action-report .post-action-icon-image {
+  width: 21px;
+  height: 21px;
+}
+
 .action-delete {
   min-width: auto !important;
   padding: 0 12px !important;
@@ -2177,9 +2182,9 @@ body::-webkit-scrollbar-thumb,
 
 @media (max-width: 900px) {
   .top-brand-bar {
-    padding-left: 12px;
-    padding-right: 12px;
-    min-height: 40px;
+    padding-left: 0;
+    padding-right: 0;
+    min-height: 0;
   }
 
   .app-main {
