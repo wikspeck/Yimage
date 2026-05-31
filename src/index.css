@@ -2056,8 +2056,8 @@ body::-webkit-scrollbar-thumb,
 }
 
 .post-action-button.is-active {
-  background: rgba(255, 255, 255, 0.96) !important;
-  color: #0a0a0a !important;
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.78) !important;
 }
 
 .post-action-icon-image {
@@ -2070,7 +2070,7 @@ body::-webkit-scrollbar-thumb,
 .post-action-count {
   font-size: 0.84rem !important;
   font-weight: 700 !important;
-  color: inherit !important;
+  color: #ffffff !important;
   line-height: 1 !important;
 }
 
