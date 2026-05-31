@@ -10,6 +10,7 @@ import ShareDialog from "../components/ShareDialog";
 import ToastNotice from "../components/ToastNotice";
 import { useAuth } from "../context/AuthContext";
 import { useAuthModal } from "../context/AuthModalContext";
+import usePersistentPostActionState from "../hooks/usePersistentPostActionState";
 import { formatFullDate, formatRelativeTime } from "../utils/formatters";
 
 export default function PostPage() {
@@ -30,6 +31,9 @@ export default function PostPage() {
   const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [hasCommented, setHasCommented] = usePersistentPostActionState("comment", postId, user);
+  const [hasDownloaded, setHasDownloaded] = usePersistentPostActionState("download", postId, user);
+  const [hasReported, setHasReported] = usePersistentPostActionState("report", postId, user);
 
   useEffect(() => {
     let isMounted = true;
@@ -313,13 +317,17 @@ export default function PostPage() {
                 onRepost={handleRepost}
                 onShare={handleShare}
                 onReport={() => setReportOpen(true)}
+                onDownload={() => setHasDownloaded(true)}
                 onDelete={handleDeletePost}
                 canDelete={Boolean(user && (user.id === post.userId || user.isAdmin))}
                 onComment={() => setCommentsOpen(true)}
                 onRequireLogin={(mode = "login") => (mode === "signup" ? openSignup(`/${post.id}`) : openLogin(`/${post.id}`))}
                 isCommentsOpen={commentsOpen}
+                hasCommented={hasCommented}
                 isReportOpen={reportOpen}
+                hasReported={hasReported}
                 isShareActive={shareOpen}
+                hasDownloaded={hasDownloaded}
               />
             </div>
 
@@ -366,7 +374,14 @@ export default function PostPage() {
           </Stack>
         </Card>
 
-        <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} targetType="post" targetId={post.id} title="Report post" />
+        <ReportDialog
+          open={reportOpen}
+          onClose={() => setReportOpen(false)}
+          onSubmitted={() => setHasReported(true)}
+          targetType="post"
+          targetId={post.id}
+          title="Report post"
+        />
         <PostCommentsSheet
           open={commentsOpen}
           onClose={() => setCommentsOpen(false)}
@@ -374,6 +389,7 @@ export default function PostPage() {
           user={user}
           onRequireLogin={(mode = "login") => (mode === "signup" ? openSignup(`/${post.id}`) : openLogin(`/${post.id}`))}
           onCommentCountChange={(delta) => setPost((current) => ({ ...current, commentsCount: current.commentsCount + delta }))}
+          onCommentCreated={() => setHasCommented(true)}
         />
         <ShareDialog
           open={shareOpen}

@@ -44,20 +44,25 @@ export default function PostActionBar({
   onShare,
   onReport,
   onComment,
+  onDownload,
   onDelete,
   canDelete = false,
   onRequireLogin,
   isCommentsOpen = false,
+  hasCommented = false,
   isReportOpen = false,
-  isShareActive = false
+  hasReported = false,
+  isShareActive = false,
+  hasDownloaded = false
 }) {
   const [shareFlashActive, setShareFlashActive] = useState(false);
-  const [downloadFlashActive, setDownloadFlashActive] = useState(false);
   const likeCount = post.score ?? post.likeCount ?? 0;
   const commentsCount = post.commentsCount ?? 0;
   const repostCount = post.repostCount ?? 0;
   const isLiked = post.viewerVote === "up";
   const isReposted = Boolean(post.hasReposted);
+  const commentSelected = isCommentsOpen || hasCommented;
+  const reportSelected = isReportOpen || hasReported;
   const shareSelected = isShareActive || shareFlashActive;
 
   useEffect(() => {
@@ -68,15 +73,6 @@ export default function PostActionBar({
     const timeout = window.setTimeout(() => setShareFlashActive(false), 1200);
     return () => window.clearTimeout(timeout);
   }, [isShareActive, shareFlashActive]);
-
-  useEffect(() => {
-    if (!downloadFlashActive) {
-      return undefined;
-    }
-
-    const timeout = window.setTimeout(() => setDownloadFlashActive(false), 1200);
-    return () => window.clearTimeout(timeout);
-  }, [downloadFlashActive]);
 
   function getActionClassName(action, active) {
     return `post-action-button action-${action}${active ? " is-active" : ""}`;
@@ -110,7 +106,7 @@ export default function PostActionBar({
   }
 
   function handleDownload() {
-    setDownloadFlashActive(true);
+    onDownload?.();
   }
 
   return (
@@ -136,10 +132,10 @@ export default function PostActionBar({
           variant="plain"
           color="neutral"
           onClick={() => onComment?.()}
-          className={getActionClassName("comment", isCommentsOpen)}
+          className={getActionClassName("comment", commentSelected)}
           aria-label="Comments"
         >
-          <ActionIcon action="comment" active={isCommentsOpen} />
+          <ActionIcon action="comment" active={commentSelected} />
           <Typography component="span" level="body-sm" className="post-action-count">
             {commentsCount}
           </Typography>
@@ -177,10 +173,10 @@ export default function PostActionBar({
           variant="plain"
           color="neutral"
           onClick={handleDownload}
-          className={getActionClassName("download", downloadFlashActive)}
+          className={getActionClassName("download", hasDownloaded)}
           aria-label="Download"
         >
-          <ActionIcon action="download" active={downloadFlashActive} />
+          <ActionIcon action="download" active={hasDownloaded} />
         </Button>
 
         <Button
@@ -188,10 +184,10 @@ export default function PostActionBar({
           variant="plain"
           color="neutral"
           onClick={handleReport}
-          className={getActionClassName("report", isReportOpen)}
+          className={getActionClassName("report", reportSelected)}
           aria-label="Report"
         >
-          <ActionIcon action="report" active={isReportOpen} />
+          <ActionIcon action="report" active={reportSelected} />
         </Button>
 
         {canDelete ? (

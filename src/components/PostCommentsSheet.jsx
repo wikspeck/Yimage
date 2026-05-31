@@ -29,7 +29,7 @@ function appendReply(comments, reply) {
   });
 }
 
-export default function PostCommentsSheet({ open, onClose, post, user, onRequireLogin, onCommentCountChange }) {
+export default function PostCommentsSheet({ open, onClose, post, user, onRequireLogin, onCommentCountChange, onCommentCreated }) {
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
   const [commentTurnstileToken, setCommentTurnstileToken] = useState("");
@@ -89,6 +89,7 @@ export default function PostCommentsSheet({ open, onClose, post, user, onRequire
       setComments((current) => [...current, comment]);
       setCommentText("");
       onCommentCountChange?.(1);
+      onCommentCreated?.(comment);
     } catch (actionError) {
       setError(actionError.message || "Something went wrong loading this section.");
     } finally {

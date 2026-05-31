@@ -14,7 +14,7 @@ const REPORT_OPTIONS = [
   "other"
 ];
 
-export default function ReportDialog({ open, onClose, targetType, targetId, title = "Report content" }) {
+export default function ReportDialog({ open, onClose, targetType, targetId, title = "Report content", onSubmitted }) {
   const [reason, setReason] = useState("spam");
   const [details, setDetails] = useState("");
   const [claimantName, setClaimantName] = useState("");
@@ -44,6 +44,7 @@ export default function ReportDialog({ open, onClose, targetType, targetId, titl
         copyrightDescription
       });
       setNotice(result.message || "Report submitted.");
+      onSubmitted?.(result);
       setTimeout(() => {
         onClose?.();
         setDetails("");

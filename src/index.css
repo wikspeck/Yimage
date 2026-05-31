@@ -1038,8 +1038,8 @@ body::-webkit-scrollbar-thumb,
   border: 0;
   background: transparent;
   color: #7b7b7b;
-  width: 50px;
-  height: 50px;
+  width: 58px;
+  height: 58px;
   border-radius: 999px;
   display: inline-flex;
   flex-direction: column;
@@ -1052,8 +1052,8 @@ body::-webkit-scrollbar-thumb,
 }
 
 .nav-menu-icon-image {
-  width: 24px;
-  height: 24px;
+  width: 31px;
+  height: 31px;
   object-fit: contain;
   display: block;
 }
@@ -1791,12 +1791,17 @@ body::-webkit-scrollbar-thumb,
 }
 
 .page-shell {
-  width: min(100%, 960px);
+  width: min(100%, 1024px);
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .feed-post-list,
 .profile-post-list {
   align-items: center;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .post-view-shell {
@@ -1804,18 +1809,18 @@ body::-webkit-scrollbar-thumb,
 }
 
 .post-card {
-  width: fit-content;
-  max-width: min(100%, 700px);
-  align-self: flex-start;
+  width: 100%;
+  max-width: 740px;
+  align-self: center;
   margin-inline: auto;
 }
 
 .post-card-normal {
-  max-width: min(100%, 640px);
+  max-width: 700px;
 }
 
 .post-card-image-only {
-  max-width: min(100%, 760px);
+  max-width: 780px;
 }
 
 .post-media-frame {
@@ -2035,9 +2040,9 @@ body::-webkit-scrollbar-thumb,
 }
 
 .post-action-button {
-  min-width: 42px !important;
-  min-height: 42px !important;
-  padding: 0 8px !important;
+  min-width: 46px !important;
+  min-height: 46px !important;
+  padding: 0 10px !important;
   border: 0 !important;
   border-radius: 999px !important;
   background: transparent !important;
@@ -2061,8 +2066,8 @@ body::-webkit-scrollbar-thumb,
 }
 
 .post-action-icon-image {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   display: block;
   flex-shrink: 0;
 }
@@ -2077,13 +2082,13 @@ body::-webkit-scrollbar-thumb,
 .action-heart,
 .action-comment,
 .action-repost {
-  padding-right: 10px !important;
+  padding-right: 12px !important;
 }
 
 .action-share,
 .action-download,
 .action-report {
-  min-width: 42px !important;
+  min-width: 46px !important;
 }
 
 .action-delete {
@@ -2157,8 +2162,8 @@ body::-webkit-scrollbar-thumb,
   }
 
   .nav-menu-button {
-    width: 44px;
-    height: 44px;
+    width: 50px;
+    height: 50px;
     flex-shrink: 0;
   }
 

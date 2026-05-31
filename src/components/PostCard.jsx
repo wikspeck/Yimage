@@ -6,6 +6,7 @@ import PostCommentsSheet from "./PostCommentsSheet";
 import PostFocusDialog from "./PostFocusDialog";
 import ReportDialog from "./ReportDialog";
 import { useAuth } from "../context/AuthContext";
+import usePersistentPostActionState from "../hooks/usePersistentPostActionState";
 import { formatRelativeTime } from "../utils/formatters";
 
 function getPostImages(post) {
@@ -46,6 +47,9 @@ export default function PostCard({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const images = useMemo(() => getPostImages(post), [post]);
+  const [hasCommented, setHasCommented] = usePersistentPostActionState("comment", post.id, user);
+  const [hasDownloaded, setHasDownloaded] = usePersistentPostActionState("download", post.id, user);
+  const [hasReported, setHasReported] = usePersistentPostActionState("report", post.id, user);
   const hasMedia = images.length > 0;
   const isImageOnly = post.postType === "image-only";
   const activeImage = hasMedia ? images[Math.min(activeImageIndex, images.length - 1)] : null;
@@ -202,13 +206,17 @@ export default function PostCard({
             onRepost={onRepost}
             onShare={onShare}
             onReport={() => setReportOpen(true)}
+            onDownload={() => setHasDownloaded(true)}
             onDelete={onDelete}
             canDelete={canDelete}
             onComment={() => setCommentsOpen(true)}
             onRequireLogin={onRequireLogin}
             isCommentsOpen={commentsOpen}
+            hasCommented={hasCommented}
             isReportOpen={reportOpen}
+            hasReported={hasReported}
             isShareActive={isShareActive}
+            hasDownloaded={hasDownloaded}
           />
         </Stack>
       </Card>
@@ -233,9 +241,17 @@ export default function PostCard({
         user={user}
         onRequireLogin={onRequireLogin}
         onCommentCountChange={() => {}}
+        onCommentCreated={() => setHasCommented(true)}
       />
 
-      <ReportDialog open={reportOpen} onClose={() => setReportOpen(false)} targetType="post" targetId={post.id} title="Report post" />
+      <ReportDialog
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        onSubmitted={() => setHasReported(true)}
+        targetType="post"
+        targetId={post.id}
+        title="Report post"
+      />
     </>
   );
 }
