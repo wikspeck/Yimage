@@ -182,8 +182,8 @@ export default function Header({
             <NavItem
               active={isModeration}
               label="Moderation"
-              iconSrc="/nav-options.svg"
-              selectedIconSrc="/nav-options-selected.svg"
+              iconSrc="/action-report.svg"
+              selectedIconSrc="/action-report-selected.svg"
               onClick={onModeration}
             />
           ) : null}

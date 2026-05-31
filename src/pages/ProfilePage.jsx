@@ -396,6 +396,7 @@ export default function ProfilePage() {
                     onHashtagClick={(tag) => navigate(`/?hashtag=${encodeURIComponent(tag)}`)}
                     onAuthorClick={() => navigate(`/u/${post.authorUsername}`)}
                     onRequireLogin={(mode = "login") => (mode === "signup" ? openSignup(`/${post.id}`) : openLogin(`/${post.id}`))}
+                    reviewBanner={isOwnProfile && post.moderationStatus === "under_review" ? "This post is currently being reviewed and is not visible to other users." : ""}
                   />
                 ))}
               </Stack>

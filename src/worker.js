@@ -2444,6 +2444,13 @@ async function handleCreateReport(request, env) {
     riskScore: reportRisk,
     details: details || "User report"
   });
+  if (targetType === "post") {
+    await env.DB.prepare(
+      "UPDATE posts SET moderation_status = CASE WHEN COALESCE(moderation_status, 'active') = 'active' THEN 'under_review' ELSE moderation_status END WHERE id = ?"
+    )
+      .bind(targetId)
+      .run();
+  }
 
   return success({ message: "Report submitted." }, { status: 201 });
 }
@@ -2504,11 +2511,12 @@ async function handleModerationOverview(request, env) {
         MAX(reports.created_at) AS latestReportAt,
         GROUP_CONCAT(DISTINCT reports.reason) AS reasons,
         COALESCE(posts.title, '') AS postTitle,
-        COALESCE(posts.image_url, '') AS postImageUrl,
-        COALESCE(users.username, '') AS authorUsername
+        COALESCE(post_authors.username, '') AS authorUsername,
+        COALESCE(reporters.username, '') AS reporterUsername
       FROM reports
       LEFT JOIN posts ON posts.id = reports.target_id AND reports.target_type = 'post'
-      LEFT JOIN users ON users.id = posts.author_id
+      LEFT JOIN users AS post_authors ON post_authors.id = posts.author_id
+      LEFT JOIN users AS reporters ON reporters.id = reports.reporter_id
       WHERE reports.status = 'open'
       GROUP BY reports.target_type, reports.target_id
       ORDER BY latestReportAt DESC

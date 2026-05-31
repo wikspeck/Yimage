@@ -37,7 +37,8 @@ export default function PostCard({
   canDelete,
   onDelete,
   onRequireLogin,
-  isShareActive = false
+  isShareActive = false,
+  reviewBanner = ""
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -76,6 +77,11 @@ export default function PostCard({
     <>
       <Card variant="outlined" className={`post-card ${isImageOnly ? "post-card-image-only" : "post-card-normal"}`}>
         <Stack spacing={1.05}>
+          {reviewBanner ? (
+            <div className="post-review-banner">
+              {reviewBanner}
+            </div>
+          ) : null}
           <Stack direction="row" justifyContent="space-between" spacing={1.25} alignItems="flex-start">
             <Stack direction="row" spacing={1.1} alignItems="center" sx={{ minWidth: 0 }}>
               <Avatar

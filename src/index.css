@@ -2101,6 +2101,16 @@ body::-webkit-scrollbar-thumb,
   background: rgba(255, 255, 255, 0.08) !important;
 }
 
+.post-review-banner {
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: rgba(196, 31, 31, 0.16);
+  border: 1px solid rgba(255, 99, 99, 0.34);
+  color: #ffb1b1;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .post-action-icon-image {
   width: 20px;
   height: 20px;
