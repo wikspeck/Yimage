@@ -100,7 +100,7 @@ export default function Header({
           <button type="button" className="brand-lockup" onClick={onHome} aria-label="Go to Yimage home">
             <Box
               component="img"
-              src="/yimage-logo-header.svg"
+              src="/Yimarealgelogodark.svg"
               alt="Yimage"
               sx={{
                 width: { xs: 50, sm: 56 },
